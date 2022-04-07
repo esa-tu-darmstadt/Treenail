@@ -9,8 +9,10 @@ import org.junit.jupiter.api.Test;
 
 class AppTest {
   @Test
-  void appHasAGreeting() {
-    App classUnderTest = new App();
-    assertNotNull(classUnderTest.getGreeting(), "app should have a greeting");
+  void parserWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("intro_syntax.core_desc").getPath();
+    assertTrue(appInst.parse(fileName),
+               "app should be able to parse a simple CoreDSL file");
   }
 }

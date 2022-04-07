@@ -3,10 +3,51 @@
  */
 package de.tudarmstadt.esa.treenail;
 
+import com.google.inject.Inject;
+import com.google.inject.Provider;
+import com.minres.coredsl.CoreDslStandaloneSetup;
+import org.eclipse.emf.common.util.URI;
+import org.eclipse.emf.ecore.resource.ResourceSet;
+import org.eclipse.xtext.generator.JavaIoFileSystemAccess;
+import org.eclipse.xtext.util.CancelIndicator;
+import org.eclipse.xtext.validation.CheckMode;
+import org.eclipse.xtext.validation.IResourceValidator;
+
 public class App {
+  @Inject Provider<ResourceSet> resourceSetProvider;
+  @Inject IResourceValidator validator;
+  @Inject JavaIoFileSystemAccess fileAccess;
+
   public String getGreeting() { return "Hello World!"; }
 
+  public boolean parse(String fileName) {
+    var resourceSet = resourceSetProvider.get();
+    var resource = resourceSet.getResource(URI.createFileURI(fileName), true);
+    var issues =
+        validator.validate(resource, CheckMode.ALL, CancelIndicator.NullImpl);
+
+    if (!issues.isEmpty()) {
+      System.err.println("Parsing failed:");
+      issues.forEach(issue -> System.err.println(issues));
+      return false;
+    }
+
+    System.out.println("Dumping contents:");
+    var it = resource.getAllContents();
+    while (it.hasNext())
+      System.out.println(it.next());
+
+    return true;
+  }
+
+  public static App getInstance() {
+    var injector =
+        new CoreDslStandaloneSetup().createInjectorAndDoEMFRegistration();
+    return injector.getInstance(App.class);
+  }
+
   public static void main(String[] args) {
-    System.out.println(new App().getGreeting());
+    assert args.length > 0;
+    getInstance().parse(args[0]);
   }
 }
