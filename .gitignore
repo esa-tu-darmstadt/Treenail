@@ -3,3 +3,9 @@
 
 # Ignore Gradle build output directory
 build
+
+# Ignore VS Code output directory
+bin
+
+# Ignore IDE settings
+.vscode
