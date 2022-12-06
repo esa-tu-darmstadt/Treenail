@@ -12,7 +12,7 @@
     "editor.useTabStops": true,
     "editor.tabSize": 2,
     "editor.formatOnSave": true,
-    "editor.defaultFormatter": "xaver.clang-format",
+    "editor.defaultFormatter": "xaver.clang-format"
   },
 
   "extensions": {
