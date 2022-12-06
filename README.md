@@ -2,13 +2,12 @@
 
 ## Setup
 
-Install the CoreDSL (Xtext) parser in your local Maven repository. You [currently](https://github.com/Minres/CoreDSL/issues/33) need a **Java 11 VM** for this step.
+Pull in the CoreDSL frontend:
 ```
-$ git clone -b develop https://github.com/Minres/CoreDSL.git ; cd CoreDSL
-$ mvn -pl "!com.minres.coredsl.ui.tests" -B install --file pom.xml
+$ git submodule --init update
 ```
 
-From there, Treenail is a standard Gradle project (including the `./gradlew` wrapper), and compatible with newer JVMs as well.
+Treenail is a standard Gradle project (including the `./gradlew` wrapper):
 ```
 $ gradle build
 $ gradle test

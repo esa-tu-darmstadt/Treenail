@@ -12,8 +12,6 @@ plugins {
 }
 
 repositories {
-    // Get CoreDSL from local Maven repository.
-    mavenLocal()
     // Use Maven Central for resolving dependencies.
     mavenCentral()
 }
@@ -23,9 +21,7 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.8.1'
 
     // App dependencies.
-    implementation 'com.google.inject:guice:5.1.0'
-    implementation 'org.eclipse.xtext:org.eclipse.xtext:2.26.0'
-    implementation 'com.minres.coredsl:com.minres.coredsl:2.0.2-SNAPSHOT'
+    implementation 'com.minres.coredsl:com.minres.coredsl'
 }
 
 application {
