@@ -1,3 +1,4 @@
+# This file is a template, and might need editing before it works on your project.
 # You can copy and paste this template into a new `.gitlab-ci.yml` file.
 # You should not add this template to an existing `.gitlab-ci.yml` file by using the `include:` keyword.
 # To contribute improvements to CI/CD templates, please follow the Development guide at:
@@ -17,6 +18,7 @@ image: gradle:alpine
 # isolated from any previous builds.
 variables:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  GIT_SUBMODULE_STRATEGY: normal
 
 before_script:
   - GRADLE_USER_HOME="$(pwd)/.gradle"
