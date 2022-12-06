@@ -4,7 +4,7 @@
 
 Pull in the CoreDSL frontend:
 ```
-$ git submodule --init update
+$ git submodule update --init
 ```
 
 Treenail is a standard Gradle project (including the `./gradlew` wrapper):
