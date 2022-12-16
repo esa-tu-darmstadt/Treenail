@@ -6,6 +6,8 @@ package de.tudarmstadt.esa.treenail;
 import com.google.inject.Inject;
 import com.google.inject.Provider;
 import com.minres.coredsl.CoreDslStandaloneSetup;
+import com.minres.coredsl.coreDsl.DescriptionContent;
+import de.tudarmstadt.esa.treenail.codegen.LongnailCodegen;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.xtext.generator.JavaIoFileSystemAccess;
@@ -18,9 +20,7 @@ public class App {
   @Inject IResourceValidator validator;
   @Inject JavaIoFileSystemAccess fileAccess;
 
-  public String getGreeting() { return "Hello World!"; }
-
-  public boolean parse(String fileName) {
+  public DescriptionContent parse(String fileName) {
     var resourceSet = resourceSetProvider.get();
     var resource = resourceSet.getResource(URI.createFileURI(fileName), true);
     var issues =
@@ -28,16 +28,16 @@ public class App {
 
     if (!issues.isEmpty()) {
       System.err.println("Parsing failed:");
-      issues.forEach(issue -> System.err.println(issues));
-      return false;
+      issues.forEach(System.err::println);
+      return null;
     }
 
-    System.out.println("Dumping contents:");
-    var it = resource.getAllContents();
-    while (it.hasNext())
-      System.out.println(it.next());
+    return (DescriptionContent)resource.getContents().get(0);
+  }
 
-    return true;
+  public String generateMLIR(DescriptionContent content) {
+    var codegen = new LongnailCodegen();
+    return codegen.emit(content);
   }
 
   public static App getInstance() {
@@ -48,6 +48,9 @@ public class App {
 
   public static void main(String[] args) {
     assert args.length > 0;
-    getInstance().parse(args[0]);
+    var app = getInstance();
+    var content = app.parse(args[0]);
+    if (content != null)
+      System.out.println(app.generateMLIR(content));
   }
 }

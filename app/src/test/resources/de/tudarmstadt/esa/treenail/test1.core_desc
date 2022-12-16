@@ -1,0 +1,19 @@
+InstructionSet Test1 {
+  architectural_state {
+    register unsigned<32> X[32] [[is_main_reg]];
+    register unsigned<17> Y;
+  }
+
+  instructions {
+    Inst1 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        unsigned<32> x = imm;
+        unsigned<32> y = Y;
+        X[rd] = x;
+        X[rd] = y;
+      }
+    }
+  }
+}
+

@@ -29,6 +29,10 @@ application {
     mainClass = 'de.tudarmstadt.esa.treenail.App'
 }
 
+run {
+    enableAssertions = true
+}
+
 tasks.named('test') {
     // Use JUnit Platform for unit tests.
     useJUnitPlatform()

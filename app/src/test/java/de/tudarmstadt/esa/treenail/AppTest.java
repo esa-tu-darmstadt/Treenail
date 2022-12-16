@@ -12,7 +12,17 @@ class AppTest {
   void parserWorks() {
     var appInst = App.getInstance();
     var fileName = getClass().getResource("intro_syntax.core_desc").getPath();
-    assertTrue(appInst.parse(fileName),
-               "app should be able to parse a simple CoreDSL file");
+    assertNotNull(appInst.parse(fileName),
+                  "app should be able to parse a simple CoreDSL file");
+  }
+
+  @Test
+  void codegenWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("test1.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    assertNotNull(content, "app should be able to parse a simple CoreDSL file");
+    assertTrue(appInst.generateMLIR(content).startsWith("module @Test1"),
+               "app should be able to generate MLIR");
   }
 }
