@@ -2,10 +2,10 @@ package de.tudarmstadt.esa.treenail.codegen;
 
 import static java.lang.String.format;
 
-import com.minres.coredsl.coreDsl.ArrayAccessExpression;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.EntityReference;
+import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
@@ -62,7 +62,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                      cast(newValue, type), type));
   }
 
-  private void store(ArrayAccessExpression access, MLIRValue newValue) {
+  private void store(IndexAccessExpression access, MLIRValue newValue) {
     var arrayReference = access.getTarget();
     assert arrayReference instanceof EntityReference;
 
@@ -88,8 +88,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var lhs = assign.getTarget();
     if (lhs instanceof EntityReference)
       store((EntityReference)lhs, rhs);
-    else if (lhs instanceof ArrayAccessExpression)
-      store((ArrayAccessExpression)lhs, rhs);
+    else if (lhs instanceof IndexAccessExpression)
+      store((IndexAccessExpression)lhs, rhs);
     else
       assert false : "NYI: Lvalue other than entity or array access";
 
@@ -123,7 +123,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   }
 
   @Override
-  public MLIRValue caseArrayAccessExpression(ArrayAccessExpression access) {
+  public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
     var arrayReference = access.getTarget();
     assert arrayReference instanceof EntityReference;
 

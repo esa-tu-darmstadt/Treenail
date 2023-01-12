@@ -10,6 +10,7 @@ import com.minres.coredsl.coreDsl.DescriptionContent;
 import de.tudarmstadt.esa.treenail.codegen.LongnailCodegen;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.ResourceSet;
+import org.eclipse.xtext.diagnostics.Severity;
 import org.eclipse.xtext.generator.JavaIoFileSystemAccess;
 import org.eclipse.xtext.util.CancelIndicator;
 import org.eclipse.xtext.validation.CheckMode;
@@ -26,7 +27,8 @@ public class App {
     var issues =
         validator.validate(resource, CheckMode.ALL, CancelIndicator.NullImpl);
 
-    if (!issues.isEmpty()) {
+    if (!issues.isEmpty() &&
+        issues.stream().anyMatch(i -> i.getSeverity() != Severity.INFO)) {
       System.err.println("Parsing failed:");
       issues.forEach(System.err::println);
       return null;
