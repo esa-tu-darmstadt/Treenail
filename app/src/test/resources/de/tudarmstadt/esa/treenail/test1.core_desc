@@ -14,6 +14,15 @@ InstructionSet Test1 {
         X[rd] = y;
       }
     }
+
+    Inst2 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        X[rd] = (unsigned) (imm + 42 - 1 * 3 / 7 % 15);
+        signed<100> xxx = imm & 20'hFFFFF | 0 ^ 20'hCCCCC << 5 >> 17;
+        X[rd] = (unsigned<32>) ~xxx;
+      }
+    }
   }
 }
 

@@ -6,14 +6,19 @@ import static java.lang.String.format;
 import com.minres.coredsl.analysis.ElaborationContext;
 import com.minres.coredsl.analysis.ElaborationContext.NodeInfo;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
+import com.minres.coredsl.coreDsl.CastExpression;
 import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
+import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
+import com.minres.coredsl.coreDsl.ParenthesisExpression;
+import com.minres.coredsl.coreDsl.PrefixExpression;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.CoreDslType;
 import com.minres.coredsl.type.IntegerType;
+import java.util.AbstractMap;
 import java.util.Map;
 import org.eclipse.emf.ecore.EObject;
 
@@ -110,7 +115,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue caseIntegerConstant(IntegerConstant konst) {
     var type = mapType(getType(konst));
-    var value = getConstValue(konst);
+    // TODO: var value = getConstValue(konst);
+    var value = konst.getValue().intValue();
     var result = makeAnonymousValue(type);
     sb.append(format("%s = hwarith.constant %d : %s\n", result, value, type));
     return result;
@@ -149,5 +155,78 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     sb.append(format("%s = coredsl.get @%s[%s : %s] : %s\n", result,
                      arrayEntity.getName(), index, index.type, elementType));
     return result;
+  }
+
+  private static AbstractMap.SimpleEntry<String, String> mapping(String coreDsl,
+                                                                 String mlir) {
+    return new AbstractMap.SimpleEntry<String, String>(coreDsl, mlir);
+  }
+  private static final Map<String, String> operatorMap =
+      Map.ofEntries(mapping("+", "hwarith.add"), mapping("-", "hwarith.sub"),
+                    mapping("*", "hwarith.mul"), mapping("/", "hwarith.div"),
+                    mapping("%", "coredsl.mod"), mapping("&", "coredsl.and"),
+                    mapping("|", "coredsl.or"), mapping("^", "coredsl.xor"),
+                    mapping("<<", "coredsl.shift_left"),
+                    mapping(">>", "coredsl.shift_right"));
+
+  private void emitBinaryOp(String op, MLIRValue res, MLIRValue lhs,
+                            MLIRValue rhs) {
+    if (op.startsWith("hwarith."))
+      sb.append(format("%s = %s %s, %s : (%s, %s) -> %s\n", res, op, lhs, rhs,
+                       lhs.type, rhs.type, res.type));
+    else
+      sb.append(format("%s = %s %s, %s : %s, %s\n", res, op, lhs, rhs, lhs.type,
+                       rhs.type));
+  }
+
+  @Override
+  public MLIRValue caseInfixExpression(InfixExpression expr) {
+    var lhs = doSwitch(expr.getLeft());
+    var rhs = doSwitch(expr.getRight());
+    var res = makeAnonymousValue(mapType(getType(expr)));
+
+    var op = operatorMap.get(expr.getOperator());
+    assert op != null : "NYI: operator " + expr.getOperator();
+    emitBinaryOp(op, res, lhs, rhs);
+
+    return res;
+  }
+
+  @Override
+  public MLIRValue casePrefixExpression(PrefixExpression expr) {
+    var oprnd = doSwitch(expr.getOperand());
+    var type = mapType(getType(expr));
+    var res = makeAnonymousValue(type);
+
+    // The target dialect don't have unary operations, hence we must construct
+    // equivalent binary operations here.
+    var zero = makeAnonymousValue(type);
+    sb.append(format("%s = hwarith.constant 0 : %s\n", zero, type));
+
+    // TODO: ! -> cmp, - -> sub. Encountered type mismatches.
+    assert expr.getOperator().equals("~")
+        : "NYI: operator " +
+        expr.getOperator();
+    emitBinaryOp("coredsl.xor", res, zero, oprnd);
+
+    return res;
+  }
+
+  @Override
+  public MLIRValue caseCastExpression(CastExpression cast) {
+    var source = doSwitch(cast.getOperand());
+    var type = mapType(getType(cast));
+    return cast(source, type);
+  }
+
+  @Override
+  public MLIRValue caseParenthesisExpression(ParenthesisExpression expr) {
+    return doSwitch(expr.getInner());
+  }
+
+  @Override
+  public MLIRValue defaultCase(EObject obj) {
+    sb.append("// unhandled: ").append(obj).append('\n');
+    return makeAnonymousValue(MLIRType.getType(1, false));
   }
 }
