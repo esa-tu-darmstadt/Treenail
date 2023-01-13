@@ -1,5 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import com.minres.coredsl.analysis.ElaborationContext;
+import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
@@ -10,14 +12,18 @@ import java.util.Map;
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
+  private final ElaborationContext ctx;
   private final Map<NamedEntity, MLIRValue> values;
   private final StringBuilder sb;
+
   private final ExpressionSwitch exprSwitch;
 
-  StatementSwitch(Map<NamedEntity, MLIRValue> values, StringBuilder sb) {
+  StatementSwitch(ElaborationContext ctx, Map<NamedEntity, MLIRValue> values,
+                  StringBuilder sb) {
+    this.ctx = ctx;
     this.values = values;
     this.sb = sb;
-    exprSwitch = new ExpressionSwitch(values, sb);
+    exprSwitch = new ExpressionSwitch(ctx, values, sb);
   }
 
   @Override
@@ -31,13 +37,13 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   @Override
   public Object caseDeclarationStatement(DeclarationStatement declStmt) {
     var decl = declStmt.getDeclaration();
-    assert decl.getStorage().isEmpty()
-        : "Local variables have no storage class";
     assert decl.getQualifiers().isEmpty()
         : "NYI: Const/volatile for local variables";
 
     for (var dtor : decl.getDeclarators()) {
-      assert dtor.getDimensions().isEmpty();
+      var nfo = ctx.getNodeInfo(dtor);
+      assert nfo.getStorage() == StorageClass.local;
+      assert nfo.getType().isIntegerType() : "NYI: Local arrays";
       var init = dtor.getInitializer();
       if (init == null) {
         // TODO: better handling for undefined values
@@ -61,7 +67,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
   @Override
   public Object defaultCase(EObject obj) {
-    sb.append(obj).append('\n');
+    sb.append("// unhandled: ").append(obj).append('\n');
     return this;
   }
 }

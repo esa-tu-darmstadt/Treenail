@@ -1,5 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import com.minres.coredsl.type.CoreDslType;
+import com.minres.coredsl.type.IntegerType;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -22,6 +24,12 @@ class MLIRType {
       map.put(width, new MLIRType(width, isSigned));
     }
     return map.get(width);
+  }
+
+  static MLIRType mapType(CoreDslType type) {
+    assert type.isIntegerType();
+    var intType = (IntegerType)type;
+    return getType(intType.getBitSize(), intType.isSigned());
   }
 
   public String toString() { return (isSigned ? "si" : "ui") + width; }

@@ -1,36 +1,47 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
 
+import com.minres.coredsl.analysis.ElaborationContext;
+import com.minres.coredsl.analysis.ElaborationContext.NodeInfo;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
-import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
-import com.minres.coredsl.util.BigIntegerWithRadix;
+import com.minres.coredsl.type.ArrayType;
+import com.minres.coredsl.type.CoreDslType;
+import com.minres.coredsl.type.IntegerType;
 import java.util.Map;
+import org.eclipse.emf.ecore.EObject;
 
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
+  private final ElaborationContext ctx;
   private final Map<NamedEntity, MLIRValue> values;
   private final StringBuilder sb;
-  private final TypeSwitch typeSwitch;
 
   private int anonymousValueCounter = 0;
 
-  ExpressionSwitch(Map<NamedEntity, MLIRValue> values, StringBuilder sb) {
+  ExpressionSwitch(ElaborationContext ctx, Map<NamedEntity, MLIRValue> values,
+                   StringBuilder sb) {
+    this.ctx = ctx;
     this.values = values;
     this.sb = sb;
-    this.typeSwitch = new TypeSwitch();
   }
 
-  private MLIRType getType(NamedEntity entity) {
-    var container = entity.eContainer();
-    if (container == null || !(container instanceof Declaration))
-      return null;
-
-    return typeSwitch.doSwitch(((Declaration)container).getType());
+  private NodeInfo getInfo(EObject obj) { return ctx.getNodeInfo(obj); }
+  private CoreDslType getType(EObject obj) { return getInfo(obj).getType(); }
+  private IntegerType getElementType(NamedEntity ent) {
+    var type = getType(ent);
+    assert type.isArrayType();
+    var arrayType = (ArrayType)type;
+    assert arrayType.elementType.isIntegerType();
+    return (IntegerType)arrayType.elementType;
+  }
+  private int getConstValue(EObject obj) {
+    return getInfo(obj).getValue().value.intValue();
   }
 
   private MLIRValue makeAnonymousValue(MLIRType type) {
@@ -57,7 +68,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     // Otherwise, we update an architectural state element and have to emit a
     // `coredsl.set`.
-    var type = getType(entity);
+    var type = mapType(getType(entity));
     sb.append(format("coredsl.set @%s = %s : %s\n", entity.getName(),
                      cast(newValue, type), type));
   }
@@ -74,7 +85,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     // We are accessing an array-like architectural state element. Doesn't
     // matter whether it is a register or address space.
-    var elementType = getType(arrayEntity);
+    var elementType = mapType(getElementType(arrayEntity));
     sb.append(format("coredsl.set @%s[%s : %s] = %s : %s\n",
                      arrayEntity.getName(), index, index.type,
                      cast(newValue, elementType), elementType));
@@ -98,12 +109,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   @Override
   public MLIRValue caseIntegerConstant(IntegerConstant konst) {
-    var bigInt = (BigIntegerWithRadix)konst.getValue();
-    var type = MLIRType.getType(
-        bigInt.getSize(), bigInt.getType() == BigIntegerWithRadix.TYPE.SIGNED);
+    var type = mapType(getType(konst));
+    var value = getConstValue(konst);
     var result = makeAnonymousValue(type);
-    sb.append(format("%s = hwarith.constant %d : %s\n", result,
-                     bigInt.intValue(), type));
+    sb.append(format("%s = hwarith.constant %d : %s\n", result, value, type));
     return result;
   }
 
@@ -115,7 +124,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return values.get(entity);
 
     // Otherwise, emit a `coredsl.get`.
-    var type = getType(entity);
+    var type = mapType(getType(entity));
     var result = makeAnonymousValue(type);
     sb.append(
         format("%s = coredsl.get @%s : %s\n", result, entity.getName(), type));
@@ -135,7 +144,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     // We are accessing an array-like architectural state element. Doesn't
     // matter whether it is a register or address space.
-    var elementType = getType(arrayEntity);
+    var elementType = mapType(getElementType(arrayEntity));
     var result = makeAnonymousValue(elementType);
     sb.append(format("%s = coredsl.get @%s[%s : %s] : %s\n", result,
                      arrayEntity.getName(), index, index.type, elementType));
