@@ -92,24 +92,90 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     return result;
   }
 
-  @Override
-  public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
-    var arrayReference = access.getTarget();
-    assert arrayReference instanceof EntityReference;
+  private MLIRValue handleSingleBitAccess(IndexAccessExpression access) {
+    var target = doSwitch(access.getTarget());
 
-    var arrayEntity = ((EntityReference)arrayReference).getTarget();
-    assert !cc.hasValue(arrayEntity) : "NYI: Local arrays";
+    // FIXME: Node info not set for access
+    // var type = mapType(cc.getType(access));
+    var type = MLIRType.getType(1, false);
+    var result = cc.makeAnonymousValue(type);
+    // FIXME: Constant value not set for integerConstant
+    // var indexInfo = cc.getInfo(access.getIndex());
+    // if (indexInfo.getValue().isValid()) {
+    if (access.getIndex() instanceof IntegerConstant) {
+      var constIndex =
+          ((IntegerConstant)access.getIndex()).getValue().intValue();
+      cc.emitLn("%s = coredsl.bitextract %s[%d] : (%s) -> %s", result, target,
+                constIndex, target.type, type);
+      return result;
+    }
 
-    // Evaluate the index expression.
     var index = doSwitch(access.getIndex());
+    cc.emitLn("%s = coredsl.bitextract %s[%s : %s] : (%s) -> %s", result,
+              target, index, index.type, target.type, type);
+
+    return result;
+  }
+
+  private MLIRValue handleBitRangeAccess(IndexAccessExpression access) {
+    var target = doSwitch(access.getTarget());
+    assert access.getIndex() instanceof IntegerConstant &&
+        access.getEndIndex() instanceof IntegerConstant
+        : "NYI: Variable bit-ranges";
+
+    var from = ((IntegerConstant)access.getIndex()).getValue().intValue();
+    var to = ((IntegerConstant)access.getEndIndex()).getValue().intValue();
+
+    // FIXME: Node info not set for access
+    var type = MLIRType.getType(Math.abs(from - to) + 1, false);
+    var result = cc.makeAnonymousValue(type);
+    cc.emitLn("%s = coredsl.bitextract %s[%d:%d] : (%s) -> %s", result, target,
+              from, to, target.type, type);
+
+    return result;
+  }
+
+  private MLIRValue handleSingleElementAccess(IndexAccessExpression access) {
+    assert access.getTarget() instanceof EntityReference
+        : "NYI: Element access into a temporary object";
+    var entity = ((EntityReference)access.getTarget()).getTarget();
+    assert !cc.hasValue(entity) : "NYI: Element access into local arrays";
 
     // We are accessing an array-like architectural state element. Doesn't
     // matter whether it is a register or address space.
-    var elementType = mapType(cc.getElementType(arrayEntity));
+    var elementType = mapType(cc.getElementType(entity));
     var result = cc.makeAnonymousValue(elementType);
-    cc.emitLn("%s = coredsl.get @%s[%s : %s] : %s", result,
-              arrayEntity.getName(), index, index.type, elementType);
+    var index = doSwitch(access.getIndex());
+    cc.emitLn("%s = coredsl.get @%s[%s : %s] : %s", result, entity.getName(),
+              index, index.type, elementType);
+
     return result;
+  }
+
+  private MLIRValue handleElementRangeAccess(IndexAccessExpression access) {
+    assert false : "NYI: Address space range access";
+    return null;
+  }
+
+  @Override
+  public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
+    // An innocuous `[...]` expression has different lowerings depending on the
+    // type of the expression that is indexed into, and the presence of an end
+    // index (i.e. it's a range index).
+
+    var targetType = cc.getType(access.getTarget());
+    // It's a bit-level access if we're indexing into a scalar.
+    if (targetType.isIntegerType()) {
+      if (access.getEndIndex() != null)
+        return handleBitRangeAccess(access);
+      return handleSingleBitAccess(access);
+    }
+
+    // Otherwise, we indexing into an array and retrieve one or more elements.
+    assert targetType.isArrayType();
+    if (access.getEndIndex() != null)
+      return handleElementRangeAccess(access);
+    return handleSingleElementAccess(access);
   }
 
   private static AbstractMap.SimpleEntry<String, String> m(String coreDsl,

@@ -30,6 +30,15 @@ InstructionSet Test1 {
         X[rd] = imm > 0 | (unsigned)(-imm) | !imm | ~imm;
       }
     }
+
+    Inst4 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        unsigned<3> idx = 1;
+        X[rd] = imm[2] + imm[idx];
+        X[rd] = X[imm[5:1]];
+      }
+    }
   }
 }
 
