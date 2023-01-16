@@ -42,11 +42,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private MLIRValue storeSingleBit(MLIRValue oldValue, Expression indexExpr,
                                    MLIRValue newValue) {
     var result = cc.makeAnonymousValue(oldValue.type);
-    if (indexExpr instanceof IntegerConstant) {
-      var constIndex = ((IntegerConstant)indexExpr).getValue().intValue();
+    if (cc.isConstant(indexExpr)) {
       cc.emitLn("%s = coredsl.bitset %s[%d] = %s: (%s, %s) -> %s", result,
-                oldValue, constIndex, newValue, oldValue.type, newValue.type,
-                result.type);
+                oldValue, cc.getConstantValue(indexExpr), newValue,
+                oldValue.type, newValue.type, result.type);
       return result;
     }
 
@@ -60,11 +59,11 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   private MLIRValue storeBitRange(MLIRValue oldValue, Expression fromExpr,
                                   Expression toExpr, MLIRValue newValue) {
-    assert fromExpr instanceof IntegerConstant &&
-        toExpr instanceof IntegerConstant : "NYI: Variable bit-ranges";
+    assert cc.isConstant(fromExpr) && cc.isConstant(toExpr)
+        : "NYI: Variable bit-ranges";
 
-    var from = ((IntegerConstant)fromExpr).getValue().intValue();
-    var to = ((IntegerConstant)toExpr).getValue().intValue();
+    var from = cc.getConstantValue(fromExpr);
+    var to = cc.getConstantValue(toExpr);
 
     var result = cc.makeAnonymousValue(oldValue.type);
     var rangeType = MLIRType.getType(Math.abs(from - to) + 1, false);
@@ -153,8 +152,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue caseIntegerConstant(IntegerConstant konst) {
     var type = mapType(cc.getType(konst));
-    // TODO: var value = getConstValue(konst);
-    var value = konst.getValue().intValue();
+    var value = cc.getConstantValue(konst);
     return cc.makeConst(value, type);
   }
 
@@ -173,24 +171,18 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   }
 
   private MLIRValue handleSingleBitAccess(IndexAccessExpression access) {
+    var indexExpr = access.getIndex();
     var target = doSwitch(access.getTarget());
 
-    // FIXME: Node info not set for access
-    // var type = mapType(cc.getType(access));
-    var type = MLIRType.getType(1, false);
+    var type = mapType(cc.getType(access));
     var result = cc.makeAnonymousValue(type);
-    // FIXME: Constant value not set for integerConstant
-    // var indexInfo = cc.getInfo(access.getIndex());
-    // if (indexInfo.getValue().isValid()) {
-    if (access.getIndex() instanceof IntegerConstant) {
-      var constIndex =
-          ((IntegerConstant)access.getIndex()).getValue().intValue();
+    if (cc.isConstant(indexExpr)) {
       cc.emitLn("%s = coredsl.bitextract %s[%d] : (%s) -> %s", result, target,
-                constIndex, target.type, type);
+                cc.getConstantValue(indexExpr), target.type, type);
       return result;
     }
 
-    var index = doSwitch(access.getIndex());
+    var index = doSwitch(indexExpr);
     cc.emitLn("%s = coredsl.bitextract %s[%s : %s] : (%s) -> %s", result,
               target, index, index.type, target.type, type);
 
@@ -198,16 +190,17 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   }
 
   private MLIRValue handleBitRangeAccess(IndexAccessExpression access) {
-    var target = doSwitch(access.getTarget());
-    assert access.getIndex() instanceof IntegerConstant &&
-        access.getEndIndex() instanceof IntegerConstant
+    var fromExpr = access.getIndex();
+    var toExpr = access.getEndIndex();
+    assert cc.isConstant(fromExpr) && cc.isConstant(toExpr)
         : "NYI: Variable bit-ranges";
 
-    var from = ((IntegerConstant)access.getIndex()).getValue().intValue();
-    var to = ((IntegerConstant)access.getEndIndex()).getValue().intValue();
+    var target = doSwitch(access.getTarget());
 
-    // FIXME: Node info not set for access
-    var type = MLIRType.getType(Math.abs(from - to) + 1, false);
+    var from = cc.getConstantValue(fromExpr);
+    var to = cc.getConstantValue(toExpr);
+
+    var type = mapType(cc.getType(access));
     var result = cc.makeAnonymousValue(type);
     cc.emitLn("%s = coredsl.bitextract %s[%d:%d] : (%s) -> %s", result, target,
               from, to, target.type, type);

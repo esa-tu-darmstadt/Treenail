@@ -68,6 +68,22 @@ InstructionSet Test1 {
           Y = (unsigned) y;
       }
     }
+
+    Inst7 {
+      encoding: 0b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {              
+        signed<8> op1_0 = (signed) X[rs1][ 7: 0];
+        signed<8> op1_1 = (signed) X[rs1][15: 8];
+        signed<8> op2_0 = (signed) X[rs2][ 7: 0];
+        signed<8> op2_1 = (signed) X[rs2][15: 8];
+        signed<32> op3 = (signed) X[rd];
+        signed<16> mul0 = op1_0 * op2_0;
+        signed<16> mul1 = op1_1 * op2_1;
+        signed<17> sum_tmp = mul0 + mul1;
+        signed<33> result = op3 + sum_tmp;
+        if(rd != 0) X[rd] = result[31:0];
+      }
+    }
   }
 }
 

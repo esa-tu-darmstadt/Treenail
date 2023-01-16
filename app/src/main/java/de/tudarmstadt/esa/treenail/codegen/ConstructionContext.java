@@ -1,7 +1,9 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.ElaborationContext;
 import com.minres.coredsl.analysis.ElaborationContext.NodeInfo;
+import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.CoreDslType;
@@ -32,6 +34,13 @@ class ConstructionContext {
   NodeInfo getInfo(EObject obj) { return ctx.getNodeInfo(obj); }
 
   CoreDslType getType(EObject obj) { return getInfo(obj).getType(); }
+
+  boolean isConstant(Expression expr) { return getInfo(expr).isValueSet(); }
+
+  // FIXME: should really switch to using the BigIntegers here.
+  int getConstantValue(Expression expr) {
+    return getInfo(expr).getValue().getValue().intValue();
+  }
 
   IntegerType getElementType(NamedEntity ent) {
     var type = getType(ent);
