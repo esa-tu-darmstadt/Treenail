@@ -27,8 +27,7 @@ public class App {
     var issues =
         validator.validate(resource, CheckMode.ALL, CancelIndicator.NullImpl);
 
-    if (!issues.isEmpty() &&
-        issues.stream().anyMatch(i -> i.getSeverity() != Severity.INFO)) {
+    if (issues.stream().anyMatch(i -> i.getSeverity() == Severity.ERROR)) {
       System.err.println("Parsing failed:");
       issues.forEach(System.err::println);
       return null;

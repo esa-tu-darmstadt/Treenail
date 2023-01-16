@@ -153,13 +153,13 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   public void acceptInfo(String message, EObject object,
                          EStructuralFeature feature, int index, String code,
                          String... issueData) {
-    System.err.println("[INFO] " + message + " " + object);
+    // System.err.println("[INFO] " + message + " " + object);
   }
 
   @Override
   public void acceptInfo(String message, EObject object, int offset, int length,
                          String code, String... issueData) {
-    System.err.println("[INFO] " + message + " " + object);
+    // System.err.println("[INFO] " + message + " " + object);
   }
 
   @Override
