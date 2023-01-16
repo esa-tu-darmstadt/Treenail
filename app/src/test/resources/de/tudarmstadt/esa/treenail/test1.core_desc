@@ -43,6 +43,14 @@ InstructionSet Test1 {
         Y[16:4] = 3'd5;
       }
     }
+
+    Inst5 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        signed<100> xxx = imm;
+        X[rd] = (unsigned<32>) (xxx :: 1 :: imm :: -1);
+      }
+    }
   }
 }
 

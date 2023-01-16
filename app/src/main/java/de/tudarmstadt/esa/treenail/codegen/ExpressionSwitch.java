@@ -4,6 +4,7 @@ import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 
 import com.minres.coredsl.coreDsl.AssignmentExpression;
 import com.minres.coredsl.coreDsl.CastExpression;
+import com.minres.coredsl.coreDsl.ConcatenationExpression;
 import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
@@ -313,6 +314,23 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       assert false : "NYI: operator " + expr.getOperator();
       return null;
     }
+  }
+
+  @Override
+  public MLIRValue caseConcatenationExpression(ConcatenationExpression concat) {
+    var parts = concat.getParts();
+    assert parts.size() >= 2;
+
+    var head = doSwitch(parts.get(0));
+    for (int i = 1; i < parts.size(); ++i) {
+      var next = doSwitch(parts.get(i));
+      head = emitBinaryOp(
+          "coredsl.concat",
+          MLIRType.getType(head.type.width + next.type.width, false), head,
+          next);
+    }
+
+    return head;
   }
 
   @Override
