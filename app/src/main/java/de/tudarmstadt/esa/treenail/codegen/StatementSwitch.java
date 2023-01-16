@@ -48,8 +48,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       assert nfo.getType().isIntegerType() : "NYI: Local arrays";
       var init = dtor.getInitializer();
       if (init == null) {
-        // TODO: better handling for undefined values
-        cc.setValue(dtor, null);
+        // Spec: Unitialized variables have an undefined value. It simplifies IR
+        // construction if we just assume them to be zero. Unnecessary const ops
+        // will be canonicalized away later in MLIR.
+        var zero = cc.makeConst(0, mapType(nfo.getType()));
+        cc.setValue(dtor, zero);
         continue;
       }
 
