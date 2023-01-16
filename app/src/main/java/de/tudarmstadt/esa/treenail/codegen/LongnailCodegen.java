@@ -18,13 +18,14 @@ import com.minres.coredsl.coreDsl.StorageClassSpecifier;
 import com.minres.coredsl.type.ArrayType;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.xtext.validation.ValidationMessageAcceptor;
 
 public class LongnailCodegen implements ValidationMessageAcceptor {
-  private static final int N_SPACES = 2;
+  public static final int N_SPACES = 2;
 
   public String emit(DescriptionContent content) {
     var defs = content.getDefinitions();
@@ -127,7 +128,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   public String emitBehavior(Statement behavior, ElaborationContext ctx,
                              Map<NamedEntity, MLIRValue> values) {
     var sb = new StringBuilder();
-    new StatementSwitch(ctx, values, sb).doSwitch(behavior);
+    new StatementSwitch(
+        new ConstructionContext(values, new AtomicInteger(0), ctx, sb))
+        .doSwitch(behavior);
     // TODO: `coredsl.spawn` might become an alternate terminator in the future.
     sb.append("coredsl.end").append('\n');
     return sb.toString();

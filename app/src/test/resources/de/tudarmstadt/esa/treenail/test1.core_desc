@@ -51,6 +51,23 @@ InstructionSet Test1 {
         X[rd] = (unsigned<32>) (xxx :: 1 :: imm :: -1);
       }
     }
+
+    Inst6 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        unsigned<10> x = 3;
+        signed<5> y = -4;
+        if (imm > 0)
+          x = 42;
+        else
+          y = (signed<5>)(y * 5);
+        X[rd] = x;
+        if (imm < 100)
+          Y = x;
+        else
+          Y = (unsigned) y;
+      }
+    }
   }
 }
 

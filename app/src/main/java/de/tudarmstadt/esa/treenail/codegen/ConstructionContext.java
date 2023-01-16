@@ -6,11 +6,16 @@ import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.CoreDslType;
 import com.minres.coredsl.type.IntegerType;
+import java.util.Collections;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.emf.ecore.EObject;
 
 class ConstructionContext {
+  private final Set<NamedEntity> updatedEntities = new LinkedHashSet<>();
+
   private final Map<NamedEntity, MLIRValue> values;
   private final AtomicInteger counter;
   private final ElaborationContext ctx;
@@ -40,7 +45,10 @@ class ConstructionContext {
 
   MLIRValue getValue(NamedEntity ent) { return values.get(ent); }
 
-  void setValue(NamedEntity ent, MLIRValue value) { values.put(ent, value); }
+  void setValue(NamedEntity ent, MLIRValue value) {
+    values.put(ent, value);
+    updatedEntities.add(ent);
+  }
 
   MLIRValue makeAnonymousValue(MLIRType type) {
     return new MLIRValue(Integer.toString(counter.getAndIncrement()), type);
@@ -61,7 +69,21 @@ class ConstructionContext {
     return result;
   }
 
-  StringBuilder emitLn(String format, Object... args) {
-    return sb.append(String.format(format, args)).append('\n');
+  void emitLn(String format, Object... args) {
+    sb.append(String.format(format, args)).append('\n');
   }
+
+  Set<NamedEntity> getUpdatedEntities() {
+    return Collections.unmodifiableSet(updatedEntities);
+  }
+
+  Map<NamedEntity, MLIRValue> getValues() {
+    return Collections.unmodifiableMap(values);
+  }
+
+  int getCounter() { return counter.get(); }
+
+  ElaborationContext getElaborationContext() { return ctx; }
+
+  StringBuilder getStringBuilder() { return sb; }
 }
