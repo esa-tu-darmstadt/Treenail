@@ -4,6 +4,7 @@ import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.ElaborationContext;
 import com.minres.coredsl.analysis.ElaborationContext.NodeInfo;
 import com.minres.coredsl.coreDsl.Expression;
+import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.CoreDslType;
@@ -35,10 +36,14 @@ class ConstructionContext {
 
   CoreDslType getType(EObject obj) { return getInfo(obj).getType(); }
 
-  boolean isConstant(Expression expr) { return getInfo(expr).isValueSet(); }
+  boolean isConstant(Expression expr) {
+    return expr instanceof IntegerConstant || getInfo(expr).isValueSet();
+  }
 
   // FIXME: should really switch to using the BigIntegers here.
   int getConstantValue(Expression expr) {
+    if (expr instanceof IntegerConstant)
+      return ((IntegerConstant)expr).getValue().intValue();
     return getInfo(expr).getValue().getValue().intValue();
   }
 

@@ -11,7 +11,6 @@ import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.Instruction;
-import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
 import com.minres.coredsl.coreDsl.StorageClassSpecifier;
