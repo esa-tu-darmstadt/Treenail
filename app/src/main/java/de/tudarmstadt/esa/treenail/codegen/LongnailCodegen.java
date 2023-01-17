@@ -8,6 +8,7 @@ import com.minres.coredsl.analysis.ElaborationContext;
 import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
+import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
 import com.minres.coredsl.coreDsl.ISA;
@@ -45,8 +46,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       assert stmt instanceof DeclarationStatement
           : "NYI: Support for parameter assignments etc.";
       var declStmt = (DeclarationStatement)stmt;
-      sb.append(emitArchitecturalStateElement(declStmt.getDeclaration(), ctx)
-                    .indent(N_SPACES));
+      var elem = emitArchitecturalStateElement(declStmt.getDeclaration(), ctx);
+      if (elem != null)
+        sb.append(elem.indent(N_SPACES));
     }
 
     // TODO: Functions, Always blocks
@@ -58,20 +60,10 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return sb.toString();
   }
 
-  private String emitArchitecturalStateElement(Declaration decl,
-                                               ElaborationContext ctx) {
-    assert decl.getQualifiers().isEmpty() : "NYI: Const/volatile";
-    assert decl.getDeclarators().size() == 1 : "NYI: Multiple declarators";
-
-    var dtor = decl.getDeclarators().get(0);
-    var info = ctx.getNodeInfo(dtor);
-    var name = dtor.getName();
-    if (info.getStorage() == StorageClass.param)
-      return format("// parameter: `%s`\n", name);
-
-    assert info.getStorage() == StorageClass.register
-        : "NYI: Architectural state other than registers";
+  private String emitRegister(Declarator dtor, ElaborationContext ctx) {
     assert dtor.getInitializer() == null : "NYI: Register initializers";
+
+    var name = dtor.getName();
     var type = ctx.getNodeInfo(dtor).getType();
 
     if (type.isIntegerType()) {
@@ -98,6 +90,56 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     return format("coredsl.register %s @%s[%d] : %s\n", proto, name,
                   numElements, mapType(arrayType.elementType));
+  }
+
+  private String emitAddressSpace(Declarator dtor, ElaborationContext ctx) {
+    assert dtor.getInitializer() == null
+        : "Address spaces cannot have initizers";
+
+    var name = dtor.getName();
+    var type = ctx.getNodeInfo(dtor).getType();
+
+    assert type.isArrayType() : "NYI: Single-element address 'spaces'";
+    var arrayType = (ArrayType)type;
+    assert arrayType.elementType.isIntegerType()
+        : "NYI: Multi-dimensional address spaces";
+
+    var width = arrayType.elementType.getBitSize();
+    var numElements = arrayType.count;
+    var proto = "";
+    var addressWidth = -1;
+    // TODO: inspect attributes instead, and deal with the actual size (which
+    // may overflow a Java `int`).
+    if ("MEM".equals(name) && width == 8) {
+      proto = "core_mem";
+      addressWidth = 32;
+    } else if ("CSR".equals(name) && width == 32 && numElements == 4096) {
+      proto = "core_csr";
+      addressWidth = 12;
+    }
+    assert !proto.isEmpty() : "NYI: Custom address spaces";
+
+    return format("coredsl.addrspace %s @%s : (ui%d) -> %s\n", proto, name,
+                  addressWidth, mapType(arrayType.elementType));
+  }
+
+  private String emitArchitecturalStateElement(Declaration decl,
+                                               ElaborationContext ctx) {
+    assert decl.getQualifiers().isEmpty() : "NYI: Const/volatile";
+    assert decl.getDeclarators().size() == 1 : "NYI: Multiple declarators";
+
+    var dtor = decl.getDeclarators().get(0);
+    switch (ctx.getNodeInfo(dtor).getStorage()) {
+    case param:
+      return null; // Ignore, we're only dealing with the elaborated values.
+    case register:
+      return emitRegister(dtor, ctx);
+    case extern:
+      return emitAddressSpace(dtor, ctx);
+    default:
+      assert false : "NYI: Architectural state declaration: " + decl;
+      return null;
+    }
   }
 
   private String emitInstruction(Instruction inst, ElaborationContext ctx) {
