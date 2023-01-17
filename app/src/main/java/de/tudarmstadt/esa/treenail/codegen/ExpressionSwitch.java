@@ -160,11 +160,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private static final Map<String, String> binaryOperatorMap = Map.ofEntries(
       m("+", "hwarith.add"), m("-", "hwarith.sub"), m("*", "hwarith.mul"),
       m("/", "hwarith.div"), m("%", "coredsl.mod"), m("&", "coredsl.and"),
-      m("|", "coredsl.or"), m("^", "coredsl.xor"),
-      m("<<", "coredsl.shift_left"), m(">>", "coredsl.shift_right"),
-      m("==", "hwarith.icmp eq"), m("!=", "hwarith.icmp ne"),
-      m("<", "hwarith.icmp lt"), m("<=", "hwarith.icmp le"),
-      m(">", "hwarith.icmp gt"), m(">=", "hwarith.icmp ge"));
+      m("&&", "coredsl.and"), m("|", "coredsl.or"), m("||", "coredsl.or"),
+      m("^", "coredsl.xor"), m("<<", "coredsl.shift_left"),
+      m(">>", "coredsl.shift_right"), m("==", "hwarith.icmp eq"),
+      m("!=", "hwarith.icmp ne"), m("<", "hwarith.icmp lt"),
+      m("<=", "hwarith.icmp le"), m(">", "hwarith.icmp gt"),
+      m(">=", "hwarith.icmp ge"));
 
   private MLIRValue emitBinaryOp(String op, MLIRType resType, MLIRValue lhs,
                                  MLIRValue rhs) {
@@ -184,8 +185,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var rhs = doSwitch(expr.getRight());
     var type = mapType(ac.getExpressionType(expr));
 
-    var op = binaryOperatorMap.get(expr.getOperator());
-    assert op != null : "NYI: operator " + expr.getOperator();
+    var opr = expr.getOperator();
+    var op = binaryOperatorMap.get(opr);
+    assert op != null : "NYI: operator " + opr;
+    if ("&&".equals(opr) || "||".equals(opr))
+      System.err.println("[WARN] NYI: Short-circuit evaluation. Evaluating `" +
+                         opr + "` eagerly.");
     return emitBinaryOp(op, type, lhs, rhs);
   }
 
