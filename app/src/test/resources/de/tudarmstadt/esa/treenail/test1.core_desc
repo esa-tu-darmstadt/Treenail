@@ -89,6 +89,19 @@ InstructionSet Test1 {
         if(rd != 0) X[rd] = result[31:0];
       }
     }
+
+    Inst8 {
+      encoding: imm[6:0] :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {              
+        MEM[imm] = 0xFF;
+        MEM[X[rs1]] = MEM[imm];
+        MEM[11:8] = 0xC0FFEE;
+        unsigned<3> smallIdx = imm[5:3];
+        MEM[imm+3:imm] = MEM[imm:imm+2];
+        unsigned<11> x = 0;
+        x[smallIdx:smallIdx+5] = x[smallIdx+4:smallIdx];
+      }
+    }
   }
 }
 

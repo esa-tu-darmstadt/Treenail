@@ -5,7 +5,6 @@ import static java.lang.String.format;
 
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
 import com.minres.coredsl.analysis.ElaborationContext;
-import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
@@ -15,7 +14,6 @@ import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.Instruction;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
-import com.minres.coredsl.coreDsl.StorageClassSpecifier;
 import com.minres.coredsl.type.ArrayType;
 import java.util.LinkedHashMap;
 import java.util.Map;
