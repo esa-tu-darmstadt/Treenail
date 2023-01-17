@@ -60,7 +60,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private MLIRValue storeBitRange(MLIRValue oldValue, Expression fromExpr,
                                   Expression toExpr, MLIRValue newValue,
                                   MLIRType accessType) {
-    var rangeRes = RangeAnalyzer.analyze(fromExpr, toExpr, cc);
+    var rangeRes = RangeAnalyzer.analyze(fromExpr, toExpr, cc, this);
     assert rangeRes != null : "Invalid range";
 
     var result = cc.makeAnonymousValue(oldValue.type);
@@ -87,7 +87,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                                  MLIRType accessType) {
     assert !cc.hasValue(entity) : "NYI: local arrays";
 
-    var rangeRes = RangeAnalyzer.analyze(fromExpr, toExpr, cc);
+    var rangeRes = RangeAnalyzer.analyze(fromExpr, toExpr, cc, this);
     assert rangeRes != null : "Invalid range";
 
     cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), rangeRes,
@@ -174,92 +174,36 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     return result;
   }
 
-  private MLIRValue handleSingleBitAccess(IndexAccessExpression access) {
-    var indexExpr = access.getIndex();
-    var target = doSwitch(access.getTarget());
-
-    var type = mapType(cc.getType(access));
-    var result = cc.makeAnonymousValue(type);
-    if (cc.isConstant(indexExpr)) {
-      cc.emitLn("%s = coredsl.bitextract %s[%d] : (%s) -> %s", result, target,
-                cc.getConstantValue(indexExpr), target.type, type);
-      return result;
-    }
-
-    var index = doSwitch(indexExpr);
-    cc.emitLn("%s = coredsl.bitextract %s[%s : %s] : (%s) -> %s", result,
-              target, index, index.type, target.type, type);
-
-    return result;
-  }
-
-  private MLIRValue handleBitRangeAccess(IndexAccessExpression access) {
-    var rangeRes =
-        RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(), cc);
-    assert rangeRes != null : "Invalid range";
-
-    var target = doSwitch(access.getTarget());
-
-    var type = mapType(cc.getType(access));
-    var result = cc.makeAnonymousValue(type);
-    cc.emitLn("%s = coredsl.bitextract %s[%s] : (%s) -> %s", result, target,
-              rangeRes, target.type, type);
-
-    return result;
-  }
-
-  private MLIRValue handleSingleElementAccess(IndexAccessExpression access) {
-    assert access.getTarget() instanceof EntityReference
-        : "NYI: Element access into a temporary object";
-    var entity = ((EntityReference)access.getTarget()).getTarget();
-    assert !cc.hasValue(entity) : "NYI: Element access into local arrays";
-
-    var type = mapType(cc.getType(access));
-    var result = cc.makeAnonymousValue(type);
-    var index = doSwitch(access.getIndex());
-    cc.emitLn("%s = coredsl.get @%s[%s : %s] : %s", result, entity.getName(),
-              index, index.type, type);
-
-    return result;
-  }
-
-  private MLIRValue handleElementRangeAccess(IndexAccessExpression access) {
-    assert access.getTarget() instanceof EntityReference
-        : "NYI: Element access into a temporary object";
-    var entity = ((EntityReference)access.getTarget()).getTarget();
-    assert !cc.hasValue(entity) : "NYI: Element access into local arrays";
-
-    var rangeRes =
-        RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(), cc);
-    assert rangeRes != null : "Invalid range";
-
-    var type = mapType(cc.getType(access));
-    var result = cc.makeAnonymousValue(type);
-    cc.emitLn("%s = coredsl.get @%s[%s] : %s", result, entity.getName(),
-              rangeRes, type);
-
-    return result;
-  }
-
   @Override
   public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
     // An innocuous `[...]` expression has different lowerings depending on the
     // type of the expression that is indexed into, and the presence of an end
     // index (i.e. it's a range index).
 
+    var type = mapType(cc.getType(access));
+    var result = cc.makeAnonymousValue(type);
+    var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
+                                      cc, this);
+
     var targetType = cc.getType(access.getTarget());
     // It's a bit-level access if we're indexing into a scalar.
     if (targetType.isIntegerType()) {
-      if (access.getEndIndex() != null)
-        return handleBitRangeAccess(access);
-      return handleSingleBitAccess(access);
+      var target = doSwitch(access.getTarget());
+      cc.emitLn("%s = coredsl.bitextract %s[%s] : (%s) -> %s", result, target,
+                index, target.type, type);
+      return result;
     }
 
     // Otherwise, we indexing into an array and retrieve one or more elements.
     assert targetType.isArrayType();
-    if (access.getEndIndex() != null)
-      return handleElementRangeAccess(access);
-    return handleSingleElementAccess(access);
+    assert access.getTarget() instanceof EntityReference
+        : "NYI: Element access into a temporary object";
+    var entity = ((EntityReference)access.getTarget()).getTarget();
+    assert !cc.hasValue(entity) : "NYI: Element access into local arrays";
+
+    cc.emitLn("%s = coredsl.get @%s[%s] : %s", result, entity.getName(), index,
+              type);
+    return result;
   }
 
   private static AbstractMap.SimpleEntry<String, String> m(String coreDsl,

@@ -10,12 +10,23 @@ import com.minres.coredsl.coreDsl.NamedEntity;
 class RangeAnalyzer {
   static class RangeResult {
     MLIRValue base;
-    int from, to;
+    Integer from, to;
 
     public String toString() {
-      if (base == null)
+      if (base != null) {
+        if (from != null && to != null)
+          return format("%s : %s, %d:%d", base, base.type, from, to);
+
+        return format("%s : %s", base, base.type);
+      }
+
+      if (from != null && to != null)
         return format("%d:%d", from, to);
-      return format("%s : %s, %d:%d", base, base.type, from, to);
+
+      if (from != null)
+        return from.toString();
+
+      return "<invalid>";
     }
   }
 
@@ -44,8 +55,21 @@ class RangeAnalyzer {
   }
 
   static RangeResult analyze(Expression fromExpr, Expression toExpr,
-                             ConstructionContext cc) {
+                             ConstructionContext cc,
+                             ExpressionSwitch exprSwitch) {
+    assert fromExpr != null;
+
     var res = new RangeResult();
+
+    // Single element
+    if (toExpr == null) {
+      if (cc.isConstant(fromExpr)) {
+        res.from = cc.getConstantValue(fromExpr);
+        return res;
+      }
+      res.base = exprSwitch.doSwitch(fromExpr);
+      return res;
+    }
 
     // Constant range
     if (cc.isConstant(fromExpr) && cc.isConstant(toExpr)) {
