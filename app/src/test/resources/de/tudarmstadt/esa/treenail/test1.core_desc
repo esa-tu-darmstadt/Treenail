@@ -102,6 +102,13 @@ InstructionSet Test1 {
         x[smallIdx:smallIdx+5] = x[smallIdx+4:smallIdx];
       }
     }
+
+    Inst9 {
+      encoding: imm[6:0] :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        X[rd] = (unsigned)(rs1 > 4 && rs2 < 2 ? -imm : imm[0:3]);
+      }
+    }
   }
 }
 

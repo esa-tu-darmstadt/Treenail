@@ -76,6 +76,13 @@ class ConstructionContext {
     return result;
   }
 
+  MLIRValue makeSignlessCast(MLIRValue value) {
+    var result =
+        makeAnonymousValue(MLIRType.getType(1, false) /* doesn't matter */);
+    emitLn("%s = coredsl.cast %s : %s to i1", result, value, value.type);
+    return result;
+  }
+
   void emitLn(String format, Object... args) {
     sb.append(String.format(format, args)).append('\n');
   }

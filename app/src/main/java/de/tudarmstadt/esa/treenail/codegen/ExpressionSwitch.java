@@ -1,20 +1,28 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 
+import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
 import com.minres.coredsl.coreDsl.CastExpression;
 import com.minres.coredsl.coreDsl.ConcatenationExpression;
+import com.minres.coredsl.coreDsl.ConditionalExpression;
 import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
+import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ParenthesisExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.util.AbstractMap;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
 
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
@@ -231,6 +239,43 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
 
     return head;
+  }
+
+  @Override
+  public MLIRValue caseConditionalExpression(ConditionalExpression expr) {
+    var type = mapType(ac.getExpressionType(expr));
+
+    var cond = doSwitch(expr.getCondition());
+    var cast = cc.makeSignlessCast(cond);
+
+    var values = cc.getValues();
+    var counter = cc.getCounter();
+
+    var thenCC = new ConstructionContext(
+        new LinkedHashMap<NamedEntity, MLIRValue>(values),
+        new AtomicInteger(counter), ac, new StringBuilder());
+
+    var elseCC = new ConstructionContext(
+        new LinkedHashMap<NamedEntity, MLIRValue>(values),
+        new AtomicInteger(counter), ac, new StringBuilder());
+
+    Streams.forEachPair(
+        Stream.of(thenCC, elseCC),
+        Stream.of(expr.getThenExpression(), expr.getElseExpression()),
+        (xCC, xExpr) -> {
+          var xVal = new ExpressionSwitch(xCC).doSwitch(xExpr);
+          assert xCC.getUpdatedEntities().isEmpty()
+              : "NYI: conditional expressions with side-effects";
+          var xCast = xCC.makeCast(xVal, type);
+          xCC.emitLn("scf.yield %s : %s", xCast, type);
+        });
+
+    var result = cc.makeAnonymousValue(type);
+    cc.emitLn("%s = scf.if %s -> (%s) {\n%s} else {\n%s}", result, cast, type,
+              thenCC.getStringBuilder().toString().indent(N_SPACES),
+              elseCC.getStringBuilder().toString().indent(N_SPACES));
+
+    return result;
   }
 
   @Override

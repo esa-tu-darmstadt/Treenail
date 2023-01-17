@@ -77,8 +77,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   @Override
   public Object caseIfStatement(IfStatement ifStmt) {
     var cond = exprSwitch.doSwitch(ifStmt.getCondition());
-    var cast = cc.makeAnonymousValue(MLIRType.getType(1, false));
-    cc.emitLn("%s = coredsl.cast %s : %s to i1", cast, cond, cond.type);
+    var cast = cc.makeSignlessCast(cond);
 
     var values = cc.getValues();
     var counter = cc.getCounter();
