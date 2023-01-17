@@ -2,6 +2,9 @@ InstructionSet Test1 {
   architectural_state {
     register unsigned<32> X[32] [[is_main_reg]];
     register unsigned<17> Y;
+    unsigned<32> XLEN = 32;
+    unsigned<32> XLEN_2 = XLEN/2;
+    unsigned<32> XLEN_4 = XLEN/4;
   }
 
   instructions {
@@ -72,13 +75,13 @@ InstructionSet Test1 {
     Inst7 {
       encoding: 0b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
       behavior: {              
-        signed<8> op1_0 = (signed) X[rs1][ 7: 0];
-        signed<8> op1_1 = (signed) X[rs1][15: 8];
-        signed<8> op2_0 = (signed) X[rs2][ 7: 0];
-        signed<8> op2_1 = (signed) X[rs2][15: 8];
-        signed<32> op3 = (signed) X[rd];
-        signed<16> mul0 = op1_0 * op2_0;
-        signed<16> mul1 = op1_1 * op2_1;
+        signed<XLEN_4> op1_0 = (signed) X[rs1][ 7: 0];
+        signed<XLEN_4> op1_1 = (signed) X[rs1][15: 8];
+        signed<XLEN_4> op2_0 = (signed) X[rs2][ 7: 0];
+        signed<XLEN_4> op2_1 = (signed) X[rs2][15: 8];
+        signed<XLEN> op3 = (signed) X[rd];
+        signed<XLEN_2> mul0 = op1_0 * op2_0;
+        signed<XLEN_2> mul1 = op1_1 * op2_1;
         signed<17> sum_tmp = mul0 + mul1;
         signed<33> result = op3 + sum_tmp;
         if(rd != 0) X[rd] = result[31:0];

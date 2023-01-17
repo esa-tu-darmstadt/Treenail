@@ -5,6 +5,7 @@ import static java.lang.String.format;
 
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
 import com.minres.coredsl.analysis.ElaborationContext;
+import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.DescriptionContent;
@@ -62,14 +63,15 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     assert decl.getQualifiers().isEmpty() : "NYI: Const/volatile";
     assert decl.getDeclarators().size() == 1 : "NYI: Multiple declarators";
 
-    boolean isRegister =
-        decl.getStorage().contains(StorageClassSpecifier.REGISTER);
-    assert isRegister : "NYI: Architectural state other than registers";
-
     var dtor = decl.getDeclarators().get(0);
-    assert dtor.getInitializer() == null : "NYI: Register initializers";
-
+    var info = ctx.getNodeInfo(dtor);
     var name = dtor.getName();
+    if (info.getStorage() == StorageClass.param)
+      return format("// parameter: `%s`\n", name);
+
+    assert info.getStorage() == StorageClass.register
+        : "NYI: Architectural state other than registers";
+    assert dtor.getInitializer() == null : "NYI: Register initializers";
     var type = ctx.getNodeInfo(dtor).getType();
 
     if (type.isIntegerType()) {
