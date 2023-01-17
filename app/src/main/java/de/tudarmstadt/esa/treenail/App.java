@@ -8,6 +8,7 @@ import com.google.inject.Provider;
 import com.minres.coredsl.CoreDslStandaloneSetup;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import de.tudarmstadt.esa.treenail.codegen.LongnailCodegen;
+import java.io.FileWriter;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.xtext.diagnostics.Severity;
@@ -51,7 +52,23 @@ public class App {
     assert args.length > 0;
     var app = getInstance();
     var content = app.parse(args[0]);
-    if (content != null)
-      System.out.println(app.generateMLIR(content));
+    if (content == null)
+      return;
+    var mlir = app.generateMLIR(content);
+    if (mlir == null)
+      return;
+
+    if (args.length > 1) {
+      try {
+        var w = new FileWriter(args[1]);
+        w.write(mlir);
+        w.close();
+      } catch (Exception e) {
+        e.printStackTrace();
+      }
+      return;
+    }
+
+    System.out.println(app.generateMLIR(content));
   }
 }
