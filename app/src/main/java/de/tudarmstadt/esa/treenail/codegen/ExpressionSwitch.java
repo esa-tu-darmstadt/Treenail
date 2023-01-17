@@ -6,11 +6,9 @@ import com.minres.coredsl.coreDsl.AssignmentExpression;
 import com.minres.coredsl.coreDsl.CastExpression;
 import com.minres.coredsl.coreDsl.ConcatenationExpression;
 import com.minres.coredsl.coreDsl.EntityReference;
-import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
-import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ParenthesisExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
@@ -39,81 +37,24 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), castValue, type);
   }
 
-  private MLIRValue storeSingleBit(MLIRValue oldValue, Expression indexExpr,
-                                   MLIRValue newValue, MLIRType accessType) {
-    var result = cc.makeAnonymousValue(oldValue.type);
-    if (cc.isConstant(indexExpr)) {
-      cc.emitLn("%s = coredsl.bitset %s[%d] = %s: (%s, %s) -> %s", result,
-                oldValue, cc.getConstantValue(indexExpr), newValue,
-                oldValue.type, newValue.type, result.type);
-      return result;
-    }
-
-    var index = doSwitch(indexExpr);
-    assert newValue.type == accessType;
-    cc.emitLn("%s = coredsl.bitset %s[%s : %s] = %s : (%s, %s) -> %s", result,
-              oldValue, index, index.type, newValue, oldValue.type,
-              newValue.type, result.type);
-    return result;
-  }
-
-  private MLIRValue storeBitRange(MLIRValue oldValue, Expression fromExpr,
-                                  Expression toExpr, MLIRValue newValue,
-                                  MLIRType accessType) {
-    var rangeRes = RangeAnalyzer.analyze(fromExpr, toExpr, cc, this);
-    assert rangeRes != null : "Invalid range";
-
-    var result = cc.makeAnonymousValue(oldValue.type);
-    cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", result,
-              oldValue, rangeRes, cc.makeCast(newValue, accessType),
-              oldValue.type, accessType, result.type);
-
-    return result;
-  }
-
-  private void storeSingleElement(NamedEntity entity, Expression index,
-                                  MLIRValue newValue, MLIRType accessType) {
-    assert !cc.hasValue(entity) : "NYI: local arrays";
-
-    // TODO: could also check here for a constant index
-    var idx = doSwitch(index);
-
-    cc.emitLn("coredsl.set @%s[%s : %s] = %s : %s", entity.getName(), idx,
-              idx.type, cc.makeCast(newValue, accessType), accessType);
-  }
-
-  private void storeElementRange(NamedEntity entity, Expression fromExpr,
-                                 Expression toExpr, MLIRValue newValue,
-                                 MLIRType accessType) {
-    assert !cc.hasValue(entity) : "NYI: local arrays";
-
-    var rangeRes = RangeAnalyzer.analyze(fromExpr, toExpr, cc, this);
-    assert rangeRes != null : "Invalid range";
-
-    cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), rangeRes,
-              cc.makeCast(newValue, accessType), accessType);
-  }
-
   private void store(IndexAccessExpression access, MLIRValue newValue) {
     assert access.getTarget() instanceof EntityReference
         : "NYI: Nested Lvalues";
     var entity = ((EntityReference)access.getTarget()).getTarget();
     var entityType = cc.getType(entity);
 
-    var from = access.getIndex();
-    var to = access.getEndIndex();
-
     var isLocal = cc.hasValue(entity);
     var isBitAccess = entityType.isIntegerType();
-    var isRange = to != null;
 
     var accessType = mapType(cc.getType(access));
+    var castValue = cc.makeCast(newValue, accessType);
+    var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
+                                      cc, this);
 
     if (!isBitAccess) {
-      if (isRange)
-        storeElementRange(entity, from, to, newValue, accessType);
-      else
-        storeSingleElement(entity, from, newValue, accessType);
+      assert !isLocal : "NYI: local arrays";
+      cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), index,
+                castValue, accessType);
       return;
     }
 
@@ -126,9 +67,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                 oldValue.type);
     }
 
-    var updatedValue =
-        isRange ? storeBitRange(oldValue, from, to, newValue, accessType)
-                : storeSingleBit(oldValue, from, newValue, accessType);
+    var updatedValue = cc.makeAnonymousValue(oldValue.type);
+    cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", updatedValue,
+              oldValue, index, castValue, oldValue.type, accessType,
+              updatedValue.type);
 
     if (isLocal)
       cc.setValue(entity, updatedValue);
