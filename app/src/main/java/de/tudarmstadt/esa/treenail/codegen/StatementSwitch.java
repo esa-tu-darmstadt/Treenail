@@ -6,6 +6,7 @@ import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.Streams;
+import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
@@ -20,10 +21,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
+  private final AnalysisContext ac;
   private final ConstructionContext cc;
   private final ExpressionSwitch exprSwitch;
 
   StatementSwitch(ConstructionContext cc) {
+    this.ac = cc.getAnalysisContext();
     this.cc = cc;
     exprSwitch = new ExpressionSwitch(cc);
   }
@@ -43,22 +46,22 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         : "NYI: Const/volatile for local variables";
 
     for (var dtor : decl.getDeclarators()) {
-      var nfo = cc.getInfo(dtor);
-      assert nfo.getStorage() == StorageClass.local;
-      assert nfo.getType().isIntegerType() : "NYI: Local arrays";
+      assert ac.getStorageClass(dtor) == StorageClass.local;
+      var type = ac.getDeclaredType(dtor);
+      assert type.isIntegerType() : "NYI: Local arrays";
       var init = dtor.getInitializer();
       if (init == null) {
         // Spec: Unitialized variables have an undefined value. It simplifies IR
         // construction if we just assume them to be zero. Unnecessary const ops
         // will be canonicalized away later in MLIR.
-        var zero = cc.makeConst(0, mapType(nfo.getType()));
+        var zero = cc.makeConst(0, mapType(type));
         cc.setValue(dtor, zero);
         continue;
       }
 
       assert init instanceof ExpressionInitializer : "NYI: List initializers";
       var value = exprSwitch.doSwitch(((ExpressionInitializer)init).getValue());
-      var castValue = cc.makeCast(value, mapType(nfo.getType()));
+      var castValue = cc.makeCast(value, mapType(type));
       cc.setValue(dtor, castValue);
     }
 
@@ -79,17 +82,16 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
     var values = cc.getValues();
     var counter = cc.getCounter();
-    var ctx = cc.getElaborationContext();
 
     var hasElse = ifStmt.getElseBody() != null;
 
     var thenCC = new ConstructionContext(
         new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ctx, new StringBuilder());
+        new AtomicInteger(counter), ac, new StringBuilder());
 
     var elseCC = new ConstructionContext(
         new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ctx, new StringBuilder());
+        new AtomicInteger(counter), ac, new StringBuilder());
 
     new StatementSwitch(thenCC).doSwitch(ifStmt.getThenBody());
     if (hasElse)

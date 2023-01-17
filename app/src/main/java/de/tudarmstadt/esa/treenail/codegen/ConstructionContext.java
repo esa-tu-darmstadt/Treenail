@@ -1,8 +1,6 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
-import com.minres.coredsl.analysis.ConstantValue.StatusCode;
-import com.minres.coredsl.analysis.ElaborationContext;
-import com.minres.coredsl.analysis.ElaborationContext.NodeInfo;
+import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
@@ -14,41 +12,36 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.eclipse.emf.ecore.EObject;
 
 class ConstructionContext {
   private final Set<NamedEntity> updatedEntities = new LinkedHashSet<>();
 
   private final Map<NamedEntity, MLIRValue> values;
   private final AtomicInteger counter;
-  private final ElaborationContext ctx;
+  private final AnalysisContext ac;
   private final StringBuilder sb;
 
   ConstructionContext(Map<NamedEntity, MLIRValue> values, AtomicInteger counter,
-                      ElaborationContext ctx, StringBuilder sb) {
+                      AnalysisContext ac, StringBuilder sb) {
     this.values = values;
     this.counter = counter;
-    this.ctx = ctx;
+    this.ac = ac;
     this.sb = sb;
   }
 
-  NodeInfo getInfo(EObject obj) { return ctx.getNodeInfo(obj); }
-
-  CoreDslType getType(EObject obj) { return getInfo(obj).getType(); }
-
   boolean isConstant(Expression expr) {
-    return expr instanceof IntegerConstant || getInfo(expr).isValueSet();
+    return expr instanceof IntegerConstant || ac.isExpressionValueSet(expr);
   }
 
   // FIXME: should really switch to using the BigIntegers here.
   int getConstantValue(Expression expr) {
     if (expr instanceof IntegerConstant)
       return ((IntegerConstant)expr).getValue().intValue();
-    return getInfo(expr).getValue().getValue().intValue();
+    return ac.getExpressionValue(expr).getValue().intValue();
   }
 
   IntegerType getElementType(NamedEntity ent) {
-    var type = getType(ent);
+    var type = ac.getDeclaredType(ent);
     assert type.isArrayType();
     var arrayType = (ArrayType)type;
     assert arrayType.elementType.isIntegerType();
@@ -97,7 +90,7 @@ class ConstructionContext {
 
   int getCounter() { return counter.get(); }
 
-  ElaborationContext getElaborationContext() { return ctx; }
+  AnalysisContext getAnalysisContext() { return ac; }
 
   StringBuilder getStringBuilder() { return sb; }
 }

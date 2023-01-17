@@ -3,8 +3,8 @@ package de.tudarmstadt.esa.treenail.codegen;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
 
+import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
-import com.minres.coredsl.analysis.ElaborationContext;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
@@ -31,12 +31,12 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     assert defs.size() == 1 : "NYI: Multiple instruction sets/core definitions";
 
     var isa = defs.get(0);
-    var anaCtx = CoreDslAnalyzer.analyze(content, this);
+    var anaRes = CoreDslAnalyzer.analyze(content, this);
 
-    return emitISA(isa, anaCtx.elaborationResults.get(isa));
+    return emitISA(isa, anaRes.results.get(isa));
   }
 
-  private String emitISA(ISA isa, ElaborationContext ctx) {
+  private String emitISA(ISA isa, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
     sb.append(format("module @%s {\n", isa.getName()));
@@ -58,11 +58,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return sb.toString();
   }
 
-  private String emitRegister(Declarator dtor, ElaborationContext ctx) {
+  private String emitRegister(Declarator dtor, AnalysisContext ctx) {
     assert dtor.getInitializer() == null : "NYI: Register initializers";
 
     var name = dtor.getName();
-    var type = ctx.getNodeInfo(dtor).getType();
+    var type = ctx.getDeclaredType(dtor);
 
     if (type.isIntegerType()) {
       var proto = "local";
@@ -90,12 +90,12 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                   numElements, mapType(arrayType.elementType));
   }
 
-  private String emitAddressSpace(Declarator dtor, ElaborationContext ctx) {
+  private String emitAddressSpace(Declarator dtor, AnalysisContext ctx) {
     assert dtor.getInitializer() == null
         : "Address spaces cannot have initizers";
 
     var name = dtor.getName();
-    var type = ctx.getNodeInfo(dtor).getType();
+    var type = ctx.getDeclaredType(dtor);
 
     assert type.isArrayType() : "NYI: Single-element address 'spaces'";
     var arrayType = (ArrayType)type;
@@ -122,12 +122,12 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   }
 
   private String emitArchitecturalStateElement(Declaration decl,
-                                               ElaborationContext ctx) {
+                                               AnalysisContext ctx) {
     assert decl.getQualifiers().isEmpty() : "NYI: Const/volatile";
     assert decl.getDeclarators().size() == 1 : "NYI: Multiple declarators";
 
     var dtor = decl.getDeclarators().get(0);
-    switch (ctx.getNodeInfo(dtor).getStorage()) {
+    switch (ctx.getStorageClass(dtor)) {
     case param:
       return null; // Ignore, we're only dealing with the elaborated values.
     case register:
@@ -140,7 +140,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     }
   }
 
-  private String emitInstruction(Instruction inst, ElaborationContext ctx) {
+  private String emitInstruction(Instruction inst, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
@@ -166,7 +166,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return String.join(", ", fields);
   }
 
-  public String emitBehavior(Statement behavior, ElaborationContext ctx,
+  public String emitBehavior(Statement behavior, AnalysisContext ctx,
                              Map<NamedEntity, MLIRValue> values) {
     var sb = new StringBuilder();
     new StatementSwitch(

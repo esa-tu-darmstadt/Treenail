@@ -2,6 +2,7 @@ package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 
+import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
 import com.minres.coredsl.coreDsl.CastExpression;
 import com.minres.coredsl.coreDsl.ConcatenationExpression;
@@ -17,13 +18,17 @@ import java.util.Map;
 import org.eclipse.emf.ecore.EObject;
 
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
+  private final AnalysisContext ac;
   private final ConstructionContext cc;
 
-  ExpressionSwitch(ConstructionContext cc) { this.cc = cc; }
+  ExpressionSwitch(ConstructionContext cc) {
+    this.ac = cc.getAnalysisContext();
+    this.cc = cc;
+  }
 
   private void store(EntityReference reference, MLIRValue newValue) {
     var entity = reference.getTarget();
-    var type = mapType(cc.getType(entity));
+    var type = mapType(ac.getDeclaredType(entity));
     var castValue = cc.makeCast(newValue, type);
 
     if (cc.hasValue(entity)) {
@@ -41,12 +46,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     assert access.getTarget() instanceof EntityReference
         : "NYI: Nested Lvalues";
     var entity = ((EntityReference)access.getTarget()).getTarget();
-    var entityType = cc.getType(entity);
+    var entityType = ac.getDeclaredType(entity);
 
     var isLocal = cc.hasValue(entity);
     var isBitAccess = entityType.isIntegerType();
 
-    var accessType = mapType(cc.getType(access));
+    var accessType = mapType(ac.getExpressionType(access));
     var castValue = cc.makeCast(newValue, accessType);
     var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
                                       cc, this);
@@ -97,7 +102,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   @Override
   public MLIRValue caseIntegerConstant(IntegerConstant konst) {
-    var type = mapType(cc.getType(konst));
+    var type = mapType(ac.getExpressionType(konst));
     var value = cc.getConstantValue(konst);
     return cc.makeConst(value, type);
   }
@@ -110,7 +115,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return cc.getValue(entity);
 
     // Otherwise, emit a `coredsl.get`.
-    var type = mapType(cc.getType(entity));
+    var type = mapType(ac.getDeclaredType(entity));
     var result = cc.makeAnonymousValue(type);
     cc.emitLn("%s = coredsl.get @%s : %s", result, entity.getName(), type);
     return result;
@@ -122,12 +127,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     // type of the expression that is indexed into, and the presence of an end
     // index (i.e. it's a range index).
 
-    var type = mapType(cc.getType(access));
+    var type = mapType(ac.getExpressionType(access));
     var result = cc.makeAnonymousValue(type);
     var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
                                       cc, this);
 
-    var targetType = cc.getType(access.getTarget());
+    var targetType = ac.getExpressionType(access.getTarget());
     // It's a bit-level access if we're indexing into a scalar.
     if (targetType.isIntegerType()) {
       var target = doSwitch(access.getTarget());
@@ -177,7 +182,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   public MLIRValue caseInfixExpression(InfixExpression expr) {
     var lhs = doSwitch(expr.getLeft());
     var rhs = doSwitch(expr.getRight());
-    var type = mapType(cc.getType(expr));
+    var type = mapType(ac.getExpressionType(expr));
 
     var op = binaryOperatorMap.get(expr.getOperator());
     assert op != null : "NYI: operator " + expr.getOperator();
@@ -187,7 +192,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue casePrefixExpression(PrefixExpression expr) {
     var oprnd = doSwitch(expr.getOperand());
-    var type = mapType(cc.getType(expr));
+    var type = mapType(ac.getExpressionType(expr));
 
     // The target dialect don't have unary operations, hence we must construct
     // equivalent binary operations here.
@@ -226,7 +231,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue caseCastExpression(CastExpression cast) {
     var source = doSwitch(cast.getOperand());
-    var type = mapType(cc.getType(cast));
+    var type = mapType(ac.getExpressionType(cast));
     return cc.makeCast(source, type);
   }
 
