@@ -5,7 +5,6 @@ import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.type.ArrayType;
-import com.minres.coredsl.type.CoreDslType;
 import com.minres.coredsl.type.IntegerType;
 import java.util.Collections;
 import java.util.LinkedHashSet;
