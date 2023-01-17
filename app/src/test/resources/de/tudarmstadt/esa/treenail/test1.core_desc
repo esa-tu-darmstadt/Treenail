@@ -76,7 +76,7 @@ InstructionSet Test1 {
 
     Inst7 {
       encoding: 0b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
-      behavior: {              
+      behavior: {
         signed<XLEN_4> op1_0 = (signed) X[rs1][ 7: 0];
         signed<XLEN_4> op1_1 = (signed) X[rs1][15: 8];
         signed<XLEN_4> op2_0 = (signed) X[rs2][ 7: 0];
@@ -92,7 +92,7 @@ InstructionSet Test1 {
 
     Inst8 {
       encoding: imm[6:0] :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
-      behavior: {              
+      behavior: {
         MEM[imm] = 0xFF;
         MEM[X[rs1]] = MEM[imm];
         MEM[11:8] = 0xC0FFEE;
