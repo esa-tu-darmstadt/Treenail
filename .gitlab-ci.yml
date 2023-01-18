@@ -47,7 +47,7 @@ test:
       - .gradle
 
 release:
-  stage: release
+  stage: deploy
   script: 
     - mkdir treenail
     - cd treenail ; tar xf ../app/build/distributions/app.tar --strip-components=1
