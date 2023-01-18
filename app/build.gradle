@@ -27,10 +27,8 @@ dependencies {
 application {
     // Define the main class for the application.
     mainClass = 'de.tudarmstadt.esa.treenail.App'
-}
-
-run {
-    enableAssertions = true
+    // Treenail makes extensive use of assertions.
+    applicationDefaultJvmArgs = ['-ea']
 }
 
 tasks.named('test') {
