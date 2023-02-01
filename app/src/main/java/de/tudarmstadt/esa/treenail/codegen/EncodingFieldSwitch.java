@@ -4,7 +4,7 @@ import com.minres.coredsl.coreDsl.BitField;
 import com.minres.coredsl.coreDsl.BitValue;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
-import com.minres.coredsl.util.BigIntegerWithRadix;
+import com.minres.coredsl.util.TypedBigInteger;
 import java.util.Map;
 
 class EncodingFieldSwitch extends CoreDslSwitch<String> {
@@ -14,7 +14,7 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
     this.values = values;
   }
 
-  private String toBitString(BigIntegerWithRadix bigInt) {
+  private String toBitString(TypedBigInteger bigInt) {
     int n = bigInt.getSize();
     char[] bits = new char[n];
     for (var i = 0; i < n; ++i)
@@ -25,8 +25,8 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
   @Override
   public String caseBitValue(BitValue val) {
     var bigInt = val.getValue();
-    assert bigInt instanceof BigIntegerWithRadix;
-    return toBitString((BigIntegerWithRadix)bigInt);
+    assert bigInt instanceof TypedBigInteger;
+    return toBitString((TypedBigInteger)bigInt);
   }
 
   @Override
