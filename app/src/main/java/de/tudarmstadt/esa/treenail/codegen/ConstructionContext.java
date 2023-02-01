@@ -6,6 +6,8 @@ import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.IntegerType;
+import com.minres.coredsl.util.TypedBigInteger;
+import java.math.BigInteger;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -32,11 +34,18 @@ class ConstructionContext {
     return expr instanceof IntegerConstant || ac.isExpressionValueSet(expr);
   }
 
-  // FIXME: should really switch to using the BigIntegers here.
-  int getConstantValue(Expression expr) {
-    if (expr instanceof IntegerConstant)
-      return ((IntegerConstant)expr).getValue().intValue();
-    return ac.getExpressionValue(expr).getValue().intValue();
+  // This method ensures that the return value is a standard `BigInteger`, as
+  // the frontend's `TypedBigInteger` has a `toString()` method that is
+  // unsuitable for use here.
+  BigInteger getConstantValue(Expression expr) {
+    BigInteger value = expr instanceof IntegerConstant
+                           ? ((IntegerConstant)expr).getValue()
+                           : ac.getExpressionValue(expr).getValue();
+    if (value == null)
+      return null;
+    if (value instanceof TypedBigInteger)
+      return new BigInteger(value.toByteArray());
+    return value;
   }
 
   IntegerType getElementType(NamedEntity ent) {
@@ -60,7 +69,8 @@ class ConstructionContext {
     return new MLIRValue(Integer.toString(counter.getAndIncrement()), type);
   }
 
-  MLIRValue makeConst(int value, MLIRType type) {
+  MLIRValue makeConst(BigInteger value, MLIRType type) {
+    assert !(value instanceof TypedBigInteger);
     var result = makeAnonymousValue(type);
     emitLn("%s = hwarith.constant %d : %s", result, value, type);
     return result;

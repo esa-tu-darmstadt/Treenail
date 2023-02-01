@@ -15,6 +15,7 @@ import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.IfStatement;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -54,7 +55,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         // Spec: Unitialized variables have an undefined value. It simplifies IR
         // construction if we just assume them to be zero. Unnecessary const ops
         // will be canonicalized away later in MLIR.
-        var zero = cc.makeConst(0, mapType(type));
+        var zero = cc.makeConst(BigInteger.ZERO, mapType(type));
         cc.setValue(dtor, zero);
         continue;
       }

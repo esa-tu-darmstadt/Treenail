@@ -6,13 +6,18 @@ import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.NamedEntity;
+import com.minres.coredsl.util.TypedBigInteger;
+import java.math.BigInteger;
 
 class RangeAnalyzer {
   static class RangeResult {
     MLIRValue base;
-    Integer from, to;
+    BigInteger from, to;
 
     public String toString() {
+      assert from == null || !(from instanceof TypedBigInteger);
+      assert to == null || !(to instanceof TypedBigInteger);
+
       if (base != null) {
         if (from != null && to != null)
           return format("%s : %s, %d:%d", base, base.type, from, to);
@@ -36,8 +41,8 @@ class RangeAnalyzer {
     return ((EntityReference)expr).getTarget();
   }
 
-  private static Integer getOffset(Expression expr, NamedEntity entity,
-                                   ConstructionContext cc) {
+  private static BigInteger getOffset(Expression expr, NamedEntity entity,
+                                      ConstructionContext cc) {
     if (!(expr instanceof InfixExpression))
       return null;
     var infixExpr = (InfixExpression)expr;
@@ -51,7 +56,10 @@ class RangeAnalyzer {
     if (!cc.isConstant(rhs))
       return null;
 
-    return ("-".equals(opr) ? -1 : 1) * cc.getConstantValue(rhs);
+    var val = cc.getConstantValue(rhs);
+    if ("-".equals(opr))
+      val = val.negate();
+    return val;
   }
 
   static RangeResult analyze(Expression fromExpr, Expression toExpr,
@@ -85,7 +93,7 @@ class RangeAnalyzer {
       if (offset != null) {
         res.base = cc.getValue(entity);
         res.from = offset;
-        res.to = 0;
+        res.to = BigInteger.ZERO;
         assert res.base != null
             : "NYI: Architectural state element in range specifier";
         return res;
@@ -98,7 +106,7 @@ class RangeAnalyzer {
       var offset = getOffset(toExpr, entity, cc);
       if (offset != null) {
         res.base = cc.getValue(entity);
-        res.from = 0;
+        res.from = BigInteger.ZERO;
         res.to = offset;
         assert res.base != null
             : "NYI: Architectural state element in range specifier";

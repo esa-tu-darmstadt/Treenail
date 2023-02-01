@@ -1,5 +1,8 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
+
+import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.BitField;
 import com.minres.coredsl.coreDsl.BitValue;
 import com.minres.coredsl.coreDsl.NamedEntity;
@@ -8,9 +11,11 @@ import com.minres.coredsl.util.TypedBigInteger;
 import java.util.Map;
 
 class EncodingFieldSwitch extends CoreDslSwitch<String> {
+  private final AnalysisContext ac;
   private final Map<NamedEntity, MLIRValue> values;
 
-  EncodingFieldSwitch(Map<NamedEntity, MLIRValue> values) {
+  EncodingFieldSwitch(AnalysisContext ac, Map<NamedEntity, MLIRValue> values) {
+    this.ac = ac;
     this.values = values;
   }
 
@@ -31,11 +36,10 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
 
   @Override
   public String caseBitField(BitField field) {
-    int from = field.getStartIndex().getValue().intValue();
-    int to = field.getEndIndex().getValue().intValue();
-    assert to == 0 : "NYI: Shifted encoding fields";
+    assert field.getEndIndex().getValue().signum() == 0
+        : "NYI: Shifted encoding fields";
 
-    var type = MLIRType.getType(from + 1, false);
+    var type = mapType(ac.getDeclaredType(field));
     var value = new MLIRValue(field.getName(), type);
     values.put(field, value);
 

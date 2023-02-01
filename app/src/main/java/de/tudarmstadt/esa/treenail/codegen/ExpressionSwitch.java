@@ -17,6 +17,7 @@ import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ParenthesisExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
+import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -208,7 +209,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     // The target dialect don't have unary operations, hence we must construct
     // equivalent binary operations here.
-    var zero = cc.makeConst(0, MLIRType.getType(1, false));
+    var zero = cc.makeConst(BigInteger.ZERO, MLIRType.getType(1, false));
 
     switch (expr.getOperator()) {
     case "-":

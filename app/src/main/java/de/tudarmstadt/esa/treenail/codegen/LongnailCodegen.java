@@ -144,7 +144,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
-    var encoding = emitEncoding(inst.getEncoding(), values);
+    var encoding = emitEncoding(inst.getEncoding(), ctx, values);
     var behavior = emitBehavior(inst.getBehavior(), ctx, values);
 
     sb.append(
@@ -155,9 +155,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return sb.toString();
   }
 
-  public String emitEncoding(Encoding encoding,
+  public String emitEncoding(Encoding encoding, AnalysisContext ctx,
                              Map<NamedEntity, MLIRValue> values) {
-    var encodingFieldSwitch = new EncodingFieldSwitch(values);
+    var encodingFieldSwitch = new EncodingFieldSwitch(ctx, values);
 
     var fields = encoding.getFields()
                      .stream()
