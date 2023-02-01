@@ -197,6 +197,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var op = binaryOperatorMap.get(opr);
     assert op != null : "NYI: operator " + opr;
     if ("&&".equals(opr) || "||".equals(opr))
+      // TODO: Emit icmp for operands that are not bools.
       System.err.println("[WARN] NYI: Short-circuit evaluation. Evaluating `" +
                          opr + "` eagerly.");
     return emitBinaryOp(op, type, lhs, rhs);
