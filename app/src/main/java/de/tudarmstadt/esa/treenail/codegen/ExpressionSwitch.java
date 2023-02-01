@@ -1,6 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
+import static de.tudarmstadt.esa.treenail.codegen.MLIRType.getType;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 
 import com.google.common.collect.Streams;
@@ -92,20 +93,82 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                 updatedValue.type);
   }
 
+  private int getAddSubResultWidth(MLIRType lhsTy, MLIRType rhsTy) {
+    if (lhsTy.isSigned == rhsTy.isSigned)
+      return Math.max(lhsTy.width, rhsTy.width) + 1;
+
+    // Extra bit necessary if the respective operand is _unsigned_.
+    int lhsExtraBit = lhsTy.isSigned ? 0 : 1;
+    int rhsExtraBit = rhsTy.isSigned ? 0 : 1;
+    return Math.max(lhsTy.width + lhsExtraBit, rhsTy.width + rhsExtraBit) + 1;
+  }
+
   @Override
   public MLIRValue caseAssignmentExpression(AssignmentExpression assign) {
-    assert "=".equals(assign.getOperator()) : "NYI: Combined assignments";
-
-    var rhs = doSwitch(assign.getValue());
     var lhs = assign.getTarget();
+    var opr = assign.getOperator();
+    var rhs = assign.getValue();
+
+    var rhsVal = doSwitch(rhs);
+    if (opr.length() > 1) {
+      // It's a compound assignment; evaluate the current LHS value.
+      var lhsVal = doSwitch(lhs);
+
+      var binOpr = opr.substring(0, opr.length() - 1);
+      var lhsTy = lhsVal.type;
+      var rhsTy = rhsVal.type;
+
+      // The result type of the underlying binary op cannot be queried from the
+      // analysis context, so we have to manually compute it again here.
+      MLIRType type = null;
+      switch (binOpr) {
+      case "&":
+      case "|":
+      case "^":
+      case "<<":
+      case ">>":
+        // Easy: The LHS type dictates the result type.
+        type = lhsTy;
+        break;
+      case "+":
+        type = getType(getAddSubResultWidth(lhsTy, rhsTy),
+                       lhsTy.isSigned | rhsTy.isSigned);
+        break;
+      case "-":
+        type = getType(getAddSubResultWidth(lhsTy, rhsTy), true);
+        break;
+      case "*":
+        type =
+            getType(lhsTy.width + rhsTy.width, lhsTy.isSigned | rhsTy.isSigned);
+        break;
+      case "/":
+        type = getType(lhsTy.width + (rhsTy.isSigned ? 1 : 0), lhsTy.isSigned);
+        break;
+      case "%":
+        if (lhsTy.isSigned == rhsTy.isSigned)
+          type = getType(Math.min(lhsTy.width, rhsTy.width), lhsTy.isSigned);
+        else if (lhsTy.isSigned)
+          type = getType(Math.min(lhsTy.width, rhsTy.width + 1), true);
+        else
+          type = getType(Math.min(lhsTy.width, Math.max(1, rhsTy.width - 1)),
+                         false);
+        break;
+      default:
+        assert false : "NYI: Unhandled compound assignment operator: " + opr;
+      }
+
+      rhsVal =
+          emitBinaryOp(binaryOperatorMap.get(binOpr), type, lhsVal, rhsVal);
+    }
+
     if (lhs instanceof EntityReference)
-      store((EntityReference)lhs, rhs);
+      store((EntityReference)lhs, rhsVal);
     else if (lhs instanceof IndexAccessExpression)
-      store((IndexAccessExpression)lhs, rhs);
+      store((IndexAccessExpression)lhs, rhsVal);
     else
       assert false : "NYI: Lvalue other than entity or array access";
 
-    return rhs;
+    return rhsVal;
   }
 
   @Override
@@ -210,7 +273,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     // The target dialect don't have unary operations, hence we must construct
     // equivalent binary operations here.
-    var zero = cc.makeConst(BigInteger.ZERO, MLIRType.getType(1, false));
+    var zero = cc.makeConst(BigInteger.ZERO, getType(1, false));
 
     switch (expr.getOperator()) {
     case "-":
@@ -233,10 +296,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var head = doSwitch(parts.get(0));
     for (int i = 1; i < parts.size(); ++i) {
       var next = doSwitch(parts.get(i));
-      head = emitBinaryOp(
-          "coredsl.concat",
-          MLIRType.getType(head.type.width + next.type.width, false), head,
-          next);
+      head = emitBinaryOp("coredsl.concat",
+                          getType(head.type.width + next.type.width, false),
+                          head, next);
     }
 
     return head;
@@ -294,6 +356,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue defaultCase(EObject obj) {
     cc.emitLn("// unhandled: %s", obj);
-    return cc.makeAnonymousValue(MLIRType.getType(1, false));
+    return cc.makeAnonymousValue(getType(1, false));
   }
 }

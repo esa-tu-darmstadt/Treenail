@@ -2,6 +2,7 @@ InstructionSet Test1 {
   architectural_state {
     register unsigned<32> X[32] [[is_main_reg]];
     register unsigned<17> Y;
+    register signed<5> Z[4];
     unsigned<32> XLEN = 32;
     unsigned<32> XLEN_2 = XLEN/2;
     unsigned<32> XLEN_4 = XLEN/4;
@@ -107,6 +108,35 @@ InstructionSet Test1 {
       encoding: imm[6:0] :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
       behavior: {
         X[rd] = (unsigned)(rs1 > 4 && rs2 < 2 ? -imm : imm[0:3]);
+      }
+    }
+
+    Inst10 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        unsigned<32> x = 0;
+        x &= imm;
+        x |= imm;
+        x ^= imm;
+        x <<= imm;
+        x >>= imm;
+        x += imm;
+        x -= imm;
+        x *= imm;
+        x /= imm;
+        x %= imm;
+        X[rd] = x;
+
+        Z[3] &= 1;
+        Z[3] |= 2;
+        Z[3] ^= 3;
+        Z[3] <<= 4;
+        Z[3] >>= 5;
+        Z[3] += 6;
+        Z[3] -= 7;
+        Z[3] *= 8;
+        Z[3] /= 9;
+        Z[3] %= 10;
       }
     }
   }
