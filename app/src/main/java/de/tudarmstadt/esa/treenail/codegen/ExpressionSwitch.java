@@ -16,6 +16,7 @@ import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ParenthesisExpression;
+import com.minres.coredsl.coreDsl.PostfixExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.math.BigInteger;
@@ -35,12 +36,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     this.cc = cc;
   }
 
-  class StoreSwitch extends CoreDslSwitch<Object> {
+  class StoreSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
     StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
 
     @Override
-    public Object caseEntityReference(EntityReference reference) {
+    public MLIRValue caseEntityReference(EntityReference reference) {
       var entity = reference.getTarget();
       var type = mapType(ac.getDeclaredType(entity));
       var castValue = cc.makeCast(newValue, type);
@@ -48,17 +49,17 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       if (cc.hasValue(entity)) {
         // It's a local variable, just put it in the value map.
         cc.setValue(entity, castValue);
-        return this;
+        return castValue;
       }
 
       // Otherwise, we update an architectural state element and have to emit a
       // `coredsl.set`.
       cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), castValue, type);
-      return this;
+      return castValue;
     }
 
     @Override
-    public Object caseIndexAccessExpression(IndexAccessExpression access) {
+    public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
       assert access.getTarget() instanceof EntityReference
           : "NYI: Nested Lvalues";
       var entity = ((EntityReference)access.getTarget()).getTarget();
@@ -76,7 +77,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         assert !isLocal : "NYI: local arrays";
         cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), index,
                   castValue, accessType);
-        return this;
+        return castValue;
       }
 
       MLIRValue oldValue;
@@ -98,13 +99,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       else
         cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), updatedValue,
                   updatedValue.type);
-      return this;
+      return updatedValue;
     }
 
     @Override
-    public Object defaultCase(EObject obj) {
+    public MLIRValue defaultCase(EObject obj) {
       assert false : "NYI: Lvalue other than entity or array access";
-      return this;
+      return null;
     }
   }
 
@@ -177,9 +178,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
 
     // Perform the store (may fail if `lhs` is an unsupported Lvalue).
-    new StoreSwitch(rhsVal).doSwitch(lhs);
-
-    return rhsVal;
+    return new StoreSwitch(rhsVal).doSwitch(lhs);
   }
 
   @Override
@@ -280,34 +279,52 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private static final Map<String, String> unaryOperatorMap = Map.ofEntries(
       m("-", "hwarith.sub"), m("!", "hwarith.icmp ne"), m("~", "coredsl.xor"));
 
+  private MLIRValue emitIncrementOrDecrement(MLIRValue value,
+                                             boolean decrement) {
+    var type = getType(value.type.width + 1, value.type.isSigned || decrement);
+    var one = cc.makeConst(BigInteger.ONE, getType(1, false));
+    return emitBinaryOp(binaryOperatorMap.get(decrement ? "-" : "+"), type,
+                        value, one);
+  }
+
   @Override
   public MLIRValue casePrefixExpression(PrefixExpression expr) {
+    var opr = expr.getOperator();
+
     var oprndExpr = expr.getOperand();
     var oprnd = doSwitch(oprndExpr);
-    var type = mapType(ac.getExpressionType(expr));
-    var opr = expr.getOperator();
 
     if (unaryOperatorMap.containsKey(opr)) {
       // The target dialect don't have unary operations, hence we must construct
       // equivalent binary operations here.
       var zero = cc.makeConst(BigInteger.ZERO, getType(1, false));
+      var type = mapType(ac.getExpressionType(expr));
       return emitBinaryOp(unaryOperatorMap.get(opr), type, zero, oprnd);
     }
 
     assert "++".equals(opr) || "--".equals(opr)
         : "Prefix expression is neither increment nor decrement";
 
-    var incrDecrType =
-        getType(type.width + 1, type.isSigned || "--".equals(opr));
-    var one = cc.makeConst(BigInteger.ONE, getType(1, false));
-    var incrDecr = emitBinaryOp(binaryOperatorMap.get(opr.substring(0, 1)),
-                                incrDecrType, oprnd, one);
+    var incrDecr = emitIncrementOrDecrement(oprnd, "--".equals(opr));
 
     // Store the incremented/decremented value (may fail if the operand is not a
     // supported Lvalue).
+    return new StoreSwitch(incrDecr).doSwitch(oprndExpr);
+  }
+
+  @Override
+  public MLIRValue casePostfixExpression(PostfixExpression expr) {
+    var opr = expr.getOperator();
+    assert "++".equals(opr) ||
+        "--".equals(opr) : "NYI: Postfix operator: " + opr;
+
+    var oprndExpr = expr.getOperand();
+    var oprnd = doSwitch(oprndExpr);
+
+    var incrDecr = emitIncrementOrDecrement(oprnd, "--".equals(opr));
     new StoreSwitch(incrDecr).doSwitch(oprndExpr);
 
-    return incrDecr;
+    return oprnd;
   }
 
   @Override

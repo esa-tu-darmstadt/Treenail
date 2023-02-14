@@ -146,7 +146,11 @@ InstructionSet Test1 {
         unsigned<32> x = 0;
         ++x;
         --x;
-        X[rd] = x;
+        x++;
+        x--;
+        X[rd] = (x--) | x | (--x);
+        X[rd]++;
+        --Y;
       }
     }
   }
