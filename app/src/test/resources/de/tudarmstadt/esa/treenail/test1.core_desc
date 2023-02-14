@@ -140,19 +140,15 @@ InstructionSet Test1 {
       }
     }
 
-    /* NYI
     Inst11 {
       encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
       behavior: {
         unsigned<32> x = 0;
-        x++;
         ++x;
-        x--;
         --x;
         X[rd] = x;
       }
     }
-    */
   }
 }
 

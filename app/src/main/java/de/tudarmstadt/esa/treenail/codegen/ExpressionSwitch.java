@@ -35,62 +35,77 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     this.cc = cc;
   }
 
-  private void store(EntityReference reference, MLIRValue newValue) {
-    var entity = reference.getTarget();
-    var type = mapType(ac.getDeclaredType(entity));
-    var castValue = cc.makeCast(newValue, type);
+  class StoreSwitch extends CoreDslSwitch<Object> {
+    private final MLIRValue newValue;
+    StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
 
-    if (cc.hasValue(entity)) {
-      // It's a local variable, just put it in the value map.
-      cc.setValue(entity, castValue);
-      return;
+    @Override
+    public Object caseEntityReference(EntityReference reference) {
+      var entity = reference.getTarget();
+      var type = mapType(ac.getDeclaredType(entity));
+      var castValue = cc.makeCast(newValue, type);
+
+      if (cc.hasValue(entity)) {
+        // It's a local variable, just put it in the value map.
+        cc.setValue(entity, castValue);
+        return this;
+      }
+
+      // Otherwise, we update an architectural state element and have to emit a
+      // `coredsl.set`.
+      cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), castValue, type);
+      return this;
     }
 
-    // Otherwise, we update an architectural state element and have to emit a
-    // `coredsl.set`.
-    cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), castValue, type);
-  }
+    @Override
+    public Object caseIndexAccessExpression(IndexAccessExpression access) {
+      assert access.getTarget() instanceof EntityReference
+          : "NYI: Nested Lvalues";
+      var entity = ((EntityReference)access.getTarget()).getTarget();
+      var entityType = ac.getDeclaredType(entity);
 
-  private void store(IndexAccessExpression access, MLIRValue newValue) {
-    assert access.getTarget() instanceof EntityReference
-        : "NYI: Nested Lvalues";
-    var entity = ((EntityReference)access.getTarget()).getTarget();
-    var entityType = ac.getDeclaredType(entity);
+      var isLocal = cc.hasValue(entity);
+      var isBitAccess = entityType.isIntegerType();
 
-    var isLocal = cc.hasValue(entity);
-    var isBitAccess = entityType.isIntegerType();
+      var accessType = mapType(ac.getExpressionType(access));
+      var castValue = cc.makeCast(newValue, accessType);
+      var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
+                                        cc, ExpressionSwitch.this);
 
-    var accessType = mapType(ac.getExpressionType(access));
-    var castValue = cc.makeCast(newValue, accessType);
-    var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
-                                      cc, this);
+      if (!isBitAccess) {
+        assert !isLocal : "NYI: local arrays";
+        cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), index,
+                  castValue, accessType);
+        return this;
+      }
 
-    if (!isBitAccess) {
-      assert !isLocal : "NYI: local arrays";
-      cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), index,
-                castValue, accessType);
-      return;
+      MLIRValue oldValue;
+      if (isLocal)
+        oldValue = cc.getValue(entity);
+      else {
+        oldValue = cc.makeAnonymousValue(mapType(entityType));
+        cc.emitLn("%s = coredsl.get @%s : %s", oldValue, entity.getName(),
+                  oldValue.type);
+      }
+
+      var updatedValue = cc.makeAnonymousValue(oldValue.type);
+      cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
+                updatedValue, oldValue, index, castValue, oldValue.type,
+                accessType, updatedValue.type);
+
+      if (isLocal)
+        cc.setValue(entity, updatedValue);
+      else
+        cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), updatedValue,
+                  updatedValue.type);
+      return this;
     }
 
-    MLIRValue oldValue;
-    if (isLocal)
-      oldValue = cc.getValue(entity);
-    else {
-      oldValue = cc.makeAnonymousValue(mapType(entityType));
-      cc.emitLn("%s = coredsl.get @%s : %s", oldValue, entity.getName(),
-                oldValue.type);
+    @Override
+    public Object defaultCase(EObject obj) {
+      assert false : "NYI: Lvalue other than entity or array access";
+      return this;
     }
-
-    var updatedValue = cc.makeAnonymousValue(oldValue.type);
-    cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", updatedValue,
-              oldValue, index, castValue, oldValue.type, accessType,
-              updatedValue.type);
-
-    if (isLocal)
-      cc.setValue(entity, updatedValue);
-    else
-      cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), updatedValue,
-                updatedValue.type);
   }
 
   private int getAddSubResultWidth(MLIRType lhsTy, MLIRType rhsTy) {
@@ -161,12 +176,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           emitBinaryOp(binaryOperatorMap.get(binOpr), type, lhsVal, rhsVal);
     }
 
-    if (lhs instanceof EntityReference)
-      store((EntityReference)lhs, rhsVal);
-    else if (lhs instanceof IndexAccessExpression)
-      store((IndexAccessExpression)lhs, rhsVal);
-    else
-      assert false : "NYI: Lvalue other than entity or array access";
+    // Perform the store (may fail if `lhs` is an unsupported Lvalue).
+    new StoreSwitch(rhsVal).doSwitch(lhs);
 
     return rhsVal;
   }
@@ -266,26 +277,37 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     return emitBinaryOp(op, type, lhs, rhs);
   }
 
+  private static final Map<String, String> unaryOperatorMap = Map.ofEntries(
+      m("-", "hwarith.sub"), m("!", "hwarith.icmp ne"), m("~", "coredsl.xor"));
+
   @Override
   public MLIRValue casePrefixExpression(PrefixExpression expr) {
-    var oprnd = doSwitch(expr.getOperand());
+    var oprndExpr = expr.getOperand();
+    var oprnd = doSwitch(oprndExpr);
     var type = mapType(ac.getExpressionType(expr));
+    var opr = expr.getOperator();
 
-    // The target dialect don't have unary operations, hence we must construct
-    // equivalent binary operations here.
-    var zero = cc.makeConst(BigInteger.ZERO, getType(1, false));
-
-    switch (expr.getOperator()) {
-    case "-":
-      return emitBinaryOp("hwarith.sub", type, zero, oprnd);
-    case "!":
-      return emitBinaryOp("hwarith.icmp ne", type, zero, oprnd);
-    case "~":
-      return emitBinaryOp("coredsl.xor", type, zero, oprnd);
-    default:
-      assert false : "NYI: operator " + expr.getOperator();
-      return null;
+    if (unaryOperatorMap.containsKey(opr)) {
+      // The target dialect don't have unary operations, hence we must construct
+      // equivalent binary operations here.
+      var zero = cc.makeConst(BigInteger.ZERO, getType(1, false));
+      return emitBinaryOp(unaryOperatorMap.get(opr), type, zero, oprnd);
     }
+
+    assert "++".equals(opr) || "--".equals(opr)
+        : "Prefix expression is neither increment nor decrement";
+
+    var incrDecrType =
+        getType(type.width + 1, type.isSigned || "--".equals(opr));
+    var one = cc.makeConst(BigInteger.ONE, getType(1, false));
+    var incrDecr = emitBinaryOp(binaryOperatorMap.get(opr.substring(0, 1)),
+                                incrDecrType, oprnd, one);
+
+    // Store the incremented/decremented value (may fail if the operand is not a
+    // supported Lvalue).
+    new StoreSwitch(incrDecr).doSwitch(oprndExpr);
+
+    return incrDecr;
   }
 
   @Override
