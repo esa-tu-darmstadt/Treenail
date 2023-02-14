@@ -153,6 +153,16 @@ InstructionSet Test1 {
         --Y;
       }
     }
+
+    Inst12 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        unsigned<32> x = 0;
+        for (unsigned int i = 0; i < imm; ++i)
+          x += i;
+        X[rd] = x;
+      }
+    }
   }
 }
 
