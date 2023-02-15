@@ -213,9 +213,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     forCC.setValue(iterVar, iterCast);
 
     // Make other iterArgs available in the body, and create result values.
-    var iterArgTypes = new ArrayList<MLIRType>();
+    var iterArgTypes = new LinkedList<MLIRType>();
     var iterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
-    var results = new ArrayList<MLIRValue>();
+    var results = new LinkedList<MLIRValue>();
     for (var v : iterArgVars) {
       var type = mapType(ac.getDeclaredType(v));
       iterArgTypes.add(type);
@@ -294,10 +294,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
         new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
 
-    var argTypes = new ArrayList<MLIRType>();
+    var argTypes = new LinkedList<MLIRType>();
     var beforeArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var afterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
-    var results = new ArrayList<MLIRValue>();
+    var results = new LinkedList<MLIRValue>();
     for (var v : loopCarriedVars) {
       var type = mapType(ac.getDeclaredType(v));
       argTypes.add(type);
