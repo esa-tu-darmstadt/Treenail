@@ -18,6 +18,8 @@ class MLIRType {
     this.isSigned = isSigned;
   }
 
+  final static MLIRType DUMMY = new MLIRType(Integer.MAX_VALUE, false);
+
   static MLIRType getType(int width, boolean isSigned) {
     var map = isSigned ? signedTypes : unsignedTypes;
     if (!map.containsKey(width)) {

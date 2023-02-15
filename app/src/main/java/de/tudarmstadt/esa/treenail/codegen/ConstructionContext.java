@@ -37,15 +37,18 @@ class ConstructionContext {
   // This method ensures that the return value is a standard `BigInteger`, as
   // the frontend's `TypedBigInteger` has a `toString()` method that is
   // unsuitable for use here.
-  BigInteger getConstantValue(Expression expr) {
-    BigInteger value = expr instanceof IntegerConstant
-                           ? ((IntegerConstant)expr).getValue()
-                           : ac.getExpressionValue(expr).getValue();
+  static BigInteger ensureBigInteger(BigInteger value) {
     if (value == null)
       return null;
     if (value instanceof TypedBigInteger)
       return new BigInteger(value.toByteArray());
     return value;
+  }
+
+  BigInteger getConstantValue(Expression expr) {
+    return ensureBigInteger(expr instanceof IntegerConstant
+                                ? ((IntegerConstant)expr).getValue()
+                                : ac.getExpressionValue(expr).getValue());
   }
 
   IntegerType getElementType(NamedEntity ent) {
@@ -76,6 +79,13 @@ class ConstructionContext {
     return result;
   }
 
+  MLIRValue makeIndexConst(BigInteger value) {
+    assert !(value instanceof TypedBigInteger);
+    var result = makeAnonymousValue(MLIRType.getType(64, false));
+    emitLn("%s = arith.constant %d : index", result, value);
+    return result;
+  }
+
   MLIRValue makeCast(MLIRValue value, MLIRType type) {
     if (type == value.type)
       return value;
@@ -85,10 +95,21 @@ class ConstructionContext {
     return result;
   }
 
-  MLIRValue makeSignlessCast(MLIRValue value) {
+  MLIRValue makeI1Cast(MLIRValue value) {
     var result =
         makeAnonymousValue(MLIRType.getType(1, false) /* doesn't matter */);
     emitLn("%s = coredsl.cast %s : %s to i1", result, value, value.type);
+    return result;
+  }
+
+  MLIRValue makeIndexCast(MLIRValue value, MLIRType type) {
+    var temp =
+        makeAnonymousValue(MLIRType.getType(1, false) /* doesn't matter */);
+    var result = makeAnonymousValue(type);
+    emitLn("%s = arith.index_castui %s : index to i%d", temp, value,
+           type.width);
+    emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, temp, type.width,
+           type);
     return result;
   }
 

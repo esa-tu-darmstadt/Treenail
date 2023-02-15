@@ -348,7 +348,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var type = mapType(ac.getExpressionType(expr));
 
     var cond = doSwitch(expr.getCondition());
-    var cast = cc.makeSignlessCast(cond);
+    var cast = cc.makeI1Cast(cond);
 
     var values = cc.getValues();
     var counter = cc.getCounter();

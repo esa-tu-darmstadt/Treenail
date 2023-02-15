@@ -11,17 +11,22 @@ import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
+import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
 import com.minres.coredsl.coreDsl.IfStatement;
+import com.minres.coredsl.coreDsl.InfixExpression;
+import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
@@ -86,7 +91,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   @Override
   public Object caseIfStatement(IfStatement ifStmt) {
     var cond = exprSwitch.doSwitch(ifStmt.getCondition());
-    var cast = cc.makeSignlessCast(cond);
+    var cast = cc.makeI1Cast(cond);
 
     var values = cc.getValues();
     var counter = cc.getCounter();
@@ -156,8 +161,108 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     return this;
   }
 
-  @Override
-  public Object caseForLoop(ForLoop loop) {
+  private List<NamedEntity> getLoopCarriedVariables(ForLoop loop) {
+    // Simulate construction to find loop-carried values, in lieu of proper
+    // analysis.
+    var simCC = new ConstructionContext(
+        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
+        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    new ExpressionSwitch(simCC).doSwitch(loop.getCondition());
+    new StatementSwitch(simCC).doSwitch(loop.getBody());
+    loop.getLoopExpressions().forEach(new ExpressionSwitch(simCC)::doSwitch);
+    return new ArrayList<>(simCC.getUpdatedEntities());
+  }
+
+  private boolean emitScfFor(ForLoop loop) {
+    // Check whether this loop can be represented as an `scf.for` operation. If
+    // not, fail early; the construction will fall-back to a generic
+    // `scf.while` (which may be unsupported by Longnail).
+    var initAna = ForLoopAnalyzer.analyzeInitialization(loop);
+    var condAna = ForLoopAnalyzer.analyzeCondition(loop);
+    var actionAna = ForLoopAnalyzer.analyzeAction(loop);
+    if (initAna == null || condAna == null || actionAna == null ||
+        initAna.variable != condAna.variable ||
+        condAna.variable != actionAna.variable)
+      return false;
+
+    // The iterator is special in `scf.for`; separate it from the remaining
+    // loop-carried variables.
+    var iterVar = initAna.variable;
+    var iterArgVars = getLoopCarriedVariables(loop);
+    iterArgVars.remove(iterVar);
+
+    // For now, only loops with constant bounds/trip counts are supported.
+    var from = cc.makeIndexConst(initAna.value);
+    var to = cc.makeIndexConst(condAna.bound);
+    var step = cc.makeIndexConst(actionAna.step);
+
+    // This nested construction will be used for the loop body.
+    var forCC = new ConstructionContext(
+        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
+        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+
+    // Make the iterator available as an ui/si value in the body.
+    var iterIndex = forCC.makeAnonymousValue(MLIRType.DUMMY);
+    var iterType = mapType(ac.getDeclaredType(iterVar));
+    var iterCast = forCC.makeIndexCast(iterIndex, iterType);
+    forCC.setValue(iterVar, iterCast);
+
+    // Make other iterArgs available in the body, and create result values.
+    var iterArgTypes = new ArrayList<MLIRType>();
+    var iterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
+    var results = new ArrayList<MLIRValue>();
+    for (var v : iterArgVars) {
+      var type = mapType(ac.getDeclaredType(v));
+      iterArgTypes.add(type);
+
+      forCC.setValue(v, forCC.makeAnonymousValue(type));
+      iterArgs.put(v, forCC.getValue(v));
+
+      results.add(cc.makeAnonymousValue(type));
+    }
+
+    // Recurse into loop body.
+    new StatementSwitch(forCC).doSwitch(loop.getBody());
+
+    // Handle simple case first: no `iter_args`/results.
+    if (iterArgs.isEmpty()) {
+      forCC.emitLn("scf.yield");
+      cc.emitLn("scf.for %s = %s to %s step %s {\n%s}", iterIndex, from, to,
+                step, forCC.getStringBuilder().toString().indent(N_SPACES));
+      return true;
+    }
+
+    // General case: we have `iter_args` and results.
+    var iterArgTypesStr =
+        iterArgTypes.stream().map(Object::toString).collect(joining(", "));
+
+    // Emit yield in the nested region.
+    var yieldVals = iterArgVars.stream().map(forCC::getValue).toList();
+    forCC.emitLn(
+        "scf.yield %s : %s",
+        yieldVals.stream().map(Object::toString).collect(joining(", ")),
+        iterArgTypesStr);
+
+    // Collect initial values for the `iter_args`.
+    var iterArgsStr =
+        iterArgVars.stream()
+            .map(e -> format("%s = %s", iterArgs.get(e), cc.getValue(e)))
+            .collect(joining(", "));
+    var resultsStr =
+        results.stream().map(Object::toString).collect(joining(", "));
+
+    cc.emitLn("%s = scf.for %s = %s to %s step %s iter_args(%s) -> (%s) {\n%s}",
+              resultsStr, iterIndex, from, to, step, iterArgsStr,
+              iterArgTypesStr,
+              forCC.getStringBuilder().toString().indent(N_SPACES));
+
+    // Update the surrounding construction's value table.
+    Streams.forEachPair(iterArgVars.stream(), results.stream(), cc::setValue);
+
+    return true;
+  }
+
+  private void emitScfWhile(ForLoop loop) {
     var startDecl = loop.getStartDeclaration();
     var startExpr = loop.getStartExpression();
     var condExpr = loop.getCondition();
@@ -170,17 +275,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     if (startExpr != null)
       exprSwitch.doSwitch(startExpr);
 
-    // Simulate construction to find loop-carried values, in lieu of proper
-    // analysis.
-    var simCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
-    new ExpressionSwitch(simCC).doSwitch(condExpr);
-    new StatementSwitch(simCC).doSwitch(bodyStmt);
-    loopExprs.forEach(new ExpressionSwitch(simCC)::doSwitch);
-
-    var loopCarriedVars = simCC.getUpdatedEntities().stream().toList();
-    simCC = null; // Throw away the dummy construction.
+    // Find loop-carried values.
+    var loopCarriedVars = getLoopCarriedVariables(loop);
 
     // Real construction begins here. See
     // https://mlir.llvm.org/docs/Dialects/SCFDialect/#scfwhile-mlirscfwhileop
@@ -214,7 +310,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         argTypes.stream().map(Object::toString).collect(joining(", "));
 
     var cond = new ExpressionSwitch(beforeCC).doSwitch(condExpr);
-    var condCast = beforeCC.makeSignlessCast(cond);
+    var condCast = beforeCC.makeI1Cast(cond);
     var beforeCondVals =
         loopCarriedVars.stream().map(beforeCC::getValue).toList();
     beforeCC.emitLn(
@@ -254,7 +350,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
     Streams.forEachPair(loopCarriedVars.stream(), results.stream(),
                         cc::setValue);
+  }
 
+  @Override
+  public Object caseForLoop(ForLoop loop) {
+    if (!emitScfFor(loop))
+      emitScfWhile(loop);
     return this;
   }
 

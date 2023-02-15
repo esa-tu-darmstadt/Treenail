@@ -157,10 +157,22 @@ InstructionSet Test1 {
     Inst12 {
       encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
       behavior: {
-        unsigned<32> x = 0;
-        for (unsigned int i = 0; i < imm; ++i)
+        unsigned<17> x = 0;
+        signed<5> z = -3;
+        for (unsigned<4> i = 0; i < 5; ++i) {
           x += i;
+          z -= i;
+        }
         X[rd] = x;
+        Z[1] = z;
+
+        for (unsigned<4> i = 0; i < imm; i <<= 2) {
+          x += i;
+          z -= i;
+        }
+
+        X[rd] = x;
+        Z[2] = z;
       }
     }
   }
