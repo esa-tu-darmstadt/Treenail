@@ -24,9 +24,11 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
@@ -170,7 +172,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     new ExpressionSwitch(simCC).doSwitch(loop.getCondition());
     new StatementSwitch(simCC).doSwitch(loop.getBody());
     loop.getLoopExpressions().forEach(new ExpressionSwitch(simCC)::doSwitch);
-    return new ArrayList<>(simCC.getUpdatedEntities());
+    var res = new LinkedList<>(simCC.getUpdatedEntities());
+    // Filter out variables declared inside the loop.
+    res.removeIf(Predicate.not(cc::hasValue));
+    return res;
   }
 
   private boolean emitScfFor(ForLoop loop) {

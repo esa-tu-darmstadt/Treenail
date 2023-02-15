@@ -175,6 +175,20 @@ InstructionSet Test1 {
         Z[2] = z;
       }
     }
+
+    Inst13 {
+      encoding: 7'd0 :: rs2[4:0] :: rs1[4:0] :: 3'd0 :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        unsigned<32> arg1 = X[rs1];
+        unsigned<32> arg2 = X[rs2];
+        unsigned<32> res = 0;
+        for (unsigned<5> i = 0; i < 4; ++i) {
+          unsigned<5> base = i << 3;
+          res[base+7:base] = (arg1[base+7:base] * arg2[base+7:base])[7:0];
+        }
+        X[rd] = res;
+      }
+    }
   }
 }
 
