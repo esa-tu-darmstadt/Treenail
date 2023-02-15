@@ -395,6 +395,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue defaultCase(EObject obj) {
     cc.emitLn("// unhandled: %s", obj);
-    return cc.makeAnonymousValue(getType(1, false));
+    return cc.makeAnonymousValue(MLIRType.DUMMY);
   }
 }

@@ -96,15 +96,13 @@ class ConstructionContext {
   }
 
   MLIRValue makeI1Cast(MLIRValue value) {
-    var result =
-        makeAnonymousValue(MLIRType.getType(1, false) /* doesn't matter */);
+    var result = makeAnonymousValue(MLIRType.DUMMY);
     emitLn("%s = coredsl.cast %s : %s to i1", result, value, value.type);
     return result;
   }
 
   MLIRValue makeIndexCast(MLIRValue value, MLIRType type) {
-    var temp =
-        makeAnonymousValue(MLIRType.getType(1, false) /* doesn't matter */);
+    var temp = makeAnonymousValue(MLIRType.DUMMY);
     var result = makeAnonymousValue(type);
     emitLn("%s = arith.index_castui %s : index to i%d", temp, value,
            type.width);
