@@ -112,6 +112,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     if (hasElse)
       new StatementSwitch(elseCC).doSwitch(ifStmt.getElseBody());
 
+    // TODO: check if the entities are present in `cc`, similar to the for-loop
+    // construction. If not, they're local variables that cannot be live outside
+    // the branch.
     var thenUpdated = thenCC.getUpdatedEntities();
     var elseUpdated = elseCC.getUpdatedEntities();
     if (thenUpdated.isEmpty() && elseUpdated.isEmpty()) {
