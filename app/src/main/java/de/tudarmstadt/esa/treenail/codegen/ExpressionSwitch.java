@@ -60,9 +60,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     @Override
     public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
-      assert access.getTarget() instanceof EntityReference
-          : "NYI: Nested Lvalues";
-      var entity = ((EntityReference)access.getTarget()).getTarget();
+      var target = access.getTarget();
+      assert target instanceof EntityReference : "NYI: Nested Lvalues";
+      var entity = ((EntityReference)target).getTarget();
       var entityType = ac.getDeclaredType(entity);
 
       var isLocal = cc.hasValue(entity);
@@ -71,7 +71,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var accessType = mapType(ac.getExpressionType(access));
       var castValue = cc.makeCast(newValue, accessType);
       var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
-                                        cc, ExpressionSwitch.this);
+                                        entityType, cc, ExpressionSwitch.this);
 
       if (!isBitAccess) {
         assert !isLocal : "NYI: local arrays";
@@ -209,11 +209,11 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     // index (i.e. it's a range index).
 
     var type = mapType(ac.getExpressionType(access));
+    var targetType = ac.getExpressionType(access.getTarget());
     var result = cc.makeAnonymousValue(type);
     var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
-                                      cc, this);
+                                      targetType, cc, this);
 
-    var targetType = ac.getExpressionType(access.getTarget());
     // It's a bit-level access if we're indexing into a scalar.
     if (targetType.isIntegerType()) {
       var target = doSwitch(access.getTarget());

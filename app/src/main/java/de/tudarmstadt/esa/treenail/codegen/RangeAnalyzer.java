@@ -6,6 +6,8 @@ import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.NamedEntity;
+import com.minres.coredsl.type.ArrayType;
+import com.minres.coredsl.type.CoreDslType;
 import com.minres.coredsl.util.TypedBigInteger;
 import java.math.BigInteger;
 
@@ -62,10 +64,23 @@ class RangeAnalyzer {
     return val;
   }
 
+  private static MLIRType getIndexType(CoreDslType baseType) {
+    BigInteger numElems;
+    if (baseType instanceof ArrayType)
+      numElems = BigInteger.valueOf(((ArrayType)baseType).count);
+    else
+      numElems = BigInteger.valueOf(baseType.getBitSize());
+    return MLIRType.getType(numElems.bitLength() - 1, false);
+  }
+
   static RangeResult analyze(Expression fromExpr, Expression toExpr,
-                             ConstructionContext cc,
+                             CoreDslType baseType, ConstructionContext cc,
                              ExpressionSwitch exprSwitch) {
     assert fromExpr != null;
+
+    // Longnail is more restrictive than the frontend: the index value must be
+    // a) unsigned and b) not wider than necessary.
+    var indexType = getIndexType(baseType);
 
     var res = new RangeResult();
 
@@ -75,7 +90,7 @@ class RangeAnalyzer {
         res.from = cc.getConstantValue(fromExpr);
         return res;
       }
-      res.base = exprSwitch.doSwitch(fromExpr);
+      res.base = cc.makeCast(exprSwitch.doSwitch(fromExpr), indexType);
       return res;
     }
 
@@ -91,11 +106,11 @@ class RangeAnalyzer {
     if (entity != null) {
       var offset = getOffset(fromExpr, entity, cc);
       if (offset != null) {
-        res.base = cc.getValue(entity);
+        assert cc.getValue(entity) != null
+            : "NYI: Architectural state element in range specifier";
+        res.base = cc.makeCast(cc.getValue(entity), indexType);
         res.from = offset;
         res.to = BigInteger.ZERO;
-        assert res.base != null
-            : "NYI: Architectural state element in range specifier";
         return res;
       }
     }
@@ -105,7 +120,9 @@ class RangeAnalyzer {
     if (entity != null) {
       var offset = getOffset(toExpr, entity, cc);
       if (offset != null) {
-        res.base = cc.getValue(entity);
+        assert cc.getValue(entity) != null
+            : "NYI: Architectural state element in range specifier";
+        res.base = cc.makeCast(cc.getValue(entity), indexType);
         res.from = BigInteger.ZERO;
         res.to = offset;
         assert res.base != null

@@ -167,9 +167,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var simCC = new ConstructionContext(
         new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
         new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
-    new ExpressionSwitch(simCC).doSwitch(loop.getCondition());
-    new StatementSwitch(simCC).doSwitch(loop.getBody());
+    var simExprSwitch = new ExpressionSwitch(simCC);
+    var simStmtSwitch = new StatementSwitch(simCC);
+
+    var startDecl = loop.getStartDeclaration();
+    var startExpr = loop.getStartExpression();
+    if (startDecl != null)
+      simStmtSwitch.doSwitch(startDecl);
+    if (startExpr != null)
+      simExprSwitch.doSwitch(startExpr);
+    simExprSwitch.doSwitch(loop.getCondition());
+    simStmtSwitch.doSwitch(loop.getBody());
     loop.getLoopExpressions().forEach(new ExpressionSwitch(simCC)::doSwitch);
+
     var res = new LinkedList<>(simCC.getUpdatedEntities());
     // Filter out variables declared inside the loop.
     res.removeIf(Predicate.not(cc::hasValue));
