@@ -9,6 +9,7 @@ InstructionSet Test1 {
     extern unsigned char MEM[1048576] [[is_main_mem]];
     extern unsigned int CSR[4096];
     const register unsigned<4> FOO = 1+1;
+    const register unsigned<4> BAR[3] = {1,2,3};
   }
 
   instructions {
@@ -220,6 +221,13 @@ InstructionSet Test1 {
       encoding: 7'd0 :: rs2[4:0] :: rs1[4:0] :: 3'd0 :: rd[4:0] :: 7'b0001011;
       behavior: {
         X[rd] = foo(X[rs1], X[rs2]);
+      }
+    }
+
+    Inst14 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        X[rd] = BAR[FOO[1:0]];
       }
     }
   }

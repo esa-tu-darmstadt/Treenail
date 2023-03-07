@@ -17,6 +17,7 @@ import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.Instruction;
+import com.minres.coredsl.coreDsl.ListInitializer;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
 import com.minres.coredsl.coreDsl.TypeQualifier;
@@ -74,28 +75,27 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var type = ctx.getDeclaredType(dtor);
     var init = dtor.getInitializer();
 
-    var proto = "local";
-    var flags = isConst ? " const" : "";
+    var protoStr = "local";
+    var flagsStr = isConst ? " const" : "";
+    var initStr = "";
 
     if (type.isIntegerType()) {
       // TODO: inspect attributes instead
       if ("PC".equals(name) && type.getBitSize() == 32)
-        proto = "core_pc";
-      if (init == null) {
-        return format("coredsl.register %s%s @%s : %s\n", proto, flags, name,
-                      mapType(type));
+        protoStr = "core_pc";
+      if (init != null) {
+        assert init instanceof ExpressionInitializer;
+        var exprInit = (ExpressionInitializer)init;
+        var cv = ctx.getExpressionValue(exprInit.getValue());
+        assert cv.getStatus() == StatusCode.success
+            : "Non-constant initializer";
+        initStr = " = " + ensureBigInteger(cv.value);
       }
-
-      assert init instanceof ExpressionInitializer;
-      var exprInit = (ExpressionInitializer)init;
-      var cv = ctx.getExpressionValue(exprInit.getValue());
-      assert cv.getStatus() == StatusCode.success : "Non-constant initializer";
-      return format("coredsl.register %s%s @%s = %s : %s\n", proto, flags, name,
-                    ensureBigInteger(cv.value), mapType(type));
+      return format("coredsl.register %s%s @%s%s : %s\n", protoStr, flagsStr,
+                    name, initStr, mapType(type));
     }
 
     assert type.isArrayType();
-    assert init == null : "NYI: Array initializers";
     var arrayType = (ArrayType)type;
     assert arrayType.elementType.isIntegerType()
         : "NYI: Multi-dimensional registers";
@@ -104,10 +104,25 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var numElements = arrayType.count;
     // TODO: inspect attributes instead
     if ("X".equals(name) && width == 32 && numElements == 32)
-      proto = "core_x";
+      protoStr = "core_x";
 
-    return format("coredsl.register %s%s @%s[%d] : %s\n", proto, flags, name,
-                  numElements, mapType(arrayType.elementType));
+    if (init != null) {
+      assert init instanceof ListInitializer;
+      var listInit = (ListInitializer)init;
+      initStr = listInit.getInitializers()
+                    .stream()
+                    .map(i -> {
+                      var ei = (ExpressionInitializer)i;
+                      var cv = ctx.getExpressionValue(ei.getValue());
+                      assert cv.getStatus() == StatusCode.success
+                          : "Non-constant initializer";
+                      return ensureBigInteger(cv.getValue());
+                    })
+                    .map(Object::toString)
+                    .collect(joining(", ", " = [", "]"));
+    }
+    return format("coredsl.register %s%s @%s[%d]%s : %s\n", protoStr, flagsStr,
+                  name, numElements, initStr, mapType(arrayType.elementType));
   }
 
   private String emitAddressSpace(Declarator dtor, AnalysisContext ctx) {
