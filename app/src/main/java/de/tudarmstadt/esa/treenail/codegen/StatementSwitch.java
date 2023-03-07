@@ -14,8 +14,11 @@ import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
+import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IfStatement;
+import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
+import com.minres.coredsl.coreDsl.ReturnStatement;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
@@ -82,6 +85,26 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   @Override
   public Object caseExpressionStatement(ExpressionStatement exprStmt) {
     exprSwitch.doSwitch(exprStmt.getExpression());
+    return this;
+  }
+
+  @Override
+  public Object caseReturnStatement(ReturnStatement retStmt) {
+    var expr = retStmt.getValue();
+    if (expr == null) {
+      cc.emitLn("return");
+      return this;
+    }
+
+    EObject funcDef = retStmt.eContainer();
+    while (funcDef != null && !(funcDef instanceof FunctionDefinition))
+      funcDef = funcDef.eContainer();
+    assert funcDef != null : "Return statement outside of function?";
+
+    var sig = ac.getFunctionSignature((FunctionDefinition)funcDef);
+    var retTy = mapType(sig.getReturnType());
+    var retVal = cc.makeCast(exprSwitch.doSwitch(expr), retTy);
+    cc.emitLn("return %s : %s", retVal, retTy);
     return this;
   }
 

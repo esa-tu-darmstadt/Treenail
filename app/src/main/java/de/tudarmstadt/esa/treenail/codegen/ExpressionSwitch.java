@@ -3,6 +3,7 @@ package de.tudarmstadt.esa.treenail.codegen;
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.getType;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
+import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
@@ -11,6 +12,8 @@ import com.minres.coredsl.coreDsl.CastExpression;
 import com.minres.coredsl.coreDsl.ConcatenationExpression;
 import com.minres.coredsl.coreDsl.ConditionalExpression;
 import com.minres.coredsl.coreDsl.EntityReference;
+import com.minres.coredsl.coreDsl.FunctionCallExpression;
+import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
@@ -390,6 +393,37 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue caseParenthesisExpression(ParenthesisExpression expr) {
     return doSwitch(expr.getInner());
+  }
+
+  @Override
+  public MLIRValue caseFunctionCallExpression(FunctionCallExpression call) {
+    var calleeRef = call.getTarget();
+    assert calleeRef instanceof EntityReference : "Indirect call encountered";
+    var callee = ((EntityReference)calleeRef).getTarget();
+    assert callee instanceof FunctionDefinition;
+    var funcTy = ac.getFunctionSignature((FunctionDefinition)callee);
+
+    var args = call.getArguments().stream().map(this::doSwitch).toList();
+    var argTys =
+        funcTy.getParamTypes().stream().map(MLIRType::mapType).toList();
+    var argsCastStr = Streams
+                          .zip(args.stream(), argTys.stream(),
+                               (arg, ty) -> cc.makeCast(arg, ty))
+                          .map(Object::toString)
+                          .collect(joining(", "));
+    var argTysStr =
+        argTys.stream().map(Object::toString).collect(joining(", "));
+    if (funcTy.getReturnType().isVoid()) {
+      cc.emitLn("func.call @%s(%s) : (%s) -> ()", callee.getName(), argsCastStr,
+                argTysStr);
+      return cc.makeAnonymousValue(MLIRType.DUMMY);
+    }
+
+    var retTy = mapType(funcTy.getReturnType());
+    var retVal = cc.makeAnonymousValue(retTy);
+    cc.emitLn("%s = func.call @%s(%s) : (%s) -> %s", retVal, callee.getName(),
+              argsCastStr, argTysStr, retTy);
+    return retVal;
   }
 
   @Override

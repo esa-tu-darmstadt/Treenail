@@ -2,6 +2,7 @@ package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
+import static java.util.stream.Collectors.joining;
 
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
@@ -10,6 +11,7 @@ import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
+import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.Instruction;
 import com.minres.coredsl.coreDsl.NamedEntity;
@@ -18,6 +20,7 @@ import com.minres.coredsl.type.ArrayType;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
@@ -49,7 +52,10 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         sb.append(elem.indent(N_SPACES));
     }
 
-    // TODO: Functions, Always blocks
+    for (var func : isa.getFunctions())
+      sb.append(emitFunction(func, ctx).indent(N_SPACES));
+
+    // TODO: Always blocks
 
     for (var inst : isa.getInstructions())
       sb.append(emitInstruction(inst, ctx).indent(N_SPACES));
@@ -140,6 +146,36 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     }
   }
 
+  private String emitFunction(FunctionDefinition func, AnalysisContext ctx) {
+    var sb = new StringBuilder();
+
+    Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
+    Function<Declaration, String> emitParam = (d) -> {
+      var dtor = d.getDeclarators().get(0);
+      var type = mapType(ctx.getDeclaredType(dtor));
+      var value = new MLIRValue(dtor.getName(), type);
+      values.put(dtor, value);
+      return format("%s : %s", value, type);
+    };
+    var parameters =
+        func.getParameters().stream().map(emitParam).collect(joining(", "));
+    var behavior = emitBehavior(func.getBody(), ctx, values);
+
+    var anaReturnType = ctx.getFunctionSignature(func).getReturnType();
+    var returnType = anaReturnType.isVoid()
+                         ? " "
+                         : format(" -> %s ", mapType(anaReturnType));
+
+    // TODO: ensure that the `return` operation is emitted even for empty
+    // CoreDSL functions.
+    sb.append(format("func.func @%s(%s)%s{\n", func.getName(), parameters,
+                     returnType))
+        .append(behavior.indent(N_SPACES))
+        .append("}\n");
+
+    return sb.toString();
+  }
+
   private String emitInstruction(Instruction inst, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
@@ -150,6 +186,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     sb.append(
           format("coredsl.instruction @%s(%s) {\n", inst.getName(), encoding))
         .append(behavior.indent(N_SPACES))
+        .append("coredsl.end\n".indent(N_SPACES))
         .append("}\n");
 
     return sb.toString();
@@ -159,11 +196,10 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                              Map<NamedEntity, MLIRValue> values) {
     var encodingFieldSwitch = new EncodingFieldSwitch(ctx, values);
 
-    var fields = encoding.getFields()
-                     .stream()
-                     .map(encodingFieldSwitch::doSwitch)
-                     .collect(Collectors.toList());
-    return String.join(", ", fields);
+    return encoding.getFields()
+        .stream()
+        .map(encodingFieldSwitch::doSwitch)
+        .collect(joining(", "));
   }
 
   public String emitBehavior(Statement behavior, AnalysisContext ctx,
@@ -172,8 +208,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     new StatementSwitch(
         new ConstructionContext(values, new AtomicInteger(0), ctx, sb))
         .doSwitch(behavior);
-    // TODO: `coredsl.spawn` might become an alternate terminator in the future.
-    sb.append("coredsl.end").append('\n');
     return sb.toString();
   }
 

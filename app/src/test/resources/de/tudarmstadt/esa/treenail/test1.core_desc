@@ -190,10 +190,10 @@ InstructionSet Test1 {
       }
     }
 
-    Inst14 {
-      encoding: 7'd0 :: rs2[4:0] :: rs1[4:0] :: 3'd0 :: rd[4:0] :: 7'b0000010;
+    REV8 {
+      encoding: 12'b011010011000 :: rs[4:0] :: 3'b101 :: rd[4:0] :: 7'b0010011;
       behavior: {
-        unsigned int arg1 = X[rs1], res = 0;
+        unsigned int arg1 = X[rs], res = 0;
         int j = 24;
         for (int i = 0; i < 32; i += 8) {
           res[i+7 : i] = arg1[j+7 : j];
@@ -201,6 +201,37 @@ InstructionSet Test1 {
         }
         X[rd] = res;
       }
+    }
+
+    DOTP {
+      encoding: 7'd0 :: rs2[4:0] :: rs1[4:0] :: 3'd0 :: rd[4:0] :: 7'b0001011;
+      behavior: {
+        signed<32> res = 0;
+        for (int i = 0; i < 32; i += 8) {
+          signed<16> prod = (signed) X[rs1][i+7:i] * (signed) X[rs2][i+7:i];
+          res += prod;
+        }
+        X[rd] = (unsigned) res;
+      }
+    }
+
+    CALL {
+      encoding: 7'd0 :: rs2[4:0] :: rs1[4:0] :: 3'd0 :: rd[4:0] :: 7'b0001011;
+      behavior: {
+        X[rd] = foo(X[rs1], X[rs2]);
+      }
+    }
+  }
+
+  functions {
+    unsigned<32> sideeffect() {
+      Y = 0;
+      return 0;
+    }
+
+    unsigned<32> foo(unsigned<32> a, unsigned<32> b) {
+      sideeffect();
+      return (a + b)[31:0];
     }
   }
 }
