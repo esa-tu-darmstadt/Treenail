@@ -8,6 +8,7 @@ InstructionSet Test1 {
     unsigned<32> XLEN_4 = XLEN/4;
     extern unsigned char MEM[1048576] [[is_main_mem]];
     extern unsigned int CSR[4096];
+    const register unsigned<4> FOO = 1+1;
   }
 
   instructions {

@@ -1,21 +1,25 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigInteger;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
 import com.minres.coredsl.analysis.AnalysisContext;
+import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
+import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.Instruction;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
+import com.minres.coredsl.coreDsl.TypeQualifier;
 import com.minres.coredsl.type.ArrayType;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -64,35 +68,45 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return sb.toString();
   }
 
-  private String emitRegister(Declarator dtor, AnalysisContext ctx) {
-    assert dtor.getInitializer() == null : "NYI: Register initializers";
-
+  private String emitRegister(Declarator dtor, boolean isConst,
+                              AnalysisContext ctx) {
     var name = dtor.getName();
     var type = ctx.getDeclaredType(dtor);
+    var init = dtor.getInitializer();
+
+    var proto = "local";
+    var flags = isConst ? " const" : "";
 
     if (type.isIntegerType()) {
-      var proto = "local";
       // TODO: inspect attributes instead
       if ("PC".equals(name) && type.getBitSize() == 32)
         proto = "core_pc";
+      if (init == null) {
+        return format("coredsl.register %s%s @%s : %s\n", proto, flags, name,
+                      mapType(type));
+      }
 
-      return format("coredsl.register %s @%s : %s\n", proto, name,
-                    mapType(type));
+      assert init instanceof ExpressionInitializer;
+      var exprInit = (ExpressionInitializer)init;
+      var cv = ctx.getExpressionValue(exprInit.getValue());
+      assert cv.getStatus() == StatusCode.success : "Non-constant initializer";
+      return format("coredsl.register %s%s @%s = %s : %s\n", proto, flags, name,
+                    ensureBigInteger(cv.value), mapType(type));
     }
 
     assert type.isArrayType();
+    assert init == null : "NYI: Array initializers";
     var arrayType = (ArrayType)type;
     assert arrayType.elementType.isIntegerType()
         : "NYI: Multi-dimensional registers";
 
     var width = arrayType.elementType.getBitSize();
     var numElements = arrayType.count;
-    var proto = "local";
     // TODO: inspect attributes instead
     if ("X".equals(name) && width == 32 && numElements == 32)
       proto = "core_x";
 
-    return format("coredsl.register %s @%s[%d] : %s\n", proto, name,
+    return format("coredsl.register %s%s @%s[%d] : %s\n", proto, flags, name,
                   numElements, mapType(arrayType.elementType));
   }
 
@@ -129,16 +143,21 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
   private String emitArchitecturalStateElement(Declaration decl,
                                                AnalysisContext ctx) {
-    assert decl.getQualifiers().isEmpty() : "NYI: Const/volatile";
     assert decl.getDeclarators().size() == 1 : "NYI: Multiple declarators";
+
+    var qual = decl.getQualifiers();
+    var isConst = qual.contains(TypeQualifier.CONST);
+    var isVolatile = qual.contains(TypeQualifier.VOLATILE);
+    assert !isVolatile : "NYI: Volatile architectural state";
 
     var dtor = decl.getDeclarators().get(0);
     switch (ctx.getStorageClass(dtor)) {
     case param:
       return null; // Ignore, we're only dealing with the elaborated values.
     case register:
-      return emitRegister(dtor, ctx);
+      return emitRegister(dtor, isConst, ctx);
     case extern:
+      assert !isConst : "NYI: `const` address spaces";
       return emitAddressSpace(dtor, ctx);
     default:
       assert false : "NYI: Architectural state declaration: " + decl;
