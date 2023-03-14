@@ -8,6 +8,7 @@ import static java.util.stream.Collectors.joining;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
+import com.minres.coredsl.coreDsl.AlwaysBlock;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
@@ -60,10 +61,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     for (var func : isa.getFunctions())
       sb.append(emitFunction(func, ctx).indent(N_SPACES));
 
-    // TODO: Always blocks
-
     for (var inst : isa.getInstructions())
       sb.append(emitInstruction(inst, ctx).indent(N_SPACES));
+
+    for (var always : isa.getAlwaysBlocks())
+      sb.append(emitAlwaysBlock(always, ctx).indent(N_SPACES));
 
     sb.append("}\n");
     return sb.toString();
@@ -234,6 +236,20 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         .stream()
         .map(encodingFieldSwitch::doSwitch)
         .collect(joining(", "));
+  }
+
+  public String emitAlwaysBlock(AlwaysBlock always, AnalysisContext ctx) {
+    var sb = new StringBuilder();
+
+    Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
+    var behavior = emitBehavior(always.getBehavior(), ctx, values);
+
+    sb.append(format("coredsl.always @%s {\n", always.getName()))
+        .append(behavior.indent(N_SPACES))
+        .append("coredsl.end\n".indent(N_SPACES))
+        .append("}\n");
+
+    return sb.toString();
   }
 
   public String emitBehavior(Statement behavior, AnalysisContext ctx,

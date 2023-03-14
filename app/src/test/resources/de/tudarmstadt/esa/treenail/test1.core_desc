@@ -243,5 +243,11 @@ InstructionSet Test1 {
       return (a + b)[31:0];
     }
   }
+
+  always {
+    FOO {
+      Y = 0;
+    }
+  }
 }
 
