@@ -225,8 +225,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return result;
     }
 
-    // Otherwise, we indexing into an array and retrieve one or more elements.
-    assert targetType.isArrayType();
+    // Otherwise, we indexing into an arch state item and retrieve one or more
+    // elements.
+    assert targetType.isAddressSpaceType();
     assert access.getTarget() instanceof EntityReference
         : "NYI: Element access into a temporary object";
     var entity = ((EntityReference)access.getTarget()).getTarget();

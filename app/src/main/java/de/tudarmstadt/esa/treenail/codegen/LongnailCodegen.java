@@ -22,12 +22,12 @@ import com.minres.coredsl.coreDsl.ListInitializer;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
 import com.minres.coredsl.coreDsl.TypeQualifier;
-import com.minres.coredsl.type.ArrayType;
+import com.minres.coredsl.type.AddressSpaceType;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
-import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
 import org.eclipse.xtext.validation.ValidationMessageAcceptor;
@@ -97,13 +97,14 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                     name, initStr, mapType(type));
     }
 
-    assert type.isArrayType();
-    var arrayType = (ArrayType)type;
-    assert arrayType.elementType.isIntegerType()
+    assert type.isAddressSpaceType();
+    var asType = (AddressSpaceType)type;
+    assert asType.elementType.isIntegerType()
         : "NYI: Multi-dimensional registers";
 
-    var width = arrayType.elementType.getBitSize();
-    var numElements = arrayType.count;
+    var width = asType.elementType.getBitSize();
+    // assuming register are generally small
+    var numElements = asType.count.intValueExact();
     // TODO: inspect attributes instead
     if ("X".equals(name) && width == 32 && numElements == 32)
       protoStr = "core_x";
@@ -124,7 +125,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                     .collect(joining(", ", " = [", "]"));
     }
     return format("coredsl.register %s%s @%s[%d]%s : %s\n", protoStr, flagsStr,
-                  name, numElements, initStr, mapType(arrayType.elementType));
+                  name, numElements, initStr, mapType(asType.elementType));
   }
 
   private String emitAddressSpace(Declarator dtor, AnalysisContext ctx) {
@@ -134,28 +135,29 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var name = dtor.getName();
     var type = ctx.getDeclaredType(dtor);
 
-    assert type.isArrayType() : "NYI: Single-element address 'spaces'";
-    var arrayType = (ArrayType)type;
-    assert arrayType.elementType.isIntegerType()
+    assert type.isAddressSpaceType() : "NYI: Single-element address 'spaces'";
+    var asType = (AddressSpaceType)type;
+    assert asType.elementType.isIntegerType()
         : "NYI: Multi-dimensional address spaces";
 
-    var width = arrayType.elementType.getBitSize();
-    var numElements = arrayType.count;
+    var width = asType.elementType.getBitSize();
+    var numElements = asType.count;
     var proto = "";
     var addressWidth = -1;
-    // TODO: inspect attributes instead, and deal with the actual size (which
-    // may overflow a Java `int`).
-    if ("MEM".equals(name) && width == 8) {
+    // TODO: inspect attributes instead
+    if ("MEM".equals(name) && width == 8 &&
+        numElements.equals(BigInteger.TWO.pow(32))) {
       proto = "core_mem";
       addressWidth = 32;
-    } else if ("CSR".equals(name) && width == 32 && numElements == 4096) {
+    } else if ("CSR".equals(name) && width == 32 &&
+               numElements.equals(BigInteger.TWO.pow(12))) {
       proto = "core_csr";
       addressWidth = 12;
     }
     assert !proto.isEmpty() : "NYI: Custom address spaces";
 
     return format("coredsl.addrspace %s @%s : (ui%d) -> %s\n", proto, name,
-                  addressWidth, mapType(arrayType.elementType));
+                  addressWidth, mapType(asType.elementType));
   }
 
   private String emitArchitecturalStateElement(Declaration decl,
