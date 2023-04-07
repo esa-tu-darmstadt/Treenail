@@ -6,6 +6,7 @@ import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.NamedEntity;
+import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.CoreDslType;
 import com.minres.coredsl.util.TypedBigInteger;
@@ -68,6 +69,8 @@ class RangeAnalyzer {
     BigInteger numElems;
     if (baseType instanceof ArrayType)
       numElems = BigInteger.valueOf(((ArrayType)baseType).count);
+    else if (baseType instanceof AddressSpaceType)
+      numElems = ((AddressSpaceType)baseType).count;
     else
       numElems = BigInteger.valueOf(baseType.getBitSize());
     return MLIRType.getType(numElems.bitLength() - 1, false);
