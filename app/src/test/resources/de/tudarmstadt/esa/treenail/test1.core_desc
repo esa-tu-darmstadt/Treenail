@@ -10,6 +10,9 @@ InstructionSet Test1 {
     extern unsigned int CSR[4096];
     const register unsigned<4> FOO = 1+1;
     const register unsigned<4> BAR[3] = {1,2,3};
+    unsigned<17> & my_alias = Y;
+    unsigned<32> & my_element_alias = CSR[123];
+    unsigned<32> & my_range_alias[4] = CSR[43:40];
   }
 
   instructions {
@@ -230,6 +233,13 @@ InstructionSet Test1 {
         X[rd] = BAR[FOO[1:0]];
       }
     }
+
+    Inst15{
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        my_element_alias = (unsigned<32>)(my_alias + my_range_alias[imm[17:16]]);
+      }
+    }
   }
 
   functions {
@@ -245,7 +255,7 @@ InstructionSet Test1 {
   }
 
   always {
-    FOO {
+    BLUBB {
       Y = 0;
     }
   }

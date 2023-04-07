@@ -14,9 +14,11 @@ import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
+import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.ISA;
+import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.Instruction;
 import com.minres.coredsl.coreDsl.ListInitializer;
 import com.minres.coredsl.coreDsl.NamedEntity;
@@ -160,6 +162,34 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                   addressWidth, mapType(asType.elementType));
   }
 
+  private String emitAlias(Declarator dtor, AnalysisContext ctx) {
+    var name = dtor.getName();
+    var init = dtor.getInitializer();
+    assert init != null && init instanceof ExpressionInitializer;
+    var expr = ((ExpressionInitializer)init).getValue();
+
+    if (expr instanceof EntityReference) {
+      var refName = ((EntityReference)expr).getTarget().getName();
+      return format("coredsl.alias @%s = @%s\n", name, refName);
+    }
+
+    assert expr instanceof IndexAccessExpression;
+    var indexExpr = (IndexAccessExpression)expr;
+    var target = indexExpr.getTarget();
+    assert target instanceof EntityReference;
+    var refName = ((EntityReference)target).getTarget().getName();
+
+    var index = ensureBigInteger(
+                    ctx.getExpressionValue(indexExpr.getIndex()).getValue())
+                    .toString();
+    if (indexExpr.getEndIndex() != null)
+      index +=
+          ":" + ensureBigInteger(
+                    ctx.getExpressionValue(indexExpr.getEndIndex()).getValue());
+
+    return format("coredsl.alias @%s = @%s[%s]\n", name, refName, index);
+  }
+
   private String emitArchitecturalStateElement(Declaration decl,
                                                AnalysisContext ctx) {
     assert decl.getDeclarators().size() == 1 : "NYI: Multiple declarators";
@@ -178,6 +208,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     case extern:
       assert !isConst : "NYI: `const` address spaces";
       return emitAddressSpace(dtor, ctx);
+    case alias:
+      return emitAlias(dtor, ctx);
     default:
       assert false : "NYI: Architectural state declaration: " + decl;
       return null;
