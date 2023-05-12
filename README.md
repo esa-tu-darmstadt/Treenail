@@ -12,6 +12,8 @@ Treenail is a standard Gradle project (including the `./gradlew` wrapper):
 $ gradle build
 $ gradle test
 $ gradle run --args <path/to/a.core_desc>
+$ gradle install
+$ ./app/build/install/app/bin/app <path/to/a.core_desc> isax.mlir
 ```
 
 ## License
