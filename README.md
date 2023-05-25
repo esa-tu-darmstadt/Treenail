@@ -1,4 +1,4 @@
-# Project Treenail - CoreDSL frontend for Longnail
+# Treenail - CoreDSL frontend for Longnail
 
 ## Setup
 
