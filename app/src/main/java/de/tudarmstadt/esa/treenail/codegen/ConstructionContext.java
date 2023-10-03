@@ -22,6 +22,8 @@ class ConstructionContext {
   private final AnalysisContext ac;
   private final StringBuilder sb;
 
+  private boolean terminatorWasEmitted = false;
+
   ConstructionContext(Map<NamedEntity, MLIRValue> values, AtomicInteger counter,
                       AnalysisContext ac, StringBuilder sb) {
     this.values = values;
@@ -124,6 +126,10 @@ class ConstructionContext {
   }
 
   int getCounter() { return counter.get(); }
+
+  boolean getTerminatorWasEmitted() { return terminatorWasEmitted; }
+
+  void setTerminatorWasEmitted() { terminatorWasEmitted = true; }
 
   AnalysisContext getAnalysisContext() { return ac; }
 

@@ -256,7 +256,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     sb.append(
           format("coredsl.instruction @%s(%s) {\n", inst.getName(), encoding))
         .append(behavior.indent(N_SPACES))
-        .append("coredsl.end\n".indent(N_SPACES))
         .append("}\n");
 
     return sb.toString();
@@ -280,7 +279,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     sb.append(format("coredsl.always @%s {\n", always.getName()))
         .append(behavior.indent(N_SPACES))
-        .append("coredsl.end\n".indent(N_SPACES))
         .append("}\n");
 
     return sb.toString();
@@ -289,9 +287,10 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   public String emitBehavior(Statement behavior, AnalysisContext ctx,
                              Map<NamedEntity, MLIRValue> values) {
     var sb = new StringBuilder();
-    new StatementSwitch(
-        new ConstructionContext(values, new AtomicInteger(0), ctx, sb))
-        .doSwitch(behavior);
+    var cc = new ConstructionContext(values, new AtomicInteger(0), ctx, sb);
+    new StatementSwitch(cc).doSwitch(behavior);
+    if (!cc.getTerminatorWasEmitted())
+      cc.emitLn("coredsl.end");
     return sb.toString();
   }
 

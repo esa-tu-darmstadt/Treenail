@@ -253,6 +253,15 @@ InstructionSet Test1 {
         }
       }
     }
+
+    Inst17 {
+      encoding: imm[19:0] :: rd[4:0] :: 7'b0000010;
+      behavior: {
+        spawn {
+          X[rd] = imm;
+        }
+      }
+    }
   }
 
   functions {

@@ -19,6 +19,7 @@ import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IfStatement;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ReturnStatement;
+import com.minres.coredsl.coreDsl.SpawnStatement;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
@@ -398,6 +399,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   public Object caseForLoop(ForLoop loop) {
     if (!emitScfFor(loop))
       emitScfWhile(loop);
+    return this;
+  }
+
+  @Override
+  public Object caseSpawnStatement(SpawnStatement spawn) {
+    var spawnCC = new ConstructionContext(
+        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
+        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    new StatementSwitch(spawnCC).doSwitch(spawn.getBody());
+    spawnCC.emitLn("coredsl.end");
+    cc.emitLn("coredsl.spawn {\n%s}",
+              spawnCC.getStringBuilder().toString().indent(N_SPACES));
+    cc.setTerminatorWasEmitted();
     return this;
   }
 
