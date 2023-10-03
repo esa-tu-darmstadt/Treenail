@@ -4,6 +4,7 @@ import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toSet;
 
 import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
@@ -16,7 +17,6 @@ import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IfStatement;
-import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ReturnStatement;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
@@ -130,11 +130,17 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     if (hasElse)
       new StatementSwitch(elseCC).doSwitch(ifStmt.getElseBody());
 
-    // TODO: check if the entities are present in `cc`, similar to the for-loop
-    // construction. If not, they're local variables that cannot be live outside
-    // the branch.
-    var thenUpdated = thenCC.getUpdatedEntities();
-    var elseUpdated = elseCC.getUpdatedEntities();
+    // Check if the entities are present in `cc`. If not, they're local
+    // variables that cannot be live outside the branch.
+    var thenUpdated = thenCC.getUpdatedEntities()
+                          .stream()
+                          .filter(cc::hasValue)
+                          .collect(toSet());
+    var elseUpdated = elseCC.getUpdatedEntities()
+                          .stream()
+                          .filter(cc::hasValue)
+                          .collect(toSet());
+
     if (thenUpdated.isEmpty() && elseUpdated.isEmpty()) {
       // In lieu of proper live analysis: no local entities were written in
       // either branch, so we can emit a simple no-result `scf.if`.

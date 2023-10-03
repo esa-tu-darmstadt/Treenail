@@ -240,6 +240,19 @@ InstructionSet Test1 {
         my_element_alias = (unsigned<32>)(my_alias + my_range_alias[imm[17:16]]);
       }
     }
+
+    Inst16 {
+      encoding: 7'b0111000 :: Iuimm5[4:0] :: rs1[4:0] :: 3'b011 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        if (rd != 0) {
+          signed<32> a = (Iuimm5) ? -(1 << (Iuimm5 - 1)) : -1;
+          signed<32> b = (Iuimm5) ? ((1 << (Iuimm5 - 1)) - 1) : 0;
+          if (X[rs1] <= a) X[rd] = (unsigned<32>)a;
+          else if (X[rs1] >= b) X[rd] = (unsigned<32>)b;
+          else X[rd] = X[rs1];
+        }
+      }
+    }
   }
 
   functions {
