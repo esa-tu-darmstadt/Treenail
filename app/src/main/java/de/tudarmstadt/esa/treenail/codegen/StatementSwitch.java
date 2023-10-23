@@ -94,6 +94,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var expr = retStmt.getValue();
     if (expr == null) {
       cc.emitLn("return");
+      cc.setTerminatorWasEmitted();
       return this;
     }
 
@@ -106,6 +107,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var retTy = mapType(sig.getReturnType());
     var retVal = cc.makeCast(exprSwitch.doSwitch(expr), retTy);
     cc.emitLn("return %s : %s", retVal, retTy);
+    cc.setTerminatorWasEmitted();
     return this;
   }
 
