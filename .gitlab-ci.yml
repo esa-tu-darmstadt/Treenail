@@ -10,14 +10,9 @@
 # https://gradle.org/
 # https://github.com/gradle/gradle
 
-image: gradle:7.6.1-jdk17
+image: gradle:8.6.0-jdk21-alpine
 
-# Disable the Gradle daemon for Continuous Integration servers as correctness
-# is usually a priority over speed in CI environments. Using a fresh
-# runtime for each build is more reliable since the runtime is completely
-# isolated from any previous builds.
 variables:
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
   GIT_SUBMODULE_STRATEGY: normal
 
 before_script:
@@ -48,7 +43,7 @@ test:
 
 release:
   stage: deploy
-  script: 
+  script:
     - mkdir treenail
     - cd treenail ; tar xf ../app/build/distributions/app.tar --strip-components=1
   cache:
