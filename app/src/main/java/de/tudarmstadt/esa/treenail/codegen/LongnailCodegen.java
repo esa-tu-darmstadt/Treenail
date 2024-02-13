@@ -27,6 +27,8 @@ import com.minres.coredsl.coreDsl.TypeQualifier;
 import com.minres.coredsl.type.AddressSpaceType;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
@@ -250,25 +252,33 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
-    var encoding = emitEncoding(inst.getEncoding(), ctx, values);
+    List<String> splitValueDefStmts = new LinkedList<>();
+    var encoding = emitEncoding(inst.getEncoding(), values, splitValueDefStmts);
     var behavior = emitBehavior(inst.getBehavior(), ctx, values);
 
     sb.append(
-          format("coredsl.instruction @%s(%s) {\n", inst.getName(), encoding))
-        .append(behavior.indent(N_SPACES))
-        .append("}\n");
+        format("coredsl.instruction @%s(%s) {\n", inst.getName(), encoding));
+    for (var s : splitValueDefStmts) {
+      sb.append(s.indent(N_SPACES));
+    }
+    sb.append(behavior.indent(N_SPACES)).append("}\n");
 
     return sb.toString();
   }
 
-  public String emitEncoding(Encoding encoding, AnalysisContext ctx,
-                             Map<NamedEntity, MLIRValue> values) {
-    var encodingFieldSwitch = new EncodingFieldSwitch(ctx, values);
+  public String emitEncoding(Encoding encoding,
+                             Map<NamedEntity, MLIRValue> values,
+                             List<String> splitValueDefStmts) {
+    var encodingFieldSwitch = new EncodingFieldSwitch(values);
 
-    return encoding.getFields()
-        .stream()
-        .map(encodingFieldSwitch::doSwitch)
-        .collect(joining(", "));
+    var enc = encoding.getFields()
+                  .stream()
+                  .map(encodingFieldSwitch::doSwitch)
+                  .collect(joining(", "));
+
+    encodingFieldSwitch.combineSplitValues(splitValueDefStmts);
+
+    return enc;
   }
 
   public String emitAlwaysBlock(AlwaysBlock always, AnalysisContext ctx) {

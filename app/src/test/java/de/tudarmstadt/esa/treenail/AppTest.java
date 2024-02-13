@@ -25,4 +25,24 @@ class AppTest {
     assertTrue(appInst.generateMLIR(content).startsWith("module @Test1"),
                "app should be able to generate MLIR");
   }
+
+  @Test
+  void splitEncodingFieldWorks() {
+    var appInst = App.getInstance();
+    var fileName =
+        getClass().getResource("split_enc_field.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    assertNotNull(content, "app should be able to parse a simple CoreDSL file");
+    assertTrue(
+        appInst.generateMLIR(content).startsWith("module @TestSplitEncFields"),
+        "app should be able to generate MLIR");
+    assertTrue(
+        appInst.generateMLIR(content).contains(
+            "%TREENAIL_WAS_HERE_0 = coredsl.concat %TREENAIL_WAS_HERE_Imm6_5_1, %TREENAIL_WAS_HERE_Imm6_0_0 : ui5, ui1"),
+        "app should be able to merge split encoding fields");
+    assertTrue(
+        appInst.generateMLIR(content).contains(
+            "%Imm6 = coredsl.cast %TREENAIL_WAS_HERE_0 : ui6 to ui6"),
+        "app should be able to retain the original split encoding field name");
+  }
 }

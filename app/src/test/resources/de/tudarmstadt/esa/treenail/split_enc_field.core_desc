@@ -1,0 +1,18 @@
+InstructionSet TestSplitEncFields {
+    architectural_state {
+      unsigned int XLEN = 32;
+      unsigned int RFS = 32;
+      register unsigned<XLEN> X[RFS] [[is_main_reg]];
+    }
+
+  instructions {
+    Inst1 {
+        encoding: 5'b00000 :: 1'b0 :: Imm6[0:0] :: Imm6[5:1] :: rs1[4:0] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+        behavior: {
+          unsigned<32> x = Imm6;
+          X[rd] = x;
+        }
+    }
+  }
+}
+
