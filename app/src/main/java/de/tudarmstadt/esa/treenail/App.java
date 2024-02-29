@@ -9,6 +9,11 @@ import com.minres.coredsl.CoreDslStandaloneSetup;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import de.tudarmstadt.esa.treenail.codegen.LongnailCodegen;
 import java.io.FileWriter;
+import org.apache.commons.cli.DefaultParser;
+import org.apache.commons.cli.HelpFormatter;
+import org.apache.commons.cli.Option;
+import org.apache.commons.cli.Options;
+import org.apache.commons.cli.ParseException;
 import org.eclipse.emf.common.util.URI;
 import org.eclipse.emf.ecore.resource.ResourceSet;
 import org.eclipse.xtext.diagnostics.Severity;
@@ -48,27 +53,78 @@ public class App {
     return injector.getInstance(App.class);
   }
 
+  private static Options createOptions() {
+    var options = new Options();
+
+    options.addOption(
+        Option.builder("o")
+            .longOpt("out")
+            .argName("output file")
+            .hasArg()
+            .required(false)
+            .desc("file to store the emitted MLIR code for Longnail")
+            .build());
+    options.addOption(Option.builder("h")
+                          .longOpt("help")
+                          .required(false)
+                          .desc("Print this message")
+                          .build());
+
+    return options;
+  }
+
+  private static void printHelp(Options options) {
+    new HelpFormatter().printHelp("treenail <ISAX>.core_desc [options]",
+                                  options);
+  }
+
   public static void main(String[] args) {
-    assert args.length > 0;
+    var options = createOptions();
+    String coreDescPath = null;
+    String mlirOutPath = null;
+    try {
+      var cmd = new DefaultParser().parse(options, args);
+      if (cmd.hasOption("h")) {
+        printHelp(options);
+        System.exit(0);
+      }
+
+      String[] remainingArgs = cmd.getArgs();
+      if (remainingArgs.length != 1) {
+        System.err.println("ERROR: Missing CoreDSL ISAX description file!");
+        printHelp(options);
+        System.exit(-1);
+      }
+
+      coreDescPath = remainingArgs[0];
+      mlirOutPath = cmd.getOptionValue("o");
+    } catch (ParseException e) {
+      System.err.println(e.getMessage());
+      printHelp(options);
+      System.exit(1);
+    }
+
     var app = getInstance();
-    var content = app.parse(args[0]);
+    var content = app.parse(coreDescPath);
     if (content == null)
-      return;
+      System.exit(3);
+
     var mlir = app.generateMLIR(content);
     if (mlir == null)
-      return;
+      System.exit(4);
 
-    if (args.length > 1) {
+    if (mlirOutPath != null) {
       try {
-        var w = new FileWriter(args[1]);
+        var w = new FileWriter(mlirOutPath);
         w.write(mlir);
         w.close();
       } catch (Exception e) {
         e.printStackTrace();
+        System.exit(5);
       }
       return;
     }
 
-    System.out.println(app.generateMLIR(content));
+    System.out.println(mlir);
   }
 }

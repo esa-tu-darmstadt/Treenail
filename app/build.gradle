@@ -22,6 +22,7 @@ dependencies {
 
     // App dependencies.
     implementation 'com.minres.coredsl:com.minres.coredsl'
+    implementation 'commons-cli:commons-cli:1.6.0'
 }
 
 application {
