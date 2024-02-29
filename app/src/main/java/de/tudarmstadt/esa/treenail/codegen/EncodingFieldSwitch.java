@@ -59,7 +59,6 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
     int start = field.getStartIndex().getValue().intValue();
     int end = field.getEndIndex().getValue().intValue();
     boolean reversed = start < end;
-    assert !reversed : "NYI: Reversed encoding fields";
     if (reversed) {
       int tmp = end;
       end = start;
@@ -78,7 +77,8 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
   }
 
   public void combineSplitValues(List<String> splitValueDefStmts) {
-    // Merge possibly split bit fields
+    // Merge possibly split and/or reversed bit fields
+    int tmpValCnt = 0;
     for (var e : splitValues.entrySet()) {
       // first determine the final type
       var parts = e.getValue();
@@ -96,6 +96,7 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
 
       var expectedName = parts.get(0).name.getName();
       var expectedEnd = parts.get(0).end;
+      // Sanity checks
       for (var v : parts) {
         assert expectedName.equals(v.name.getName())
             : "ERROR: split field changed its name";
@@ -110,19 +111,29 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
 
       // Concat the split parts
       MLIRValue tmpVal = null;
-      int tmpValCnt = 0;
       for (var v : parts) {
+        var partVal = v.val;
+        // Use coredsl.bitextract to reverse bits if requested
+        if (v.reversed) {
+          var newTmpVar = new MLIRValue(
+              UNIQUE_PREFIX + "reversed_" + tmpValCnt++, partVal.type);
+          splitValueDefStmts.add(newTmpVar + " = coredsl.bitextract " +
+                                 partVal + "[" + v.end + ":" + v.start + "]"
+                                 + " : (" + partVal.type + ") -> " +
+                                 partVal.type + "\n");
+          partVal = newTmpVar;
+        }
+
         if (tmpVal != null) {
           var tmpType =
-              MLIRType.getType(tmpVal.type.width + v.val.type.width, false);
-          var newTmpVar = new MLIRValue(UNIQUE_PREFIX + tmpValCnt, tmpType);
-          splitValueDefStmts.add(newTmpVar + " = coredsl.concat " + v.val +
-                                 ", " + tmpVal + " : " + v.val.type + ", " +
+              MLIRType.getType(tmpVal.type.width + partVal.type.width, false);
+          var newTmpVar = new MLIRValue(UNIQUE_PREFIX + tmpValCnt++, tmpType);
+          splitValueDefStmts.add(newTmpVar + " = coredsl.concat " + partVal +
+                                 ", " + tmpVal + " : " + partVal.type + ", " +
                                  tmpVal.type + "\n");
-          ++tmpValCnt;
           tmpVal = newTmpVar;
         } else {
-          tmpVal = v.val;
+          tmpVal = partVal;
         }
       }
       // Create a NOP operation to copy the value from tmpVal to targetValue
