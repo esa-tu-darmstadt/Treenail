@@ -113,6 +113,24 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return sb.toString();
   }
 
+  private String emitConstParam(Declarator dtor, AnalysisContext ctx) {
+    var name = dtor.getName();
+    var type = ctx.getDeclaredType(dtor);
+    var init = dtor.getInitializer();
+
+    assert type.isIntegerType() : "NYI: non integer type const parameters";
+    assert init != null;
+    assert init instanceof ExpressionInitializer;
+    var exprInit = (ExpressionInitializer)init;
+    var cv = ctx.getExpressionValue(exprInit.getValue());
+    assert cv.getStatus() == StatusCode.success : "Non-constant initializer";
+    var constType = mapType(type);
+    // Instead of a hwarith.constant we will emit a local const register, which
+    // will be optimized away but allows being accessed even in isolated from
+    // above regions (esp. func.func)
+    return emitRegister(dtor, /*isConst=*/true, ctx);
+  }
+
   private String emitRegister(Declarator dtor, boolean isConst,
                               AnalysisContext ctx) {
     var name = dtor.getName();
@@ -249,6 +267,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var dtor = decl.getDeclarators().get(0);
     switch (ctx.getStorageClass(dtor)) {
     case param:
+      if (isConst) {
+        // Const parameters can be emitted since their value is already
+        // elaborated
+        return emitConstParam(dtor, ctx);
+      }
       return null; // Ignore, we're only dealing with the elaborated values.
     case register:
       return emitRegister(dtor, isConst, ctx);
