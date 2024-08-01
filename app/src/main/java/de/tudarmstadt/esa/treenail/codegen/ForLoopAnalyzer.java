@@ -54,7 +54,7 @@ class ForLoopAnalyzer {
       var exprInit = (ExpressionInitializer)init;
       var konst = (IntegerConstant)exprInit.getValue();
       res.variable = dtor;
-      res.value = ensureBigInteger(konst.getValue());
+      res.value = ensureBigInteger(konst.getValue(), null);
     } catch (ClassCastException cce) {
       return null;
     }
@@ -73,7 +73,7 @@ class ForLoopAnalyzer {
       var konst = (IntegerConstant)infix.getRight();
       res.variable = ref.getTarget();
       res.relation = opr;
-      res.bound = ensureBigInteger(konst.getValue());
+      res.bound = ensureBigInteger(konst.getValue(), null);
     } catch (ClassCastException cce) {
       return null;
     }
@@ -122,7 +122,7 @@ class ForLoopAnalyzer {
       var lhs = (EntityReference)assign.getTarget();
       var rhs = (IntegerConstant)assign.getValue();
       res.variable = lhs.getTarget();
-      res.step = "+=".equals(opr) ? ensureBigInteger(rhs.getValue())
+      res.step = "+=".equals(opr) ? ensureBigInteger(rhs.getValue(), null)
                                   : rhs.getValue().negate();
     } catch (ClassCastException cce) {
       return null;

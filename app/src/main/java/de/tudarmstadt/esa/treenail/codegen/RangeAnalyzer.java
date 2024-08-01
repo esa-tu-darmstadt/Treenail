@@ -59,7 +59,7 @@ class RangeAnalyzer {
     if (!cc.isConstant(rhs))
       return null;
 
-    var val = cc.getConstantValue(rhs);
+    var val = cc.getConstantValue(rhs, null);
     if ("-".equals(opr))
       val = val.negate();
     return val;
@@ -90,7 +90,7 @@ class RangeAnalyzer {
     // Single element
     if (toExpr == null) {
       if (cc.isConstant(fromExpr)) {
-        res.from = cc.getConstantValue(fromExpr);
+        res.from = cc.getConstantValue(fromExpr, null);
         return res;
       }
       res.base = cc.makeCast(exprSwitch.doSwitch(fromExpr), indexType);
@@ -99,8 +99,8 @@ class RangeAnalyzer {
 
     // Constant range
     if (cc.isConstant(fromExpr) && cc.isConstant(toExpr)) {
-      res.from = cc.getConstantValue(fromExpr);
-      res.to = cc.getConstantValue(toExpr);
+      res.from = cc.getConstantValue(fromExpr, null);
+      res.to = cc.getConstantValue(toExpr, null);
       return res;
     }
 

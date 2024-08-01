@@ -187,7 +187,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue caseIntegerConstant(IntegerConstant konst) {
     var type = mapType(ac.getExpressionType(konst));
-    var value = cc.getConstantValue(konst);
+    var value = cc.getConstantValue(konst, type);
     return cc.makeConst(value, type);
   }
 

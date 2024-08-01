@@ -124,6 +124,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var initStr = "";
 
     if (type.isIntegerType()) {
+      var targetType = mapType(type);
       if (hasAttr(dtor.getAttributes(), "is_pc"))
         protoStr = "core_pc";
       if (init != null) {
@@ -132,10 +133,10 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         var cv = ctx.getExpressionValue(exprInit.getValue());
         assert cv.getStatus() == StatusCode.success
             : "Non-constant initializer";
-        initStr = " = " + ensureBigInteger(cv.value);
+        initStr = " = " + ensureBigInteger(cv.value, targetType);
       }
       return format("coredsl.register %s%s @%s%s : %s\n", protoStr, flagsStr,
-                    name, initStr, mapType(type));
+                    name, initStr, targetType);
     }
 
     assert type.isAddressSpaceType();
@@ -149,6 +150,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     if (hasAttr(dtor.getAttributes(), "is_main_reg"))
       protoStr = "core_x";
 
+    var elementType = mapType(asType.elementType);
     if (init != null) {
       assert init instanceof ListInitializer;
       var listInit = (ListInitializer)init;
@@ -159,13 +161,13 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                       var cv = ctx.getExpressionValue(ei.getValue());
                       assert cv.getStatus() == StatusCode.success
                           : "Non-constant initializer";
-                      return ensureBigInteger(cv.getValue());
+                      return ensureBigInteger(cv.getValue(), elementType);
                     })
                     .map(Object::toString)
                     .collect(joining(", ", " = [", "]"));
     }
     return format("coredsl.register %s%s @%s[%d]%s : %s\n", protoStr, flagsStr,
-                  name, numElements, initStr, mapType(asType.elementType));
+                  name, numElements, initStr, elementType);
   }
 
   private String emitAddressSpace(Declarator dtor, AnalysisContext ctx) {
@@ -222,13 +224,15 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     assert target instanceof EntityReference;
     var refName = ((EntityReference)target).getTarget().getName();
 
-    var index = ensureBigInteger(
-                    ctx.getExpressionValue(indexExpr.getIndex()).getValue())
-                    .toString();
+    var index =
+        ensureBigInteger(
+            ctx.getExpressionValue(indexExpr.getIndex()).getValue(), null)
+            .toString();
     if (indexExpr.getEndIndex() != null)
       index +=
-          ":" + ensureBigInteger(
-                    ctx.getExpressionValue(indexExpr.getEndIndex()).getValue());
+          ":" +
+          ensureBigInteger(
+              ctx.getExpressionValue(indexExpr.getEndIndex()).getValue(), null);
 
     return format("coredsl.alias @%s = @%s[%s]\n", name, refName, index);
   }

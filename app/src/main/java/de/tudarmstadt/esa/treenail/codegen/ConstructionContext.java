@@ -39,18 +39,28 @@ class ConstructionContext {
   // This method ensures that the return value is a standard `BigInteger`, as
   // the frontend's `TypedBigInteger` has a `toString()` method that is
   // unsuitable for use here.
-  static BigInteger ensureBigInteger(BigInteger value) {
+  static BigInteger ensureBigInteger(BigInteger value, MLIRType targetType) {
     if (value == null)
       return null;
     if (value instanceof TypedBigInteger)
-      return new BigInteger(value.toByteArray());
+      value = new BigInteger(value.toByteArray());
+
+    // Signed type edge case handling
+    if (targetType != null && targetType.isSigned && value.signum() > 0 &&
+        BigInteger.ONE.shiftLeft(targetType.width - 1).equals(value)) {
+      // If value equals minValue, we have to negate the value to make it
+      // representable by the target type
+      return value.negate();
+    }
+
     return value;
   }
 
-  BigInteger getConstantValue(Expression expr) {
+  BigInteger getConstantValue(Expression expr, MLIRType type) {
     return ensureBigInteger(expr instanceof IntegerConstant
                                 ? ((IntegerConstant)expr).getValue()
-                                : ac.getExpressionValue(expr).getValue());
+                                : ac.getExpressionValue(expr).getValue(),
+                            type);
   }
 
   IntegerType getElementType(NamedEntity ent) {
