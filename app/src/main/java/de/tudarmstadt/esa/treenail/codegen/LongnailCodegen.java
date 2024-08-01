@@ -9,6 +9,7 @@ import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
 import com.minres.coredsl.coreDsl.AlwaysBlock;
+import com.minres.coredsl.coreDsl.Attribute;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
@@ -49,6 +50,37 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return emitISA(isa, anaRes.results.get(isa));
   }
 
+  private static boolean hasAttr(List<Attribute> attrs, String attrName) {
+    for (var a : attrs)
+      if (a.getAttributeName().equals(attrName))
+        return true;
+
+    return false;
+  }
+
+  private static boolean isEnabled(List<Attribute> attrs, AnalysisContext ctx) {
+    for (var a : attrs) {
+      if (a.getAttributeName().equals("enable")) {
+        assert a.getParameters().size() == 1;
+        var expr = a.getParameters().get(0);
+        if (ctx.isExpressionValueSet(expr)) {
+          var res = ctx.getExpressionValue(expr);
+          assert res.isValid() : "Non-constant attribute enable expression";
+          return res.getValue().compareTo(BigInteger.ZERO) > 0;
+        } else {
+          // TODO is there a warning print util?
+          System.out.println(
+              "WARNING: could not evaluate instruction enable attribute expression. Assuming true!");
+          // TODO CoreDslConstantExpressionEvaluator.evaluate(ctx, expr) can not
+          // evaluate == expression, annoying
+          return true;
+        }
+      }
+    }
+
+    return true;
+  }
+
   private String emitISA(ISA isa, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
@@ -65,11 +97,17 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     for (var func : isa.getFunctions())
       sb.append(emitFunction(func, ctx).indent(N_SPACES));
 
-    for (var inst : isa.getInstructions())
-      sb.append(emitInstruction(inst, ctx).indent(N_SPACES));
+    for (var inst : isa.getInstructions()) {
+      // emit only if not disabled via attributes
+      if (isEnabled(inst.getAttributes(), ctx))
+        sb.append(emitInstruction(inst, ctx).indent(N_SPACES));
+    }
 
-    for (var always : isa.getAlwaysBlocks())
-      sb.append(emitAlwaysBlock(always, ctx).indent(N_SPACES));
+    for (var always : isa.getAlwaysBlocks()) {
+      // emit only if not disabled via attributes
+      if (isEnabled(always.getAttributes(), ctx))
+        sb.append(emitAlwaysBlock(always, ctx).indent(N_SPACES));
+    }
 
     sb.append("}\n");
     return sb.toString();
@@ -86,8 +124,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var initStr = "";
 
     if (type.isIntegerType()) {
-      // TODO: inspect attributes instead
-      if ("PC".equals(name) && type.getBitSize() == 32)
+      if (hasAttr(dtor.getAttributes(), "is_pc"))
         protoStr = "core_pc";
       if (init != null) {
         assert init instanceof ExpressionInitializer;
@@ -109,8 +146,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var width = asType.elementType.getBitSize();
     // assuming register are generally small
     var numElements = asType.count.intValueExact();
-    // TODO: inspect attributes instead
-    if ("X".equals(name) && width == 32 && numElements == 32)
+    if (hasAttr(dtor.getAttributes(), "is_main_reg"))
       protoStr = "core_x";
 
     if (init != null) {
@@ -148,13 +184,18 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var numElements = asType.count;
     var proto = "";
     var addressWidth = -1;
-    // TODO: inspect attributes instead
-    if ("MEM".equals(name) && width == 8 &&
-        numElements.equals(BigInteger.TWO.pow(32))) {
+    if (hasAttr(dtor.getAttributes(), "is_main_mem")) {
       proto = "core_mem";
-      addressWidth = 32;
+      // Compute the addressWidth via clog2
+      // numElements.bitLength() computes: ceil(log2(numElements < 0 ?
+      // -numElements : numElements+1))
+      // -> we need to subtract 1 first
+      addressWidth = numElements.subtract(BigInteger.ONE).bitLength();
     } else if ("CSR".equals(name) && width == 32 &&
                numElements.equals(BigInteger.TWO.pow(12))) {
+      // TODO: inspect attributes instead of pattern matching for CSR, however
+      // there is currently no attribute defined in CoreDSL to mark CSR
+      // registers
       proto = "core_csr";
       addressWidth = 12;
     }
