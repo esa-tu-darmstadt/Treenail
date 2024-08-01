@@ -276,17 +276,27 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     };
     var parameters =
         func.getParameters().stream().map(emitParam).collect(joining(", "));
-    var behavior = emitBehavior(func.getBody(), ctx, values);
-
     var anaReturnType = ctx.getFunctionSignature(func).getReturnType();
-    var returnType = anaReturnType.isVoid()
-                         ? " "
-                         : format(" -> %s ", mapType(anaReturnType));
+    var returnType =
+        anaReturnType.isVoid() ? "" : format(" -> %s", mapType(anaReturnType));
+    var body = func.getBody();
+    var isExternal = body == null;
+
+    var funcSignature =
+        format("func.func %s@%s(%s)%s", isExternal ? "private " : "",
+               func.getName(), parameters, returnType);
+
+    if (isExternal) {
+      // We have a blackbox function here, only emit a function declaration
+      sb.append(funcSignature + "\n");
+      return sb.toString();
+    }
+
+    var behavior = emitBehavior(body, ctx, values);
 
     // TODO: ensure that the `return` operation is emitted even for empty
     // CoreDSL functions.
-    sb.append(format("func.func @%s(%s)%s{\n", func.getName(), parameters,
-                     returnType))
+    sb.append(funcSignature + " {\n")
         .append(behavior.indent(N_SPACES))
         .append("}\n");
 
