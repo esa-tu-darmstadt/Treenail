@@ -255,12 +255,18 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private MLIRValue emitBinaryOp(String op, MLIRType resType, MLIRValue lhs,
                                  MLIRValue rhs) {
     var res = cc.makeAnonymousValue(resType);
-    if (op.startsWith("hwarith.") && !op.startsWith("hwarith.icmp"))
+    var isICMP = op.startsWith("hwarith.icmp");
+    if (op.startsWith("hwarith.") && !isICMP)
       cc.emitLn("%s = %s %s, %s : (%s, %s) -> %s", res, op, lhs, rhs, lhs.type,
                 rhs.type, res.type);
-    else
-      cc.emitLn("%s = %s %s, %s : %s, %s", res, op, lhs, rhs, lhs.type,
+    else {
+      var immRes = isICMP ? cc.makeAnonymousValue(resType) : res;
+      cc.emitLn("%s = %s %s, %s : %s, %s", immRes, op, lhs, rhs, lhs.type,
                 rhs.type);
+      // For backwards compatibility, additionally emit a cast back to ui1
+      if (isICMP)
+        cc.emitLn("%s = hwarith.cast %s : (i1) -> ui1", res, immRes);
+    }
     return res;
   }
 
