@@ -42,7 +42,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
   public String emit(DescriptionContent content) {
     var defs = content.getDefinitions();
-    assert defs.size() == 1 : "NYI: Multiple instruction sets/core definitions";
+    assert defs.size() == 1 : ("NYI: Multiple instruction sets/core "
+                               + "definitions");
 
     var isa = defs.get(0);
     var anaRes = CoreDslAnalyzer.analyze(content, this);
@@ -69,8 +70,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
           return res.getValue().compareTo(BigInteger.ZERO) > 0;
         } else {
           // TODO is there a warning print util?
-          System.out.println(
-              "WARNING: could not evaluate instruction enable attribute expression. Assuming true!");
+          System.out.println("WARNING: could not evaluate instruction enable "
+                             + "attribute expression. Assuming true!");
           // TODO CoreDslConstantExpressionEvaluator.evaluate(ctx, expr) can not
           // evaluate == expression, annoying
           return true;

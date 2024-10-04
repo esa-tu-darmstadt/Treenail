@@ -36,10 +36,10 @@ class AppTest {
     assertNotNull(content, "app should be able to parse a simple CoreDSL file");
     assertTrue(mlirCode.startsWith("module @TestSplitEncFields"),
                "app should be able to generate MLIR");
-    assertTrue(
-        mlirCode.contains(
-            "%TREENAIL_WAS_HERE_0 = coredsl.concat %TREENAIL_WAS_HERE_Imm6_5_1, %TREENAIL_WAS_HERE_Imm6_0_0 : ui5, ui1"),
-        "app should be able to merge split encoding fields");
+    assertTrue(mlirCode.contains("%TREENAIL_WAS_HERE_0 = coredsl.concat "
+                                 + "%TREENAIL_WAS_HERE_Imm6_5_1, "
+                                 + "%TREENAIL_WAS_HERE_Imm6_0_0 : ui5, ui1"),
+               "app should be able to merge split encoding fields");
     assertTrue(
         mlirCode.contains(
             "%Imm6 = coredsl.cast %TREENAIL_WAS_HERE_0 : ui6 to ui6"),
@@ -57,25 +57,26 @@ class AppTest {
     assertTrue(mlirCode.startsWith("module @TestReversedEncFields"),
                "app should be able to generate MLIR");
     assertTrue(
-        mlirCode.contains(
-            "%TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6"),
+        mlirCode.contains("%TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract "
+                          + "%TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6"),
         "app should be able to emit bit reversal code");
     assertTrue(
         mlirCode.contains(
             "%Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6"),
-        "app should be able to retain the original reversed encoding field name");
+        "app should be able to retain the original reversed encoding field "
+            + "name");
 
     assertTrue(
-        mlirCode.contains(
-            "%TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3"),
+        mlirCode.contains("%TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract "
+                          + "%TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3"),
         "app should be able to emit bit reversal code");
-    assertTrue(
-        mlirCode.contains(
-            "%TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3"),
-        "app should be able to concat split and reversed bitfields");
-    assertTrue(
-        mlirCode.contains(
-            "%rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5"),
-        "app should be able to retain the original split and reversed encoding field name");
+    assertTrue(mlirCode.contains("%TREENAIL_WAS_HERE_2 = coredsl.concat "
+                                 + "%TREENAIL_WAS_HERE_rs1_4_3, "
+                                 + "%TREENAIL_WAS_HERE_reversed_1 : ui2, ui3"),
+               "app should be able to concat split and reversed bitfields");
+    assertTrue(mlirCode.contains(
+                   "%rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5"),
+               "app should be able to retain the original split and reversed "
+                   + "encoding field name");
   }
 }

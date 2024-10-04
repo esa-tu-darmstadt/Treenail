@@ -103,7 +103,8 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
         if (expectedEnd != v.end) {
           throw new IllegalArgumentException(
               "Invalid encoding mask! A value " + expectedName +
-              " was split into multiple parts and bits are missing between [" +
+              (" was split into multiple parts and bits are missing between "
+               + "[") +
               v.end + ":" + expectedEnd + "]");
         }
         expectedEnd = v.start + 1;

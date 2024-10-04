@@ -123,7 +123,7 @@ class ForLoopAnalyzer {
       var rhs = (IntegerConstant)assign.getValue();
       res.variable = lhs.getTarget();
       res.step = "+=".equals(opr) ? ensureBigInteger(rhs.getValue(), null)
-                                  : rhs.getValue().negate();
+                                    : rhs.getValue().negate();
     } catch (ClassCastException cce) {
       return null;
     }
