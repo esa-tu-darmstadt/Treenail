@@ -1,5 +1,8 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import static java.lang.String.format;
+import static java.util.stream.Collectors.joining;
+
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.BitField;
 import com.minres.coredsl.coreDsl.BitValue;
@@ -76,9 +79,10 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
     return value + " : " + type;
   }
 
-  public void combineSplitValues(List<String> splitValueDefStmts) {
+  public String combineSplitValues(List<String> splitValueDefStmts) {
     // Merge possibly split and/or reversed bit fields
     int tmpValCnt = 0;
+    List<String> immAttrs = new ArrayList<>();
     for (var e : splitValues.entrySet()) {
       // first determine the final type
       var parts = e.getValue();
@@ -112,7 +116,12 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
 
       // Concat the split parts
       MLIRValue tmpVal = null;
+      List<String> immPartAttrs = new ArrayList<>();
       for (var v : parts) {
+        var immAttrStr = format("[\"%s\", %d, %d, %d]", v.val, v.start, v.end,
+                                v.reversed ? 1 : 0);
+        immPartAttrs.add(immAttrStr);
+
         var partVal = v.val;
         // Use coredsl.bitextract to reverse bits if requested
         if (v.reversed) {
@@ -140,6 +149,12 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
       // Create a NOP operation to copy the value from tmpVal to targetValue
       splitValueDefStmts.add(targetValue + " = coredsl.cast " + tmpVal + " : " +
                              type + " to " + type + "\n");
+      var immAttr = '[' + immPartAttrs.stream().collect(joining(", ")) + ']';
+      immAttrs.add(immAttr);
     }
+
+    var immAttrVal = '[' + immAttrs.stream().collect(joining(", ")) + ']';
+    var attrs = format(" {lil.enc_immediates = %s} ", immAttrVal);
+    return attrs;
   }
 }

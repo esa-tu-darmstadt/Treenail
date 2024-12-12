@@ -336,7 +336,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var behavior = emitBehavior(inst.getBehavior(), ctx, values);
 
     sb.append(
-        format("coredsl.instruction @%s(%s) {\n", inst.getName(), encoding));
+        format("coredsl.instruction @%s%s {\n", inst.getName(), encoding));
     for (var s : splitValueDefStmts) {
       sb.append(s.indent(N_SPACES));
     }
@@ -350,14 +350,16 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                              List<String> splitValueDefStmts) {
     var encodingFieldSwitch = new EncodingFieldSwitch(values);
 
-    var enc = encoding.getFields()
+    var enc = '(' +
+              encoding.getFields()
                   .stream()
                   .map(encodingFieldSwitch::doSwitch)
-                  .collect(joining(", "));
+                  .collect(joining(", ")) +
+              ')';
 
-    encodingFieldSwitch.combineSplitValues(splitValueDefStmts);
+    var attrs = encodingFieldSwitch.combineSplitValues(splitValueDefStmts);
 
-    return enc;
+    return attrs + enc;
   }
 
   public String emitAlwaysBlock(AlwaysBlock always, AnalysisContext ctx) {
