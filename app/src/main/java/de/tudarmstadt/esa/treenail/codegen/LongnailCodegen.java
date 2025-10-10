@@ -26,6 +26,8 @@ import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
 import com.minres.coredsl.coreDsl.TypeQualifier;
 import com.minres.coredsl.type.AddressSpaceType;
+import com.minres.coredsl.type.ArrayType;
+import com.minres.coredsl.type.CoreDslType;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -158,18 +160,19 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                     name, initStr, targetType);
     }
 
-    assert type.isAddressSpaceType();
-    var asType = (AddressSpaceType)type;
-    assert asType.elementType.isIntegerType()
-        : "NYI: Multi-dimensional registers";
+    assert type.isArrayType();
+    // Array type
+    var arType = (ArrayType)type;
+    var elementType = arType.elementType;
+    var numElements = arType.count;
+    var width = elementType.getBitSize();
 
-    var width = asType.elementType.getBitSize();
-    // assuming register are generally small
-    var numElements = asType.count.intValueExact();
+    assert elementType.isIntegerType() : "NYI: Multi-dimensional registers";
+
     if (hasAttr(dtor.getAttributes(), "is_main_reg"))
       protoStr = "core_x";
 
-    var elementType = mapType(asType.elementType);
+    var mappedElementType = mapType(elementType);
     if (init != null) {
       assert init instanceof ListInitializer;
       var listInit = (ListInitializer)init;
@@ -180,13 +183,13 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                       var cv = ctx.getExpressionValue(ei.getValue());
                       assert cv.getStatus() == StatusCode.success
                           : "Non-constant initializer";
-                      return ensureBigInteger(cv.getValue(), elementType);
+                      return ensureBigInteger(cv.getValue(), mappedElementType);
                     })
                     .map(Object::toString)
                     .collect(joining(", ", " = [", "]"));
     }
     return format("coredsl.register %s%s @%s[%d]%s : %s\n", protoStr, flagsStr,
-                  name, numElements, initStr, elementType);
+                  name, numElements, initStr, mappedElementType);
   }
 
   private String emitAddressSpace(Declarator dtor, AnalysisContext ctx) {
