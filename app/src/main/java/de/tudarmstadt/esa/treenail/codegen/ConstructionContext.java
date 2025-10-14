@@ -91,10 +91,10 @@ class ConstructionContext {
     return result;
   }
 
-  MLIRValue makeIndexConst(BigInteger value) {
+  MLIRValue makeHWConst(BigInteger value, int bitWidth) {
     assert !(value instanceof TypedBigInteger);
-    var result = makeAnonymousValue(MLIRType.getType(64, false));
-    emitLn("%s = arith.constant %d : index", result, value);
+    var result = makeAnonymousValue(MLIRType.getType(bitWidth, false));
+    emitLn("%s = hw.constant %d : i%d", result, value, bitWidth);
     return result;
   }
 
@@ -113,12 +113,9 @@ class ConstructionContext {
     return result;
   }
 
-  MLIRValue makeIndexCast(MLIRValue value, MLIRType type) {
-    var temp = makeAnonymousValue(MLIRType.DUMMY);
+  MLIRValue makeHWConstCast(MLIRValue value, MLIRType type) {
     var result = makeAnonymousValue(type);
-    emitLn("%s = arith.index_castui %s : index to i%d", temp, value,
-           type.width);
-    emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, temp, type.width,
+    emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, value, type.width,
            type);
     return result;
   }

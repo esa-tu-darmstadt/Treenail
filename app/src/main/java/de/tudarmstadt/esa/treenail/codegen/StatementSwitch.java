@@ -21,6 +21,7 @@ import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ReturnStatement;
 import com.minres.coredsl.coreDsl.SpawnStatement;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
+import com.minres.coredsl.type.IntegerType;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -236,10 +237,16 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var iterArgVars = getLoopCarriedVariables(loop);
     iterArgVars.remove(iterVar);
 
+    var iterType = mapType(ac.getDeclaredType(iterVar));
+    var isUnsignedCmp =
+        !((IntegerType)ac.getDeclaredType(iterVar)).isSigned() &&
+        !((IntegerType)ac.getDeclaredType(condAna.variable)).isSigned() &&
+        !((IntegerType)ac.getDeclaredType(actionAna.variable)).isSigned();
+
     // For now, only loops with constant bounds/trip counts are supported.
-    var from = cc.makeIndexConst(initAna.value);
-    var to = cc.makeIndexConst(condAna.bound);
-    var step = cc.makeIndexConst(actionAna.step);
+    var from = cc.makeHWConst(initAna.value, iterType.width);
+    var to = cc.makeHWConst(condAna.bound, iterType.width);
+    var step = cc.makeHWConst(actionAna.step, iterType.width);
 
     // This nested construction will be used for the loop body.
     var forCC = new ConstructionContext(
@@ -248,8 +255,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
     // Make the iterator available as an ui/si value in the body.
     var iterIndex = forCC.makeAnonymousValue(MLIRType.DUMMY);
-    var iterType = mapType(ac.getDeclaredType(iterVar));
-    var iterCast = forCC.makeIndexCast(iterIndex, iterType);
+    var iterCast = forCC.makeHWConstCast(iterIndex, iterType);
     forCC.setValue(iterVar, iterCast);
 
     // Make other iterArgs available in the body, and create result values.
@@ -272,8 +278,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // Handle simple case first: no `iter_args`/results.
     if (iterArgs.isEmpty()) {
       forCC.emitLn("scf.yield");
-      cc.emitLn("scf.for %s = %s to %s step %s {\n%s}", iterIndex, from, to,
-                step, forCC.getStringBuilder().toString().indent(N_SPACES));
+      cc.emitLn("scf.for %s%s = %s to %s step %s : i%d {\n%s}",
+                isUnsignedCmp ? "unsigned " : "", iterIndex, from, to, step,
+                iterType.width,
+                forCC.getStringBuilder().toString().indent(N_SPACES));
       return true;
     }
 
@@ -296,9 +304,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var resultsStr =
         results.stream().map(Object::toString).collect(joining(", "));
 
-    cc.emitLn("%s = scf.for %s = %s to %s step %s iter_args(%s) -> (%s) {\n%s}",
-              resultsStr, iterIndex, from, to, step, iterArgsStr,
-              iterArgTypesStr,
+    cc.emitLn("%s = scf.for %s%s = %s to %s step %s iter_args(%s) -> (%s) : "
+                  + "i%d {\n%s}",
+              resultsStr, isUnsignedCmp ? "unsigned " : "", iterIndex, from, to,
+              step, iterArgsStr, iterArgTypesStr, iterType.width,
               forCC.getStringBuilder().toString().indent(N_SPACES));
 
     // Update the surrounding construction's value table.
