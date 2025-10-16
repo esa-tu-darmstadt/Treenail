@@ -307,9 +307,16 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     if (unaryOperatorMap.containsKey(opr)) {
       // The target dialect don't have unary operations, hence we must construct
       // equivalent binary operations here.
-      var zero = cc.makeConst(BigInteger.ZERO, getType(1, false));
+      MLIRValue lhs;
       var type = mapType(ac.getExpressionType(expr));
-      return emitBinaryOp(unaryOperatorMap.get(opr), type, zero, oprnd);
+      if ("~".equals(opr)) {
+        // To invert the value we need a -1 constant to xor with
+        lhs = cc.makeHWConst(BigInteger.ONE.negate(), type.width);
+        lhs = cc.makeHWConstCast(lhs, type.width, type);
+      } else {
+        lhs = cc.makeConst(BigInteger.ZERO, getType(1, false));
+      }
+      return emitBinaryOp(unaryOperatorMap.get(opr), type, lhs, oprnd);
     }
 
     assert "++".equals(opr) || "--".equals(opr)
