@@ -2,6 +2,7 @@ package de.tudarmstadt.esa.treenail.codegen;
 
 import com.minres.coredsl.type.CoreDslType;
 import com.minres.coredsl.type.IntegerType;
+import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -32,6 +33,16 @@ class MLIRType {
     assert type.isIntegerType();
     var intType = (IntegerType)type;
     return getType(intType.getBitSize(), intType.isSigned());
+  }
+
+  static MLIRType determineType(BigInteger value) {
+    // Determine signedness
+    boolean isNegative = value.signum() < 0;
+
+    // Determine minimal width (bits)
+    // extra bit for sign if negative
+    int bits = Math.max(value.bitLength() + (isNegative ? 1 : 0), 1);
+    return getType(bits, isNegative);
   }
 
   public String toString() { return (isSigned ? "si" : "ui") + width; }

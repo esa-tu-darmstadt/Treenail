@@ -28,6 +28,7 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import org.eclipse.emf.ecore.EObject;
 
@@ -231,22 +232,65 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         condAna.variable != actionAna.variable)
       return false;
 
+    if (!ForLoopAnalyzer.FOR_COMPATIBLE_CMP.contains(condAna.relation))
+      return false;
+
+    boolean mustNegateItVar = false;
+    switch (condAna.relation) {
+    case "<":
+      // Nothing to do, this is the intended way
+      break;
+    case "<=":
+      // a <= b <-> a < b + 1
+      condAna.bound = condAna.bound.add(BigInteger.ONE);
+      break;
+
+    case ">=":
+      // a >= b <-> a > b - 1
+      condAna.bound = condAna.bound.subtract(BigInteger.ONE);
+      // Fallthrough to convert a > b to a < b
+    case ">":
+      mustNegateItVar = true;
+      initAna.value = initAna.value.negate();
+      actionAna.step = actionAna.step.negate();
+      condAna.bound = condAna.bound.negate();
+      break;
+    default:
+      assert false : "emitScfFor: NYI relation";
+      break;
+    }
+
+    // scf.for demands that the step value is positive!
+    if (actionAna.step.signum() < 0)
+      return false;
+
     // The iterator is special in `scf.for`; separate it from the remaining
     // loop-carried variables.
     var iterVar = initAna.variable;
     var iterArgVars = getLoopCarriedVariables(loop);
     iterArgVars.remove(iterVar);
 
-    var iterType = mapType(ac.getDeclaredType(iterVar));
-    var isUnsignedCmp =
-        !((IntegerType)ac.getDeclaredType(iterVar)).isSigned() &&
-        !((IntegerType)ac.getDeclaredType(condAna.variable)).isSigned() &&
-        !((IntegerType)ac.getDeclaredType(actionAna.variable)).isSigned();
+    var expectedIterType = mapType(ac.getDeclaredType(iterVar));
+
+    // Find minimal common type for initAna.value, actionAna.step, condAna.bound
+    var minTypeInit = MLIRType.determineType(initAna.value);
+    var minTypeStep = MLIRType.determineType(actionAna.step);
+    var minTypeBound = MLIRType.determineType(condAna.bound);
+
+    var isActualSigned =
+        minTypeInit.isSigned || minTypeStep.isSigned || minTypeBound.isSigned;
+    var isUnsignedCmp = !isActualSigned;
+    Function<MLIRType, Integer> getBitWidth =
+        x -> x.width + (isActualSigned != x.isSigned ? 1 : 0);
+    var minBitWidth = Math.max(getBitWidth.apply(minTypeInit),
+                               Math.max(getBitWidth.apply(minTypeStep),
+                                        getBitWidth.apply(minTypeBound)));
+    var actualIterType = MLIRType.getType(minBitWidth, isActualSigned);
 
     // For now, only loops with constant bounds/trip counts are supported.
-    var from = cc.makeHWConst(initAna.value, iterType.width);
-    var to = cc.makeHWConst(condAna.bound, iterType.width);
-    var step = cc.makeHWConst(actionAna.step, iterType.width);
+    var from = cc.makeHWConst(initAna.value, actualIterType.width);
+    var to = cc.makeHWConst(condAna.bound, actualIterType.width);
+    var step = cc.makeHWConst(actionAna.step, actualIterType.width);
 
     // This nested construction will be used for the loop body.
     var forCC = new ConstructionContext(
@@ -255,8 +299,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
     // Make the iterator available as an ui/si value in the body.
     var iterIndex = forCC.makeAnonymousValue(MLIRType.DUMMY);
-    var iterCast = forCC.makeHWConstCast(iterIndex, iterType);
-    forCC.setValue(iterVar, iterCast);
+    var iterMlirVal = iterIndex;
+    if (mustNegateItVar) {
+      var zeroConst = forCC.makeHWConst(BigInteger.ZERO, actualIterType.width);
+      var negatedIdx = forCC.makeAnonymousValue(MLIRType.DUMMY);
+      forCC.emitLn("%s = comb.sub %s, %s : i%d", negatedIdx, zeroConst,
+                   iterIndex, actualIterType.width);
+      iterMlirVal = negatedIdx;
+    }
+    var iterRawVal = forCC.makeHWConstCast(
+        iterMlirVal, actualIterType.width,
+        MLIRType.getType(actualIterType.width, expectedIterType.isSigned));
+    iterMlirVal = forCC.makeCast(iterRawVal, expectedIterType);
+    forCC.setValue(iterVar, iterMlirVal);
 
     // Make other iterArgs available in the body, and create result values.
     var iterArgTypes = new LinkedList<MLIRType>();
@@ -280,7 +335,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       forCC.emitLn("scf.yield");
       cc.emitLn("scf.for %s%s = %s to %s step %s : i%d {\n%s}",
                 isUnsignedCmp ? "unsigned " : "", iterIndex, from, to, step,
-                iterType.width,
+                actualIterType.width,
                 forCC.getStringBuilder().toString().indent(N_SPACES));
       return true;
     }
@@ -307,7 +362,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     cc.emitLn("%s = scf.for %s%s = %s to %s step %s iter_args(%s) -> (%s) : "
                   + "i%d {\n%s}",
               resultsStr, isUnsignedCmp ? "unsigned " : "", iterIndex, from, to,
-              step, iterArgsStr, iterArgTypesStr, iterType.width,
+              step, iterArgsStr, iterArgTypesStr, actualIterType.width,
               forCC.getStringBuilder().toString().indent(N_SPACES));
 
     // Update the surrounding construction's value table.

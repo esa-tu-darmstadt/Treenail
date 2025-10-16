@@ -34,6 +34,7 @@ class ForLoopAnalyzer {
   }
 
   static final Set<String> CMP = Set.of("==", "!=", "<", "<=", ">", ">=");
+  static final Set<String> FOR_COMPATIBLE_CMP = Set.of("<", "<=", ">", ">=");
   static final Set<String> INCR_DECR = Set.of("++", "--");
   static final Set<String> COMP_ASSIGN = Set.of("+=", "-=");
 
