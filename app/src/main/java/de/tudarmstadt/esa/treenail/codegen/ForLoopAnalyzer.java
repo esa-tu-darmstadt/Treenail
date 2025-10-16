@@ -12,6 +12,7 @@ import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.PostfixExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
+import de.tudarmstadt.esa.treenail.codegen.ConstructionContext;
 import java.math.BigInteger;
 import java.util.Set;
 
@@ -61,7 +62,7 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  static Condition analyzeCondition(ForLoop loop) {
+  static Condition analyzeCondition(ForLoop loop, ConstructionContext cc) {
     var expr = loop.getCondition();
     var res = new Condition();
     try {
@@ -70,10 +71,11 @@ class ForLoopAnalyzer {
       if (!CMP.contains(opr))
         return null;
       var ref = (EntityReference)infix.getLeft();
-      var konst = (IntegerConstant)infix.getRight();
+      if (!cc.isConstant(infix.getRight()))
+        return null;
       res.variable = ref.getTarget();
       res.relation = opr;
-      res.bound = ensureBigInteger(konst.getValue(), null);
+      res.bound = cc.getConstantValue(infix.getRight(), null);
     } catch (ClassCastException cce) {
       return null;
     }

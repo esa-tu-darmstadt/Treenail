@@ -1,6 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import com.minres.coredsl.analysis.AnalysisContext;
+import com.minres.coredsl.analysis.CoreDslConstantExpressionEvaluator;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
@@ -33,7 +34,9 @@ class ConstructionContext {
   }
 
   boolean isConstant(Expression expr) {
-    return expr instanceof IntegerConstant || ac.isExpressionValueSet(expr);
+    var constExprEvalRes =
+        CoreDslConstantExpressionEvaluator.tryEvaluate(ac, expr);
+    return constExprEvalRes.isValid();
   }
 
   // This method ensures that the return value is a standard `BigInteger`, as
@@ -57,10 +60,10 @@ class ConstructionContext {
   }
 
   BigInteger getConstantValue(Expression expr, MLIRType type) {
-    return ensureBigInteger(expr instanceof IntegerConstant
-                                ? ((IntegerConstant)expr).getValue()
-                                : ac.getExpressionValue(expr).getValue(),
-                            type);
+    var constExprEvalRes =
+        CoreDslConstantExpressionEvaluator.evaluate(ac, expr);
+    assert constExprEvalRes.isValid();
+    return ensureBigInteger(constExprEvalRes.getValue(), type);
   }
 
   IntegerType getElementType(NamedEntity ent) {
@@ -113,9 +116,9 @@ class ConstructionContext {
     return result;
   }
 
-  MLIRValue makeHWConstCast(MLIRValue value, MLIRType type) {
+  MLIRValue makeHWConstCast(MLIRValue value, int inputWidth, MLIRType type) {
     var result = makeAnonymousValue(type);
-    emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, value, type.width,
+    emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, value, inputWidth,
            type);
     return result;
   }

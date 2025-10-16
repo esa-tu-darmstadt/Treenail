@@ -224,7 +224,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // not, fail early; the construction will fall-back to a generic
     // `scf.while` (which may be unsupported by Longnail).
     var initAna = ForLoopAnalyzer.analyzeInitialization(loop);
-    var condAna = ForLoopAnalyzer.analyzeCondition(loop);
+    var condAna = ForLoopAnalyzer.analyzeCondition(loop, cc);
     var actionAna = ForLoopAnalyzer.analyzeAction(loop);
     if (initAna == null || condAna == null || actionAna == null ||
         initAna.variable != condAna.variable ||
