@@ -198,8 +198,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       // It's a local variable, retrieve its last definition.
       return cc.getValue(entity);
 
-    // Otherwise, emit a `coredsl.get`.
     var type = mapType(ac.getDeclaredType(entity));
+    if (cc.isConstant(reference))
+      // If it's a compile-time parameter emit a constant
+      return cc.makeConst(cc.getConstantValue(reference, type), type);
+
+    // Otherwise, emit a `coredsl.get`.
     var result = cc.makeAnonymousValue(type);
     cc.emitLn("%s = coredsl.get @%s : %s", result, entity.getName(), type);
     return result;
