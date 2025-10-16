@@ -319,10 +319,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       return sb.toString();
     }
 
-    var behavior = emitBehavior(body, ctx, values);
+    var behavior = emitBehavior(body, ctx, values, "return");
 
-    // TODO: ensure that the `return` operation is emitted even for empty
-    // CoreDSL functions.
     sb.append(funcSignature + " {\n")
         .append(behavior.indent(N_SPACES))
         .append("}\n");
@@ -380,11 +378,16 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
   public String emitBehavior(Statement behavior, AnalysisContext ctx,
                              Map<NamedEntity, MLIRValue> values) {
+    return emitBehavior(behavior, ctx, values, "coredsl.end");
+  }
+  public String emitBehavior(Statement behavior, AnalysisContext ctx,
+                             Map<NamedEntity, MLIRValue> values,
+                             String fallbackTerminator) {
     var sb = new StringBuilder();
     var cc = new ConstructionContext(values, new AtomicInteger(0), ctx, sb);
     new StatementSwitch(cc).doSwitch(behavior);
     if (!cc.getTerminatorWasEmitted())
-      cc.emitLn("coredsl.end");
+      cc.emitLn(fallbackTerminator);
     return sb.toString();
   }
 
