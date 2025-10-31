@@ -44,13 +44,14 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
   public String emit(DescriptionContent content) {
     var defs = content.getDefinitions();
-    assert defs.size() == 1 : ("NYI: Multiple instruction sets/core "
-                               + "definitions");
-
-    var isa = defs.get(0);
     var anaRes = CoreDslAnalyzer.analyze(content, this);
 
-    return emitISA(isa, anaRes.results.get(isa));
+    String isaCode = "";
+    for (var isa : defs) {
+      isaCode += emitISA(isa, anaRes.results.get(isa));
+    }
+
+    return isaCode;
   }
 
   private static boolean hasAttr(List<Attribute> attrs, String attrName) {
