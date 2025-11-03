@@ -88,7 +88,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   private String emitISA(ISA isa, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
-    sb.append(format("module @%s {\n", isa.getName()));
+    sb.append(format("lil.isax \"%s\" {\n", isa.getName()));
     for (var stmt : isa.getArchStateBody()) {
       assert stmt instanceof DeclarationStatement
           : "NYI: Support for parameter assignments etc.";
