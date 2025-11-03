@@ -90,6 +90,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     sb.append(format("lil.isax \"%s\" {\n", isa.getName()));
     for (var stmt : isa.getArchStateBody()) {
+      if (!(stmt instanceof DeclarationStatement)) {
+        System.out.println(
+            "NYI: Support for parameter assignments etc. Ignoring...");
+        continue;
+      }
       assert stmt instanceof DeclarationStatement
           : "NYI: Support for parameter assignments etc.";
       var declStmt = (DeclarationStatement)stmt;
