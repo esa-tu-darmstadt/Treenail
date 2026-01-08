@@ -79,4 +79,49 @@ class AppTest {
                "app should be able to retain the original split and reversed "
                    + "encoding field name");
   }
+
+  @Test
+  void constVolatileWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("const_volatile.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    System.out.println(mlirCode);
+    assertNotNull(mlirCode, "MLIR should be output without errors");
+    // Test register files with qualifiers
+    assertTrue(mlirCode.contains("coredsl.register core_x @X[32] : ui32"));
+    assertTrue(mlirCode.contains(
+        "coredsl.register local const @CONST_REG_FILE[10] : ui32"));
+    assertTrue(mlirCode.contains(
+        "coredsl.register local volatile @VOLATILE_REG_FILE[12] : ui32"));
+    assertTrue(mlirCode.contains("coredsl.register local const volatile "
+                                 + "@CONST_VOLATILE_REG_FILE[14] : ui32"));
+    // test scalar registers with qualifiers
+    assertTrue(
+        mlirCode.contains("coredsl.register local @NORMAL_REG = 5 : ui32"));
+    assertTrue(mlirCode.contains(
+        "coredsl.register local const @CONST_REG = 10 : ui32"));
+    assertTrue(mlirCode.contains(
+        "coredsl.register local volatile @VOLATILE_REG = 12 : ui32"));
+    assertTrue(mlirCode.contains("coredsl.register local const volatile "
+                                 + "@CONST_VOLATILE_REG = 42 : ui32"));
+    // Make sure output MLIR contains address space command with qualifiers
+    assertTrue(
+        mlirCode.contains("coredsl.addrspace core_mem @MEM : (ui32) -> ui8"));
+    assertTrue(mlirCode.contains(
+        "coredsl.addrspace core_mem const @CONST_MEM : (ui64) -> ui8"));
+    assertTrue(mlirCode.contains(
+        "coredsl.addrspace core_mem volatile @VOLATILE_MEM : (ui8) -> ui8"));
+    assertTrue(mlirCode.contains("coredsl.addrspace core_mem const volatile "
+                                 + "@CONST_VOLATILE_MEM : (ui16) -> ui8"));
+
+    assertTrue(mlirCode.contains("coredsl.alias @FIRST_MEM_VAL = @MEM[0]"));
+    assertTrue(mlirCode.contains(
+        "coredsl.alias const @FIRST_CONST_MEM_VAL = @CONST_MEM[0]"));
+    assertTrue(mlirCode.contains(
+        "coredsl.alias volatile @FIRST_VOLATILE_MEM_VAL = @VOLATILE_MEM[0]"));
+    assertTrue(mlirCode.contains(
+        "coredsl.alias const volatile @FIRST_CONST_VOLATILE_MEM_VAL = "
+        + "@CONST_VOLATILE_MEM[0]"));
+  }
 }

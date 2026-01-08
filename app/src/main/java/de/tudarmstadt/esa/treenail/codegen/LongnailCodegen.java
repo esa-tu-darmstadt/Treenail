@@ -122,7 +122,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return sb.toString();
   }
 
-  private String emitConstParam(Declarator dtor, AnalysisContext ctx) {
+  private String emitConstParam(Declarator dtor, boolean isVolatile,
+                                AnalysisContext ctx) {
     var name = dtor.getName();
     var type = ctx.getDeclaredType(dtor);
     var init = dtor.getInitializer();
@@ -137,17 +138,18 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     // Instead of a hwarith.constant we will emit a local const register, which
     // will be optimized away but allows being accessed even in isolated from
     // above regions (esp. func.func)
-    return emitRegister(dtor, /*isConst=*/true, ctx);
+    return emitRegister(dtor, /*isConst=*/true, isVolatile, ctx);
   }
 
   private String emitRegister(Declarator dtor, boolean isConst,
-                              AnalysisContext ctx) {
+                              boolean isVolatile, AnalysisContext ctx) {
     var name = dtor.getName();
     var type = ctx.getDeclaredType(dtor);
     var init = dtor.getInitializer();
 
     var protoStr = "local";
-    var flagsStr = isConst ? " const" : "";
+    var constStr = isConst ? " const" : "";
+    var volatileStr = isVolatile ? " volatile" : "";
     var initStr = "";
 
     if (type.isIntegerType()) {
@@ -162,8 +164,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
             : "Non-constant initializer";
         initStr = " = " + ensureBigInteger(cv.value, targetType);
       }
-      return format("coredsl.register %s%s @%s%s : %s\n", protoStr, flagsStr,
-                    name, initStr, targetType);
+      return format("coredsl.register %s%s%s @%s%s : %s\n", protoStr, constStr,
+                    volatileStr, name, initStr, targetType);
     }
 
     assert type.isArrayType();
@@ -194,11 +196,13 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                     .map(Object::toString)
                     .collect(joining(", ", " = [", "]"));
     }
-    return format("coredsl.register %s%s @%s[%d]%s : %s\n", protoStr, flagsStr,
-                  name, numElements, initStr, mappedElementType);
+    return format("coredsl.register %s%s%s @%s[%d]%s : %s\n", protoStr,
+                  constStr, volatileStr, name, numElements, initStr,
+                  mappedElementType);
   }
 
-  private String emitAddressSpace(Declarator dtor, AnalysisContext ctx) {
+  private String emitAddressSpace(Declarator dtor, boolean isConst,
+                                  boolean isVolatile, AnalysisContext ctx) {
     assert dtor.getInitializer() == null
         : "Address spaces cannot have initizers";
 
@@ -231,11 +235,15 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     }
     assert !proto.isEmpty() : "NYI: Custom address spaces";
 
-    return format("coredsl.addrspace %s @%s : (ui%d) -> %s\n", proto, name,
-                  addressWidth, mapType(asType.elementType));
+    final String constString = isConst ? " const" : "";
+    final String volatileString = isVolatile ? " volatile" : "";
+    return format("coredsl.addrspace %s%s%s @%s : (ui%d) -> %s\n", proto,
+                  constString, volatileString, name, addressWidth,
+                  mapType(asType.elementType));
   }
 
-  private String emitAlias(Declarator dtor, AnalysisContext ctx) {
+  private String emitAlias(Declarator dtor, boolean isConst, boolean isVolatile,
+                           AnalysisContext ctx) {
     var name = dtor.getName();
     var init = dtor.getInitializer();
     assert init != null && init instanceof ExpressionInitializer;
@@ -262,7 +270,10 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
           ensureBigInteger(
               ctx.getExpressionValue(indexExpr.getEndIndex()).getValue(), null);
 
-    return format("coredsl.alias @%s = @%s[%s]\n", name, refName, index);
+    final String constString = isConst ? " const" : "";
+    final String volatileString = isVolatile ? " volatile" : "";
+    return format("coredsl.alias%s%s @%s = @%s[%s]\n", constString,
+                  volatileString, name, refName, index);
   }
 
   private String emitArchitecturalStateElement(Declaration decl,
@@ -272,7 +283,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var qual = decl.getQualifiers();
     var isConst = qual.contains(TypeQualifier.CONST);
     var isVolatile = qual.contains(TypeQualifier.VOLATILE);
-    assert !isVolatile : "NYI: Volatile architectural state";
 
     var dtor = decl.getDeclarators().get(0);
     switch (ctx.getStorageClass(dtor)) {
@@ -280,16 +290,15 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       if (isConst) {
         // Const parameters can be emitted since their value is already
         // elaborated
-        return emitConstParam(dtor, ctx);
+        return emitConstParam(dtor, isVolatile, ctx);
       }
       return null; // Ignore, we're only dealing with the elaborated values.
     case register:
-      return emitRegister(dtor, isConst, ctx);
+      return emitRegister(dtor, isConst, isVolatile, ctx);
     case extern:
-      assert !isConst : "NYI: `const` address spaces";
-      return emitAddressSpace(dtor, ctx);
+      return emitAddressSpace(dtor, isConst, isVolatile, ctx);
     case alias:
-      return emitAlias(dtor, ctx);
+      return emitAlias(dtor, isConst, isVolatile, ctx);
     default:
       assert false : "NYI: Architectural state declaration: " + decl;
       return null;
