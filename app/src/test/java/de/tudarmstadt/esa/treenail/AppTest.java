@@ -86,7 +86,6 @@ class AppTest {
     var fileName = getClass().getResource("const_volatile.core_desc").getPath();
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
-    System.out.println(mlirCode);
     assertNotNull(mlirCode, "MLIR should be output without errors");
     // Test register files with qualifiers
     assertTrue(mlirCode.contains("coredsl.register core_x @X[32] : ui32"));
@@ -123,5 +122,29 @@ class AppTest {
     assertTrue(mlirCode.contains(
         "coredsl.alias const volatile @FIRST_CONST_VOLATILE_MEM_VAL = "
         + "@CONST_VOLATILE_MEM[0]"));
+  }
+
+  @Test
+  void multipleDeclaratorsWork() {
+    var appInst = App.getInstance();
+    // NOTE: This file is parsed and converted to mlir in other tests
+    var expectedFileName =
+        getClass().getResource("intro_syntax.core_desc").getPath();
+    var expectedContent = appInst.parse(expectedFileName);
+    assertNotNull(expectedContent,
+                  "app should be able to parse a simple CoreDSL file");
+    var expectedMlir = appInst.generateMLIR(expectedContent);
+    assertNotNull(expectedMlir);
+
+    var testFileName =
+        getClass()
+            .getResource("intro_syntax_multiple_declarators.core_desc")
+            .getPath();
+    var testContent = appInst.parse(testFileName);
+    assertNotNull(testContent);
+    var gotMlir = appInst.generateMLIR(testContent);
+    assertNotNull(gotMlir);
+
+    assertEquals(gotMlir, expectedMlir);
   }
 }

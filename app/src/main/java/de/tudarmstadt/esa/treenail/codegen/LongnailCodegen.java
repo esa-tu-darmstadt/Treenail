@@ -278,31 +278,40 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
   private String emitArchitecturalStateElement(Declaration decl,
                                                AnalysisContext ctx) {
-    assert decl.getDeclarators().size() == 1 : "NYI: Multiple declarators";
-
     var qual = decl.getQualifiers();
     var isConst = qual.contains(TypeQualifier.CONST);
     var isVolatile = qual.contains(TypeQualifier.VOLATILE);
 
-    var dtor = decl.getDeclarators().get(0);
-    switch (ctx.getStorageClass(dtor)) {
-    case param:
-      if (isConst) {
-        // Const parameters can be emitted since their value is already
-        // elaborated
-        return emitConstParam(dtor, isVolatile, ctx);
+    var sb = new StringBuilder();
+    for (var dtor : decl.getDeclarators()) {
+      switch (ctx.getStorageClass(dtor)) {
+      case param:
+        if (isConst) {
+          // Const parameters can be emitted since their value is already
+          // elaborated
+          sb.append(emitConstParam(dtor, isVolatile, ctx));
+        }
+        break; // Ignore, we're only dealing with the elaborated values.
+      case register:
+        sb.append(emitRegister(dtor, isConst, isVolatile, ctx));
+        break;
+      case extern:
+        sb.append(emitAddressSpace(dtor, isConst, isVolatile, ctx));
+        break;
+      case alias:
+        sb.append(emitAlias(dtor, isConst, isVolatile, ctx));
+        break;
+      default:
+        assert false : "NYI: Architectural state declaration: " + decl;
+        return null;
       }
-      return null; // Ignore, we're only dealing with the elaborated values.
-    case register:
-      return emitRegister(dtor, isConst, isVolatile, ctx);
-    case extern:
-      return emitAddressSpace(dtor, isConst, isVolatile, ctx);
-    case alias:
-      return emitAlias(dtor, isConst, isVolatile, ctx);
-    default:
-      assert false : "NYI: Architectural state declaration: " + decl;
+    }
+    if (sb.isEmpty()) {
+      // Return null, because otherwise, an empty string with indents is
+      // appended to the resulting MLIR
       return null;
     }
+    return sb.toString();
   }
 
   private String emitFunction(FunctionDefinition func, AnalysisContext ctx) {
