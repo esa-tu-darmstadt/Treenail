@@ -148,4 +148,87 @@ class AppTest {
 
     assertEquals(gotMlir, expectedMlir);
   }
+
+  @Test
+  void shortCircuitEvaluationWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("short_circuit.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    assertTrue(
+        mlirCode.contains("    %7 = coredsl.cast %4 : ui1 to i1\n"
+                          + "    %6 = scf.if %7 -> (ui1) {\n"
+                          + "      %8 = hwarith.constant 10 : ui4\n"
+                          + "      %10 = hwarith.icmp lt %2, %8 : ui32, ui4\n"
+                          + "      %9 = hwarith.cast %10 : (i1) -> ui1\n"
+                          + "      scf.yield %9 : ui1\n"
+                          + "    } else {\n"
+                          + "      %8 = hwarith.constant 0 : ui1\n"
+                          + "      scf.yield %8 : ui1\n"
+                          + "    }"));
+    assertTrue(
+        mlirCode.contains("    %7 = coredsl.cast %4 : ui1 to i1\n"
+                          + "    %6 = scf.if %7 -> (ui1) {\n"
+                          + "      %8 = hwarith.constant 1 : ui1\n"
+                          + "      scf.yield %8 : ui1\n"
+                          + "    } else {\n"
+                          + "      %8 = hwarith.constant 10 : ui4\n"
+                          + "      %10 = hwarith.icmp gt %2, %8 : ui32, ui4\n"
+                          + "      %9 = hwarith.cast %10 : (i1) -> ui1\n"
+                          + "      scf.yield %9 : ui1\n"
+                          + "    }"));
+    assertTrue(mlirCode.contains("    %4 = hwarith.constant 0 : ui32\n"
+                                 + "    %5 = hwarith.icmp ne %0 %4\n"
+                                 + "    %6 = coredsl.cast %5 : ui1 to i1\n"
+                                 + "    %3 = scf.if %6 -> (ui1) {\n"
+                                 + "      %7 = hwarith.constant 1 : ui1\n"
+                                 + "      scf.yield %7 : ui1\n"
+                                 + "    } else {\n"
+                                 + "      %7 = hwarith.constant 0 : ui32\n"
+                                 + "      %8 = hwarith.icmp ne %2 %7\n"
+                                 + "      scf.yield %8 : ui1\n"
+                                 + "    }"));
+    assertTrue(mlirCode.contains(
+        "    %7 = coredsl.cast %4 : ui1 to i1\n"
+        + "    %6 = scf.if %7 -> (ui1) {\n"
+        + "      %8 = hwarith.constant 10 : ui4\n"
+        + "      %10 = hwarith.icmp lt %0, %8 : ui32, ui4\n"
+        + "      %9 = hwarith.cast %10 : (i1) -> ui1\n"
+        + "      scf.yield %9 : ui1\n"
+        + "    } else {\n"
+        + "      %8 = hwarith.constant 0 : ui1\n"
+        + "      scf.yield %8 : ui1\n"
+        + "    }\n"
+        + "    %9 = coredsl.cast %6 : ui1 to i1\n"
+        + "    %8 = scf.if %9 -> (ui1) {\n"
+        + "      %10 = hwarith.constant 1 : ui1\n"
+        + "      scf.yield %10 : ui1\n"
+        + "    } else {\n"
+        + "      %10 = hwarith.constant 10 : ui4\n"
+        + "      %12 = hwarith.icmp gt %2, %10 : ui32, ui4\n"
+        + "      %11 = hwarith.cast %12 : (i1) -> ui1\n"
+        + "      %14 = coredsl.cast %11 : ui1 to i1\n"
+        + "      %13 = scf.if %14 -> (ui1) {\n"
+        + "        %15 = hwarith.constant 15 : ui4\n"
+        + "        %17 = hwarith.icmp lt %2, %15 : ui32, ui4\n"
+        + "        %16 = hwarith.cast %17 : (i1) -> ui1\n"
+        + "        scf.yield %16 : ui1\n"
+        + "      } else {\n"
+        + "        %15 = hwarith.constant 0 : ui1\n"
+        + "        scf.yield %15 : ui1\n"
+        + "      }\n"
+        + "      %16 = coredsl.cast %13 : ui1 to i1\n"
+        + "      %15 = scf.if %16 -> (ui1) {\n"
+        + "        %17 = hwarith.constant 1 : ui1\n"
+        + "        scf.yield %17 : ui1\n"
+        + "      } else {\n"
+        + "        %17 = hwarith.constant 0 : ui1\n"
+        + "        %19 = hwarith.icmp eq %2, %17 : ui32, ui1\n"
+        + "        %18 = hwarith.cast %19 : (i1) -> ui1\n"
+        + "        scf.yield %18 : ui1\n"
+        + "      }\n"
+        + "      scf.yield %15 : ui1\n"
+        + "    }"));
+  }
 }

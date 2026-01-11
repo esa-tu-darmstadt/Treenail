@@ -1,0 +1,59 @@
+InstructionSet ShortCircuitEvaluation {
+    architectural_state {
+      unsigned int XLEN = 32;
+      unsigned int RFS = 32;
+
+      register unsigned<XLEN> X[RFS] [[is_main_reg]];
+
+      extern unsigned<8> MEM[1 << XLEN] [[is_main_mem]];
+    }
+
+  instructions {
+    LogicalAndTest {
+        encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+        behavior: {
+          unsigned<32> x = MEM[Imm6];
+          if (x > 5 && x < 10) {
+            X[rd] = x;
+          } else {
+            X[rd] = 0;
+          }
+        }
+    }
+    LogicalOrTest {
+        encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+        behavior: {
+          unsigned<32> x = MEM[Imm6];
+          if (x < 5 || x > 10) {
+            X[rd] = x;
+          } else {
+            X[rd] = 0;
+          }
+        }
+    }
+    ConvertToBoolTest {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = X[2];
+        unsigned<32> y = MEM[0];
+        if (x || y) {
+          X[0] = 1;
+        } else {
+          X[0] = 2;
+        }
+      }
+    }
+    MultipleShortCircuitTest {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = X[2];
+        unsigned<32> y = MEM[0];
+        if ((x > 5 && x < 10) || ((y > 10 && y < 15) || y == 0)) {
+            X[0] = 1;
+        } else {
+            X[0] = 0;
+        }
+      }
+    }
+  }
+}
