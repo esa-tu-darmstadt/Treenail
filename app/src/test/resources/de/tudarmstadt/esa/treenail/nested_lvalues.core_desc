@@ -1,0 +1,35 @@
+InstructionSet NestedLValues {
+  architectural_state {
+    register unsigned<32> X[32] [[is_main_reg]];
+    register unsigned<32> PC;
+    extern unsigned char MEM[0x100000000] [[is_main_mem]];
+  }
+
+  instructions {
+    SimpleRegStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        X[rs2][0:10] = 100;
+      }
+    }
+    SimpleMemStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        MEM[rs2][0:4] = 8;
+      }
+    }
+    NestedBitAccess {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        PC[16:0][8:0] = 42;
+      }
+    }
+    // TODO: need to test:
+    // - Also every option of this with locals (except local arrays)
+    // - ranged bit access then bit access
+    // - ranged address space access then element access
+    // - ranged address space access then bit access
+    // - ranged address space access then element access then bit access
+    // - element access then bit access
+  }
+}
