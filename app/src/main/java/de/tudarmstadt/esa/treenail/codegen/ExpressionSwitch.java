@@ -46,7 +46,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     private record StoreInfo (boolean isBitAccess, RangeAnalyzer.RangeResult index, MLIRValue destValue, MLIRType accessType) {}
     private final Stack<StoreInfo> storeStack;
     // The final store is special, because we are not setting an MLIRValue, but a NamedEntity
-    private record FinalStoreInfo (boolean isBitAccess, RangeAnalyzer.RangeResult index, NamedEntity destEntity, MLIRType accessType) {}
+    private record FinalStoreInfo (boolean isBitAccess,
+                                   RangeAnalyzer.RangeResult index,
+                                   NamedEntity destEntity,
+                                   // For other accesses, we can write to destEntity directly, but for bit accesses, the temporary the value was originally loaded into is required
+                                   MLIRValue bitAccessTmpVal,
+                                   MLIRType accessType) {}
     private FinalStoreInfo finalStore = null;
     StoreSwitch(MLIRValue newValue) {
       this.newValue = newValue;
@@ -96,7 +101,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           } else {
             var writtenValue = cc.makeAnonymousValue(accessType);
             cc.emitLn("%s = coredsl.get @%s[%s] : %s", writtenValue, entity.getName(), index, accessType);
-            finalStore = new FinalStoreInfo(false, index, entity, accessType);
+            finalStore = new FinalStoreInfo(false, index, entity, null, accessType);
             return writtenValue;
           }
         }
@@ -123,30 +128,46 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                     updatedValue.type);
           return updatedValue;
         } else {
+          var resValue = cc.makeAnonymousValue(accessType);
+          cc.emitLn("%s = coredsl.bitextract %s[%s] : (%s) -> %s", resValue, oldValue, index, oldValue.type, accessType);
           // TODO: consider isLocal
-          finalStore = new FinalStoreInfo(false, index, entity, accessType);
-          return oldValue;
+          finalStore = new FinalStoreInfo(true, index, entity, oldValue, accessType);
+          return resValue;
         }
       } else {
         assert target instanceof IndexAccessExpression : "NYI: Nested Lvalues other than IndexAccessExpression: " + target.getClass();
         isNestedLvalue = true;
         var valueToStore = doSwitch(target);
-        // TODO: need to write new value and return that????
+        // TODO: Do we not need to do anything for non-bit accesses?
+        // If this is a top level bit access, we don't need to extract the value, as we use bitset directly later
+        if (isBitAccess && !isTopLevel) {
+          var resValue = cc.makeAnonymousValue(accessType);
+          cc.emitLn("%s = coredsl.bitextract %s[%s] : (%s) -> %s", resValue, valueToStore, index, valueToStore.type, accessType);
+        }
         storeStack.push(new StoreInfo(isBitAccess, index, valueToStore, accessType));
         if (isTopLevel) {
           var castValue = cc.makeCast(newValue, accessType);
           var toStore = castValue;;
           while (!storeStack.isEmpty()) {
             StoreInfo store = storeStack.pop();
+            // TODO: implement non bit accesses
             assert store.isBitAccess : "NYI: array access";
             var resVal = cc.makeAnonymousValue(store.destValue.type);
             cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal, store.destValue, store.index, toStore, store.destValue.type, store.accessType, store.destValue.type);
             toStore = resVal;
           }
           assert finalStore != null;
-          assert !finalStore.isBitAccess : "NYI: final store in nested chain is bit access";
-          // TODO: final store for locals????
-          cc.emitLn("coredsl.set @%s[%s] = %s : %s", finalStore.destEntity.getName(), finalStore.index, toStore, finalStore.accessType);
+          // TODO: Handle locals
+          if (finalStore.isBitAccess) {
+            var dstType = mapType(ac.getDeclaredType(finalStore.destEntity));
+            var tmpRes = cc.makeAnonymousValue(dstType);
+            // TODO: First toStore needs to be the temporary variable this was loaded into
+            cc.emitLn("%s = coresdl.bitset %s[%s] = %s : (%s, %s) -> %s", tmpRes, finalStore.bitAccessTmpVal, finalStore.index, toStore, dstType, finalStore.accessType, tmpRes.type);
+            cc.emitLn("coredsl.set @%s = %s : %s", finalStore.destEntity.getName(), tmpRes, dstType);
+          } else {
+            cc.emitLn("coredsl.set @%s[%s] = %s : %s", finalStore.destEntity.getName(), finalStore.index, toStore, finalStore.accessType);
+          }
+          // TODO: Not sure if returning castValue is right here
           return castValue;
         }
         return valueToStore;
