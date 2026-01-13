@@ -26,6 +26,7 @@ import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
@@ -41,7 +42,16 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   class StoreSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
-    StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
+    private boolean isNestedLvalue = false;
+    private record StoreInfo (boolean isBitAccess, RangeAnalyzer.RangeResult index, MLIRValue destValue, MLIRType accessType) {}
+    private final Stack<StoreInfo> storeStack;
+    // The final store is special, because we are not setting an MLIRValue, but a NamedEntity
+    private record FinalStoreInfo (boolean isBitAccess, RangeAnalyzer.RangeResult index, NamedEntity destEntity, MLIRType accessType) {}
+    private FinalStoreInfo finalStore = null;
+    StoreSwitch(MLIRValue newValue) {
+      this.newValue = newValue;
+      this.storeStack = new Stack<>();
+    }
 
     @Override
     public MLIRValue caseEntityReference(EntityReference reference) {
@@ -64,45 +74,83 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     @Override
     public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
       var target = access.getTarget();
-      assert target instanceof EntityReference : "NYI: Nested Lvalues";
-      var entity = ((EntityReference)target).getTarget();
-      var entityType = ac.getDeclaredType(entity);
-
-      var isLocal = cc.hasValue(entity);
-      var isBitAccess = entityType.isIntegerType();
+      var targetType = ac.getExpressionType(target);
+      var isBitAccess = targetType.isIntegerType();
 
       var accessType = mapType(ac.getExpressionType(access));
-      var castValue = cc.makeCast(newValue, accessType);
       var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
-                                        entityType, cc, ExpressionSwitch.this);
+              targetType, cc, ExpressionSwitch.this);
+      final boolean isTopLevel = !isNestedLvalue;
+      if (target instanceof EntityReference) {
+        var entity = ((EntityReference) target).getTarget();
+        assert ac.getDeclaredType(entity) == targetType;
+        var isLocal = cc.hasValue(entity);
 
-      if (!isBitAccess) {
-        assert !isLocal : "NYI: local arrays";
-        cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), index,
-                  castValue, accessType);
-        return castValue;
-      }
+        if (!isBitAccess) {
+          assert !isLocal : "NYI: local arrays";
+          if (isTopLevel) {
+            var castValue = cc.makeCast(newValue, accessType);
+            cc.emitLn("coredsl.set @%s[%s] = %s : %s", entity.getName(), index,
+                    castValue, accessType);
+            return castValue;
+          } else {
+            var writtenValue = cc.makeAnonymousValue(accessType);
+            cc.emitLn("%s = coredsl.get @%s[%s] : %s", writtenValue, entity.getName(), index, accessType);
+            finalStore = new FinalStoreInfo(false, index, entity, accessType);
+            return writtenValue;
+          }
+        }
 
-      MLIRValue oldValue;
-      if (isLocal)
-        oldValue = cc.getValue(entity);
-      else {
-        oldValue = cc.makeAnonymousValue(mapType(entityType));
-        cc.emitLn("%s = coredsl.get @%s : %s", oldValue, entity.getName(),
+        MLIRValue oldValue;
+        if (isLocal)
+          oldValue = cc.getValue(entity);
+        else {
+          oldValue = cc.makeAnonymousValue(mapType(targetType));
+          cc.emitLn("%s = coredsl.get @%s : %s", oldValue, entity.getName(),
                   oldValue.type);
+        }
+
+        if (isTopLevel) {
+          var castValue = cc.makeCast(newValue, accessType);
+          var updatedValue = cc.makeAnonymousValue(oldValue.type);
+          cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
+                  updatedValue, oldValue, index, castValue, oldValue.type,
+                  accessType, updatedValue.type);
+          if (isLocal)
+            cc.setValue(entity, updatedValue);
+          else
+            cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), updatedValue,
+                    updatedValue.type);
+          return updatedValue;
+        } else {
+          // TODO: consider isLocal
+          finalStore = new FinalStoreInfo(false, index, entity, accessType);
+          return oldValue;
+        }
+      } else {
+        assert target instanceof IndexAccessExpression : "NYI: Nested Lvalues other than IndexAccessExpression: " + target.getClass();
+        isNestedLvalue = true;
+        var valueToStore = doSwitch(target);
+        // TODO: need to write new value and return that????
+        storeStack.push(new StoreInfo(isBitAccess, index, valueToStore, accessType));
+        if (isTopLevel) {
+          var castValue = cc.makeCast(newValue, accessType);
+          var toStore = castValue;;
+          while (!storeStack.isEmpty()) {
+            StoreInfo store = storeStack.pop();
+            assert store.isBitAccess : "NYI: array access";
+            var resVal = cc.makeAnonymousValue(store.destValue.type);
+            cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal, store.destValue, store.index, toStore, store.destValue.type, store.accessType, store.destValue.type);
+            toStore = resVal;
+          }
+          assert finalStore != null;
+          assert !finalStore.isBitAccess : "NYI: final store in nested chain is bit access";
+          // TODO: final store for locals????
+          cc.emitLn("coredsl.set @%s[%s] = %s : %s", finalStore.destEntity.getName(), finalStore.index, toStore, finalStore.accessType);
+          return castValue;
+        }
+        return valueToStore;
       }
-
-      var updatedValue = cc.makeAnonymousValue(oldValue.type);
-      cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
-                updatedValue, oldValue, index, castValue, oldValue.type,
-                accessType, updatedValue.type);
-
-      if (isLocal)
-        cc.setValue(entity, updatedValue);
-      else
-        cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), updatedValue,
-                  updatedValue.type);
-      return updatedValue;
     }
 
     @Override
