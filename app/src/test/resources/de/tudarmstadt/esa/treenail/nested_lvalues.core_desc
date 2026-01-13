@@ -25,7 +25,7 @@ InstructionSet NestedLValues {
       }
     }
     // TODO: need to test:
-    // - Also every option of this with locals (except local arrays)
+    // - Every following option needs to be tested with locals and non-locals
     // - ranged bit access then bit access
     // - ranged address space access then element access
     // - ranged address space access then bit access
