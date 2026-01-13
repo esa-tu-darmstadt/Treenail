@@ -1,4 +1,4 @@
-# Treenail - CoreDSL frontend for Longnail
+# Treenail - CoreDSL frontend for Shortnail
 
 ## Setup
 
@@ -13,13 +13,8 @@ $ gradle build
 $ gradle test
 $ gradle run --args <path/to/a.core_desc>
 $ gradle install
-$ ./app/build/install/app/bin/app <path/to/a.core_desc> isax.mlir
+$ ./app/build/install/app/bin/app <path/to/a.core_desc> -o isax.mlir
 ```
 
 ## License
-Treenail is proprietary software, developed as part of the Scale4Edge project.
-```
-Copyright 2022 Embedded Systems and Applications Group
-               Department of Computer Science
-               Technical University of Darmstadt, Germany
-```
+Treenail is available under the Apache License v2.0, developed as part of the Scale4Edge project.
