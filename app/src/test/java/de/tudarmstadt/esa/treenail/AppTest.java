@@ -308,5 +308,6 @@ class AppTest {
             "    %4 = coredsl.bitset %2[8:0] = %3 : (ui17, ui9) -> ui17\n" +
             "    %5 = coresdl.bitset %1[16:0] = %4 : (ui32, ui17) -> ui32\n" +
             "    coredsl.set @PC = %5 : ui32\n"));
+    System.out.println(mlirCode);
   }
 }
