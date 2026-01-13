@@ -22,8 +22,9 @@ class AppTest {
     var fileName = getClass().getResource("test1.core_desc").getPath();
     var content = appInst.parse(fileName);
     assertNotNull(content, "app should be able to parse a simple CoreDSL file");
-    assertTrue(appInst.generateMLIR(content).startsWith("lil.isax \"Test1\""),
-               "app should be able to generate MLIR");
+    assertTrue(
+        appInst.generateMLIR(content).startsWith("coredsl.isax \"Test1\""),
+        "app should be able to generate MLIR");
   }
 
   @Test
@@ -34,7 +35,7 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(content, "app should be able to parse a simple CoreDSL file");
-    assertTrue(mlirCode.startsWith("lil.isax \"TestSplitEncFields\""),
+    assertTrue(mlirCode.startsWith("coredsl.isax \"TestSplitEncFields\""),
                "app should be able to generate MLIR");
     assertTrue(mlirCode.contains("%TREENAIL_WAS_HERE_0 = coredsl.concat "
                                  + "%TREENAIL_WAS_HERE_Imm6_5_1, "
@@ -54,7 +55,7 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(content, "app should be able to parse a simple CoreDSL file");
-    assertTrue(mlirCode.startsWith("lil.isax \"TestReversedEncFields\""),
+    assertTrue(mlirCode.startsWith("coredsl.isax \"TestReversedEncFields\""),
                "app should be able to generate MLIR");
     assertTrue(
         mlirCode.contains("%TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract "
