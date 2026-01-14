@@ -42,6 +42,12 @@ InstructionSet NestedLValues {
         PC[16:0][8:0] = 42;
       }
     }
+    TripleNestedBitAccess {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        PC[31:0][15:0][7:0] = 42;
+      }
+    }
     // TODO: need to test:
     // - Every following option needs to be tested with locals and non-locals
     // - ranged bit access then bit access
