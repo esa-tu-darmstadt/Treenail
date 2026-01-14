@@ -288,6 +288,19 @@ class AppTest {
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
     assertTrue(mlirCode.contains(
+            "    %0 = hwarith.constant 43 : ui6\n" +
+            "    %1 = coredsl.cast %0 : ui6 to ui32\n" +
+            "    coredsl.set @X[%rs2 : ui5] = %1 : ui32"));
+    assertTrue(mlirCode.contains(
+            "    %0 = hwarith.constant 3 : ui2\n" +
+            "    %1 = coredsl.get @PC : ui32\n" +
+            "    %2 = coredsl.cast %0 : ui2 to ui5\n" +
+            "    %3 = coredsl.bitset %1[4:0] = %2 : (ui32, ui5) -> ui32\n" +
+            "    coredsl.set @PC = %3 : ui32"));
+    assertTrue(mlirCode.contains(
+            "    %0 = coredsl.get @MEM[8:4] : ui40\n" +
+            "    coredsl.set @MEM[4:0] = %0 : ui40"));
+    assertTrue(mlirCode.contains(
             "    %0 = hwarith.constant 100 : ui7\n" +
             "    %1 = coredsl.get @X[%rs2 : ui5] : ui32\n" +
             "    %2 = coredsl.cast %0 : ui7 to ui11\n" +
@@ -308,6 +321,5 @@ class AppTest {
             "    %4 = coredsl.bitset %2[8:0] = %3 : (ui17, ui9) -> ui17\n" +
             "    %5 = coresdl.bitset %1[16:0] = %4 : (ui32, ui17) -> ui32\n" +
             "    coredsl.set @PC = %5 : ui32\n"));
-    System.out.println(mlirCode);
   }
 }

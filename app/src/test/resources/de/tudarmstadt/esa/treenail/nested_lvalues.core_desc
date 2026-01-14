@@ -7,12 +7,30 @@ InstructionSet NestedLValues {
 
   instructions {
     SimpleRegStore {
+       encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+       behavior: {
+         X[rs2] = 43;
+       }
+    }
+    SimpleBitAccessStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        PC[4:0] = 3;
+      }
+    }
+    SimpleRangedAddressSpaceStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        MEM[4:0] = MEM[8:4];
+      }
+    }
+    RegScalarThenBitAccessStore {
       encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
       behavior: {
         X[rs2][0:10] = 100;
       }
     }
-    SimpleMemStore {
+    MemScalarThenBitAccessStore {
       encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
       behavior: {
         MEM[rs2][0:4] = 8;
