@@ -167,7 +167,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           if (finalStore.isBitAccess) {
             var dstType = mapType(ac.getDeclaredType(finalStore.destEntity));
             var tmpRes = cc.makeAnonymousValue(dstType);
-            // TODO: First toStore needs to be the temporary variable this was loaded into
             cc.emitLn("%s = coresdl.bitset %s[%s] = %s : (%s, %s) -> %s", tmpRes, finalStore.bitAccessTmpVal, finalStore.index, toStore, dstType, finalStore.accessType, tmpRes.type);
             cc.emitLn("coredsl.set @%s = %s : %s", finalStore.destEntity.getName(), tmpRes, dstType);
           } else {
