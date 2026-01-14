@@ -331,5 +331,14 @@ class AppTest {
             "    %6 = coredsl.bitset %2[15:0] = %5 : (ui32, ui16) -> ui32\n" +
             "    %7 = coresdl.bitset %1[31:0] = %6 : (ui32, ui32) -> ui32\n" +
             "    coredsl.set @PC = %7 : ui32"));
+    assertTrue(mlirCode.contains(
+            "    %0 = hwarith.constant 3 : ui2\n" +
+            "    %1 = coredsl.cast %rs2 : ui5 to ui32\n" +
+            "    %2 = coredsl.get @MEM[%1 : ui32] : ui8\n" +
+            "    %3 = coredsl.bitextract %2[4:0] : (ui8) -> ui5\n" +
+            "    %4 = coredsl.cast %0 : ui2 to ui3\n" +
+            "    %5 = coredsl.bitset %3[2:0] = %4 : (ui5, ui3) -> ui5\n" +
+            "    %6 = coredsl.bitset %2[4:0] = %5 : (ui8, ui5) -> ui8\n" +
+            "    coredsl.set @MEM[%1 : ui32] = %6 : ui8"));
   }
 }
