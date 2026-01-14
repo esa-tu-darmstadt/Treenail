@@ -159,7 +159,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
             // TODO: implement non bit accesses
             assert store.isBitAccess : "NYI: array access";
             var resVal = cc.makeAnonymousValue(store.modifiedValue.type);
-            // TODO: this sets the wrong variable
             cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal, store.modifiedValue, store.index, toStore, store.modifiedValue.type, store.accessType, store.modifiedValue.type);
             toStore = resVal;
           }
