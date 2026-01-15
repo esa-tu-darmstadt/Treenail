@@ -349,5 +349,16 @@ class AppTest {
             "    %5 = coredsl.bitset %3[7:0] = %4 : (ui16, ui8) -> ui16\n" +
             "    %6 = coresdl.bitset %1[15:0] = %5 : (ui32, ui16) -> ui32\n" +
             "    coredsl.set @X[1] = %6 : ui32"));
+    assertTrue(mlirCode.contains(
+            "    %0 = hwarith.constant 10 : ui4\n" +
+            "    %1 = coredsl.cast %0 : ui4 to ui32\n" +
+            "    %2 = hwarith.constant 3 : ui2\n" +
+            "    %3 = coredsl.bitextract %1[15:0] : (ui32) -> ui16\n" +
+            "    %4 = coredsl.bitextract %3[7:0] : (ui16) -> ui8\n" +
+            "    %5 = coredsl.cast %2 : ui2 to ui5\n" +
+            "    %6 = coredsl.bitset %4[4:0] = %5 : (ui8, ui5) -> ui8\n" +
+            "    %7 = coredsl.bitset %3[7:0] = %6 : (ui16, ui8) -> ui16\n" +
+            "    %8 = coresdl.bitset %1[15:0] = %7 : (ui32, ui16) -> ui32\n" +
+            "    coredsl.set @X[1] = %8 : ui32\n"));
   }
 }
