@@ -43,6 +43,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   class StoreSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
     private boolean isNestedLvalue = false;
+    // TODO: currently, isBitAccess is always true, as multidimensional arrays are not implemented yet
     private record StoreInfo (boolean isBitAccess,
                               RangeAnalyzer.RangeResult index,
                               // The original value modified through this store
@@ -156,8 +157,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           var toStore = castValue;;
           while (!storeStack.isEmpty()) {
             StoreInfo store = storeStack.pop();
-            // TODO: implement non bit accesses
-            assert store.isBitAccess : "NYI: array access";
+            // TODO: this needs to be fixed when multi dimensional arrays are implemented (only for local arrays)
+            assert store.isBitAccess : "Non-bit accesses should be impossible if they follow an IndexAccessExpression as long as multi-dimensional arrays are not implemented";
             var resVal = cc.makeAnonymousValue(store.modifiedValue.type);
             cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal, store.modifiedValue, store.index, toStore, store.modifiedValue.type, store.accessType, store.modifiedValue.type);
             toStore = resVal;
