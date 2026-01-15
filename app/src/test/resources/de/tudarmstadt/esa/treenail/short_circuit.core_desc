@@ -55,5 +55,15 @@ InstructionSet ShortCircuitEvaluation {
         }
       }
     }
+    LoopShortCircuitWithSideEffect {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> i;
+        for (i = 0; (i < 10 && X[1]++ < 10); ++i) {
+          X[1] += 2;
+        }
+        X[2] = i;
+      }
+    }
   }
 }
