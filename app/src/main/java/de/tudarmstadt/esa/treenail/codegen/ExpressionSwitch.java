@@ -106,6 +106,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           } else {
             var writtenValue = cc.makeAnonymousValue(accessType);
             cc.emitLn("%s = coredsl.get @%s[%s] : %s", writtenValue, entity.getName(), index, accessType);
+            assert finalStore == null;
             finalStore = new FinalStoreInfo(false, index, entity, null, accessType);
             return writtenValue;
           }
@@ -135,7 +136,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         } else {
           var resValue = cc.makeAnonymousValue(accessType);
           cc.emitLn("%s = coredsl.bitextract %s[%s] : (%s) -> %s", resValue, oldValue, index, oldValue.type, accessType);
-          // TODO: consider isLocal (theoretically already considered, because we can check by cc.hasValue(entity))
+          assert finalStore == null;
           finalStore = new FinalStoreInfo(true, index, entity, oldValue, accessType);
           return resValue;
         }
@@ -164,13 +165,18 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
             toStore = resVal;
           }
           assert finalStore != null;
-          // TODO: Handle locals
+          final boolean isLocal = cc.hasValue(finalStore.destEntity);
           if (finalStore.isBitAccess) {
             var dstType = mapType(ac.getDeclaredType(finalStore.destEntity));
             var tmpRes = cc.makeAnonymousValue(dstType);
             cc.emitLn("%s = coresdl.bitset %s[%s] = %s : (%s, %s) -> %s", tmpRes, finalStore.bitAccessTmpVal, finalStore.index, toStore, dstType, finalStore.accessType, tmpRes.type);
-            cc.emitLn("coredsl.set @%s = %s : %s", finalStore.destEntity.getName(), tmpRes, dstType);
+            if (isLocal) {
+              cc.setValue(finalStore.destEntity, tmpRes);
+            } else {
+              cc.emitLn("coredsl.set @%s = %s : %s", finalStore.destEntity.getName(), tmpRes, dstType);
+            }
           } else {
+            assert !isLocal : "NYI: local arrays";
             cc.emitLn("coredsl.set @%s[%s] = %s : %s", finalStore.destEntity.getName(), finalStore.index, toStore, finalStore.accessType);
           }
           // TODO: Not sure if returning castValue is right here
