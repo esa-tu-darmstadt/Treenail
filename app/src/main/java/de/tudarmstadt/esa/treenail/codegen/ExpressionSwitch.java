@@ -145,10 +145,11 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         isNestedLvalue = true;
         var valueToStore = doSwitch(target);
         var returnValue = valueToStore;
-        // TODO: Do we not need to do anything for non-bit accesses?
-        // If this is a top level bit access, we don't need to extract the value, as we use bitset directly later
-        if (isBitAccess && !isTopLevel) {
+        // For top-level accesses, we can directly write to the result, rather
+        // than extracting the value first
+        if (!isTopLevel) {
           var resValue = cc.makeAnonymousValue(accessType);
+          assert isBitAccess : "NYI: Non top-level element access can only happen with multidimensional local arrays";
           cc.emitLn("%s = coredsl.bitextract %s[%s] : (%s) -> %s", resValue, valueToStore, index, valueToStore.type, accessType);
           returnValue = resValue;
         }
