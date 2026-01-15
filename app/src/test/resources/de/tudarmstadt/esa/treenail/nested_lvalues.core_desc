@@ -54,9 +54,16 @@ InstructionSet NestedLValues {
         MEM[rs2][4:0][2:0] = 3;
       }
     }
-    // TODO: need to test:
-    // - Every following option needs to be tested with locals and non-locals
-    // - ranged address space access then element access
-    // - ranged address space access then element access then bit access
+    LocalNestedBitAccess {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        unsigned<32> x = 10;
+        x[15:0][7:0] = 3;
+        X[1] = x;
+      }
+    }
+    // TODO: when local arrays are implemented, test:
+    // - Nested element accesses
+    // - Element access then bit access
   }
 }
