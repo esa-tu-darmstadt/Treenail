@@ -21,7 +21,7 @@ jobs:
     needs: before_script
     steps:
       - name: Build treenail
-        run: gradle --bulid-cache assemble
+        run: gradle --build-cache assemble
     # TODO: cache
   test:
     runs-on: ubuntu-latest
