@@ -14,7 +14,8 @@ jobs:
     steps:
       - name: Setup Gradle
         run:
-          docker run docker://jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+          docker run -v ./treenail:/treenail -v ~/.ssh:/var/empty/.ssh -it docker.io/jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+          cd /treenail
           GRADLE_USER_HOME="$(pwd)/.gradle"
           export GRADLE_USER_HOME
   build:
