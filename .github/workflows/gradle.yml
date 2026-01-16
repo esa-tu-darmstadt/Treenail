@@ -9,20 +9,32 @@ on:
   workflow_dispatch:
 
 jobs:
-  one_job:
+  # TODO: the effects of this will probably not persist between different runs
+  before_script:
     runs-on: ubuntu-latest
     steps:
       - name: Set gradle user home
         run: GRADLE_USER_HOME="$(pwd)/.gradle"
       - name: Export gradle user home
         run: export GRADLE_USER_HOME
+  one_job:
+    needs: before_script
+    runs-on: ubuntu-latest
+    steps:
       - name: Get Treenail
         uses: actions/checkout@v3
         with:
           submodules: "true"
       - name: Build treenail
         run: gradle --build-cache assemble
+      - name: Cache frontend
+        uses: actions/cache@v4
+        with:
+          path: frontend
+          key: frontend-${{ hashFiles('frontend') }}
+          restore-keys: frontend-
       - name: Run treenail tests
         run: gradle check
+        
     # TODO: cache
       
