@@ -9,31 +9,19 @@ on:
   workflow_dispatch:
 
 jobs:
-  before_script:
+  one_job:
     runs-on: ubuntu-latest
     steps:
       - name: Set gradle user home
         run: GRADLE_USER_HOME="$(pwd)/.gradle"
       - name: Export gradle user home
         run: export GRADLE_USER_HOME
-  get_treenail:
-    runs-on: ubuntu-latest
-    steps:
       - name: Get Treenail
         uses: actions/checkout@v3
-  build:
-    runs-on: ubuntu-latest
-    needs: [before_script, get_treenail]
-    steps:
       - name: get directory contents
         run: ls -a
       - name: Build treenail
         run: gradle --build-cache assemble
-    # TODO: cache
-  test:
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
       - name: Run treenail tests
         run: gradle check
     # TODO: cache
