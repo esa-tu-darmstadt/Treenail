@@ -15,7 +15,7 @@ jobs:
     name: Sanity Check
     runs-on: ubuntu-latest
     container:
-      image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+      image: ghcr.io/circt/images/circt-ci-build:20250515145637
     steps:
       # Clone the Treenail repo and its submodules. Do shallow clone to save clone
       # time.
