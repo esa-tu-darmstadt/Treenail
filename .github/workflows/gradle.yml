@@ -16,9 +16,14 @@ jobs:
         run:
           GRADLE_USER_HOME="$(pwd)/.gradle"
           export GRADLE_USER_HOME
+  get_treenail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get Treenail
+        uses: actions/checkout@v3
   build:
     runs-on: ubuntu-latest
-    needs: before_script
+    needs: [before_script, get_treenail]
     steps:
       - name: Build treenail
         run: gradle --build-cache assemble
