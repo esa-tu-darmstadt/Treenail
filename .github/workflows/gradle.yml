@@ -9,10 +9,20 @@ on:
   workflow_dispatch:
 
 jobs:
+  before_script:
+    runs-on: ubuntu-latest
+    container:
+      image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+    steps:
+      - name: Setup Gradle
+        run:
+          GRADLE_USER_HOME="$(pwd)/.gradle"
+          export GRADLE_USER_HOME
   build:
     runs-on: ubuntu-latest
     container:
       image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+    needs: before_script
     steps:
       - name: Build treenail
         run: gradle --bulid-cache assemble
