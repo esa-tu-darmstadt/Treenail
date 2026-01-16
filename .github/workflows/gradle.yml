@@ -11,17 +11,14 @@ on:
 jobs:
   before_script:
     runs-on: ubuntu-latest
-    container:
-      image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
     steps:
       - name: Setup Gradle
         run:
+          docker run docker://jhvjkcyyfdxghjk/isax-tools-integration-env:latest
           GRADLE_USER_HOME="$(pwd)/.gradle"
           export GRADLE_USER_HOME
   build:
     runs-on: ubuntu-latest
-    container:
-      image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
     needs: before_script
     steps:
       - name: Build treenail
@@ -29,8 +26,6 @@ jobs:
     # TODO: cache
   test:
     runs-on: ubuntu-latest
-    container:
-      image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
     needs: build
     steps:
       - name: Run treenail tests
