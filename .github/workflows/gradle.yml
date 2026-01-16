@@ -1,0 +1,29 @@
+name: Build and Test
+
+on:
+  push:
+    branches:
+      - github_workflows
+  pull_request:
+    types: [assigned, opened, synchronize, reopened]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+    steps:
+      - name: Build treenail
+        run: gradle --bulid-cache assemble
+    # TODO: cache
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+    needs: build
+    steps:
+      - name: Run treenail tests
+        run: gradle check
+    # TODO: cache
+      
