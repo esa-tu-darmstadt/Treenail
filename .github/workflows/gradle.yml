@@ -26,7 +26,10 @@ jobs:
     needs: [before_script, get_treenail]
     steps:
       - name: Build treenail
-        run: gradle --build-cache assemble
+        run:
+          pwd
+          ls -a
+          gradle --build-cache assemble
     # TODO: cache
   test:
     runs-on: ubuntu-latest
