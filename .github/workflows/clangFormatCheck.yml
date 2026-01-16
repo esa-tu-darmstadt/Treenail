@@ -15,7 +15,7 @@ jobs:
     name: Sanity Check
     runs-on: ubuntu-latest
     container:
-      image: hub.docker.com/layers/jhvjkcyyfdxghjk/isax-tools-integration-env/latest/
+      image: hub.docker.com/layers/jhvjkcyyfdxghjk/isax-tools-integration-env:latest
     steps:
       # Clone the Treenail repo and its submodules. Do shallow clone to save clone
       # time.
