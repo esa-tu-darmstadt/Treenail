@@ -18,6 +18,8 @@ jobs:
         run: export GRADLE_USER_HOME
       - name: Get Treenail
         uses: actions/checkout@v3
+        with:
+          submodules: "true"
       - name: get directory contents
         run: ls -a
       - name: Build treenail
