@@ -12,7 +12,9 @@ jobs:
   test_run_docker:
     runs-on: ubuntu-latest
     steps:
+      - run: gradle --version
       - uses: docker://jhvjkcyyfdxghjk/isax-tools-integration-env:latest
+      - run: gradle --version
   build:
     runs-on: ubuntu-latest
     container:
