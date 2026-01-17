@@ -41,7 +41,7 @@ jobs:
           key: build-${{ github.ref_name }}
 
       - name: Build
-        run: gradle --build-cache assemble
+        run: ./gradlew --build-cache assemble
 
       - name: Save cache
         uses: actions/cache/save@v4
