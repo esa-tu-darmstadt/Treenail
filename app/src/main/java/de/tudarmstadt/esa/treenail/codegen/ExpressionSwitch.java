@@ -54,7 +54,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     private record FinalStoreInfo (boolean isBitAccess,
                                    RangeAnalyzer.RangeResult index,
                                    NamedEntity destEntity,
-                                   // For other accesses, we can write to destEntity directly, but for bit accesses, the temporary the value was originally loaded into is required
+                                   // For other accesses, we can write to destEntity directly, but for bit accesses, we first need to use bitset on the value originally loaded from entity, then set it
                                    MLIRValue bitAccessTmpVal,
                                    MLIRType accessType) {}
     private FinalStoreInfo finalStore = null;
@@ -169,12 +169,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           final boolean isLocal = cc.hasValue(finalStore.destEntity);
           if (finalStore.isBitAccess) {
             var dstType = mapType(ac.getDeclaredType(finalStore.destEntity));
-            var tmpRes = cc.makeAnonymousValue(dstType);
-            cc.emitLn("%s = coresdl.bitset %s[%s] = %s : (%s, %s) -> %s", tmpRes, finalStore.bitAccessTmpVal, finalStore.index, toStore, dstType, finalStore.accessType, tmpRes.type);
+            var updatedValue = cc.makeAnonymousValue(dstType);
+            cc.emitLn("%s = coresdl.bitset %s[%s] = %s : (%s, %s) -> %s", updatedValue, finalStore.bitAccessTmpVal, finalStore.index, toStore, dstType, finalStore.accessType, updatedValue.type);
             if (isLocal) {
-              cc.setValue(finalStore.destEntity, tmpRes);
+              cc.setValue(finalStore.destEntity, updatedValue);
             } else {
-              cc.emitLn("coredsl.set @%s = %s : %s", finalStore.destEntity.getName(), tmpRes, dstType);
+              cc.emitLn("coredsl.set @%s = %s : %s", finalStore.destEntity.getName(), updatedValue, dstType);
             }
           } else {
             assert !isLocal : "NYI: local arrays";
