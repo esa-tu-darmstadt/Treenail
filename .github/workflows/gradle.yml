@@ -9,6 +9,10 @@ on:
       - '*'
 
 jobs:
+  test_run_docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: docker://jhvjkcyyfdxghjk/isax-tools-integration-env:latest
   build:
     runs-on: ubuntu-latest
     container:
