@@ -123,6 +123,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         assert finalStore == null;
         finalStore = new FinalStoreInfo(isBitAccess, index, entity, bitAccessOldValue, accessType);
       } else {
+        // While descending the expression tree, load all the necessary original
+        // values, while pushing the stores that will later happen into
+        // storeStack, as these need to be emitted after the top-level store
         assert target instanceof IndexAccessExpression : "NYI: Nested Lvalues other than IndexAccessExpression: " + target.getClass();
         isNestedLvalue = true;
         var valueToStore = doSwitch(target);
