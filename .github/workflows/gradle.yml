@@ -85,7 +85,7 @@ jobs:
           key: build-${{ github.ref_name }}
 
       - name: Test
-        run: gradle check
+        run: ./gradlew check
 
   release:
     runs-on: ubuntu-latest
