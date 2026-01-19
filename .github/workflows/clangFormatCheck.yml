@@ -4,7 +4,7 @@ name: Check formatting
 on:
   push:
     branches:
-      - github_workflows
+      - main
   pull_request:
     types: [assigned, opened, synchronize, reopened]
   workflow_dispatch:
