@@ -124,8 +124,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         finalStore = new FinalStoreInfo(isBitAccess, index, entity, bitAccessOldValue, accessType);
       } else {
         // While descending the expression tree, load all the necessary original
-        // values, while pushing the stores that will later happen into
-        // storeStack, as these need to be emitted after the top-level store
+        // values, while pushing the stores into those values that need to
+        // happen later into storeStack, as the stores all depend on the lowest
+        // level store
         assert target instanceof IndexAccessExpression : "NYI: Nested Lvalues other than IndexAccessExpression: " + target.getClass();
         isNestedLvalue = true;
         var valueToStore = doSwitch(target);
@@ -144,7 +145,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var castValue = cc.makeCast(newValue, accessType);
         var toStore = castValue;;
         while (!storeStack.isEmpty()) {
-          StoreInfo store = storeStack.pop();
+          final StoreInfo store = storeStack.pop();
           // TODO: this needs to be fixed when multi dimensional arrays are implemented (only for local arrays)
           assert store.isBitAccess : "Non-bit accesses should be impossible if they follow an IndexAccessExpression as long as multi-dimensional arrays are not implemented";
           var resVal = cc.makeAnonymousValue(store.modifiedValue.type);
@@ -166,7 +167,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           assert !isLocal : "NYI: local arrays";
           cc.emitLn("coredsl.set @%s[%s] = %s : %s", finalStore.destEntity.getName(), finalStore.index, toStore, finalStore.accessType);
         }
-        // TODO: Not sure if returning castValue is right here
         return castValue;
       }
       assert returnValue != null;
