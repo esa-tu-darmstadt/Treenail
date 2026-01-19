@@ -305,7 +305,26 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var elseCC = new ConstructionContext(new LinkedHashMap<>(values),
                                            new AtomicInteger(counter), ac,
                                            new StringBuilder());
-      // Constant value to return when short-circuiting
+      /*
+      The logic for outputting both branches of the short-circuiting if for
+      '&&' and '||' is equivalent, but the branches are swapped. Thus, assign
+      which construction context to emit a constant result (and which constant
+      result) and which emits the evaluation of rhs.
+      '&&':
+      %result = %scf.if %lhs -> ui1 {
+        ; evaluate rhs here
+        yield %rhs : ui1
+      } else {
+        yield 0 : ui1
+      }
+      '||'
+      %result = %scf.if %lhs {
+        yield 1 : ui1
+      } else {
+        ; evaluate rhs here
+        yield %rhs : ui1
+      }
+      */
       BigInteger constValToYield;
       ConstructionContext yieldConstCC;
       ConstructionContext emitRhsCC;
