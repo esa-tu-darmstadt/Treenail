@@ -143,8 +143,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         // than extracting the value first
         if (!isTopLevel) {
           var resValue = cc.makeAnonymousValue(accessType);
-          assert isBitAccess : ("NYI: Non top-level element access can only " +
-                                "happen with multidimensional local arrays");
+          assert isBitAccess : ("NYI: Non top-level element access can only "
+                                + "happen with multidimensional local arrays");
           cc.emitLn("%s = coredsl.bitextract %s[%s] : (%s) -> %s", resValue,
                     valueToStore, index, valueToStore.type, accessType);
           returnValue = resValue;
@@ -161,9 +161,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           // TODO: this needs to be fixed when multi dimensional arrays are
           // implemented (only for local arrays)
           assert store.isBitAccess
-              : ("Non-bit accesses should be impossible if they follow an " +
-                 "IndexAccessExpression as long as multi-dimensional arrays " +
-                 "are not implemented");
+              : ("Non-bit accesses should be impossible if they follow an "
+                 + "IndexAccessExpression as long as multi-dimensional arrays "
+                 + "are not implemented");
           var resVal = cc.makeAnonymousValue(store.modifiedValue.type);
           cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal,
                     store.modifiedValue, store.index, toStore,
