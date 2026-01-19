@@ -274,19 +274,85 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     return res;
   }
 
+  private static MLIRValue convertIntToBool(MLIRValue value,
+                                            ConstructionContext cc) {
+    if (value.type.isSigned || value.type.width > 1) {
+      var zero = cc.makeConst(BigInteger.ZERO, value.type);
+      var valueAsBool = cc.makeAnonymousValue(MLIRType.getType(1, false));
+      cc.emitLn("%s = hwarith.icmp ne %s %s", valueAsBool, value, zero);
+      return valueAsBool;
+    }
+    return value;
+  }
+
   @Override
   public MLIRValue caseInfixExpression(InfixExpression expr) {
     var lhs = doSwitch(expr.getLeft());
-    var rhs = doSwitch(expr.getRight());
-    var type = mapType(ac.getExpressionType(expr));
-
     var opr = expr.getOperator();
+    var type = mapType(ac.getExpressionType(expr));
+    final boolean isLAnd = "&&".equals(opr);
+    final boolean isLOr = "||".equals(opr);
+    if (isLAnd || isLOr) {
+      var result = cc.makeAnonymousValue(type);
+      var hwarithBoolLhs = convertIntToBool(lhs, cc);
+      var boolLhs = cc.makeI1Cast(hwarithBoolLhs);
+
+      var values = cc.getValues();
+      var counter = cc.getCounter();
+      var thenCC = new ConstructionContext(new LinkedHashMap<>(values),
+                                           new AtomicInteger(counter), ac,
+                                           new StringBuilder());
+      var elseCC = new ConstructionContext(new LinkedHashMap<>(values),
+                                           new AtomicInteger(counter), ac,
+                                           new StringBuilder());
+      /*
+      The logic for outputting both branches of the short-circuiting if for
+      '&&' and '||' is equivalent, but the branches are swapped. Thus, assign
+      which construction context to emit a constant result (and which constant
+      result) and which emits the evaluation of rhs.
+      '&&':
+      %result = %scf.if %lhs -> ui1 {
+        ; evaluate rhs here
+        yield %rhs : ui1
+      } else {
+        yield 0 : ui1
+      }
+      '||'
+      %result = %scf.if %lhs {
+        yield 1 : ui1
+      } else {
+        ; evaluate rhs here
+        yield %rhs : ui1
+      }
+      */
+      BigInteger constValToYield;
+      ConstructionContext yieldConstCC;
+      ConstructionContext emitRhsCC;
+      if (isLAnd) {
+        constValToYield = BigInteger.ZERO;
+        yieldConstCC = elseCC;
+        emitRhsCC = thenCC;
+      } else {
+        constValToYield = BigInteger.ONE;
+        yieldConstCC = thenCC;
+        emitRhsCC = elseCC;
+      }
+      assert yieldConstCC != emitRhsCC;
+      var rhs = new ExpressionSwitch(emitRhsCC).doSwitch(expr.getRight());
+      var hwarithBoolRhs = convertIntToBool(rhs, emitRhsCC);
+      emitRhsCC.emitLn("scf.yield %s : %s", hwarithBoolRhs, type);
+
+      var constToYield = yieldConstCC.makeConst(constValToYield, type);
+      yieldConstCC.emitLn("scf.yield %s : %s", constToYield, type);
+      cc.emitLn("%s = scf.if %s -> (%s) {\n%s} else {\n%s}", result, boolLhs,
+                type, thenCC.getStringBuilder().toString().indent(N_SPACES),
+                elseCC.getStringBuilder().toString().indent(N_SPACES));
+      return result;
+    }
+    var rhs = doSwitch(expr.getRight());
+
     var op = binaryOperatorMap.get(opr);
     assert op != null : "NYI: operator " + opr;
-    if ("&&".equals(opr) || "||".equals(opr))
-      // TODO: Emit icmp for operands that are not bools.
-      System.err.println("[WARN] NYI: Short-circuit evaluation. Evaluating `" +
-                         opr + "` eagerly.");
     return emitBinaryOp(op, type, lhs, rhs);
   }
 

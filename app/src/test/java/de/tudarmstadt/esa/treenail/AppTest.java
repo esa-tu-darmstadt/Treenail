@@ -148,4 +148,133 @@ class AppTest {
 
     assertEquals(gotMlir, expectedMlir);
   }
+
+  @Test
+  void shortCircuitEvaluationWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("short_circuit.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    // clang-format off
+    assertTrue(mlirCode.contains("""
+          %7 = coredsl.cast %4 : ui1 to i1
+          %6 = scf.if %7 -> (ui1) {
+            %8 = hwarith.constant 10 : ui4
+            %10 = hwarith.icmp lt %2, %8 : ui32, ui4
+            %9 = hwarith.cast %10 : (i1) -> ui1
+            scf.yield %9 : ui1
+          } else {
+            %8 = hwarith.constant 0 : ui1
+            scf.yield %8 : ui1
+          }\
+      """));
+    assertTrue(mlirCode.contains("""
+          %7 = coredsl.cast %4 : ui1 to i1
+          %6 = scf.if %7 -> (ui1) {
+            %8 = hwarith.constant 1 : ui1
+            scf.yield %8 : ui1
+          } else {
+            %8 = hwarith.constant 10 : ui4
+            %10 = hwarith.icmp gt %2, %8 : ui32, ui4
+            %9 = hwarith.cast %10 : (i1) -> ui1
+            scf.yield %9 : ui1
+          }\
+      """));
+    assertTrue(mlirCode.contains("""
+          %4 = hwarith.constant 0 : ui32
+          %5 = hwarith.icmp ne %0 %4
+          %6 = coredsl.cast %5 : ui1 to i1
+          %3 = scf.if %6 -> (ui1) {
+            %7 = hwarith.constant 1 : ui1
+            scf.yield %7 : ui1
+          } else {
+            %7 = hwarith.constant 0 : ui32
+            %8 = hwarith.icmp ne %2 %7
+            scf.yield %8 : ui1
+          }\
+      """));
+    assertTrue(mlirCode.contains("""
+          %7 = coredsl.cast %4 : ui1 to i1
+          %6 = scf.if %7 -> (ui1) {
+            %8 = hwarith.constant 10 : ui4
+            %10 = hwarith.icmp lt %0, %8 : ui32, ui4
+            %9 = hwarith.cast %10 : (i1) -> ui1
+            scf.yield %9 : ui1
+          } else {
+            %8 = hwarith.constant 0 : ui1
+            scf.yield %8 : ui1
+          }
+          %9 = coredsl.cast %6 : ui1 to i1
+          %8 = scf.if %9 -> (ui1) {
+            %10 = hwarith.constant 1 : ui1
+            scf.yield %10 : ui1
+          } else {
+            %10 = hwarith.constant 10 : ui4
+            %12 = hwarith.icmp gt %2, %10 : ui32, ui4
+            %11 = hwarith.cast %12 : (i1) -> ui1
+            %14 = coredsl.cast %11 : ui1 to i1
+            %13 = scf.if %14 -> (ui1) {
+              %15 = hwarith.constant 15 : ui4
+              %17 = hwarith.icmp lt %2, %15 : ui32, ui4
+              %16 = hwarith.cast %17 : (i1) -> ui1
+              scf.yield %16 : ui1
+            } else {
+              %15 = hwarith.constant 0 : ui1
+              scf.yield %15 : ui1
+            }
+            %16 = coredsl.cast %13 : ui1 to i1
+            %15 = scf.if %16 -> (ui1) {
+              %17 = hwarith.constant 1 : ui1
+              scf.yield %17 : ui1
+            } else {
+              %17 = hwarith.constant 0 : ui1
+              %19 = hwarith.icmp eq %2, %17 : ui32, ui1
+              %18 = hwarith.cast %19 : (i1) -> ui1
+              scf.yield %18 : ui1
+            }
+            scf.yield %15 : ui1
+          }\
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 0 : ui32
+          %1 = hwarith.constant 0 : ui1
+          %2 = coredsl.cast %1 : ui1 to ui32
+          %3 = scf.while (%3 = %2) : (ui32) -> (ui32) {
+            %4 = hwarith.constant 10 : ui4
+            %6 = hwarith.icmp lt %3, %4 : ui32, ui4
+            %5 = hwarith.cast %6 : (i1) -> ui1
+            %8 = coredsl.cast %5 : ui1 to i1
+            %7 = scf.if %8 -> (ui1) {
+              %9 = coredsl.get @X[1] : ui32
+              %10 = hwarith.constant 1 : ui1
+              %11 = hwarith.add %9, %10 : (ui32, ui1) -> ui33
+              %12 = coredsl.cast %11 : ui33 to ui32
+              coredsl.set @X[1] = %12 : ui32
+              %13 = hwarith.constant 10 : ui4
+              %15 = hwarith.icmp lt %9, %13 : ui32, ui4
+              %14 = hwarith.cast %15 : (i1) -> ui1
+              scf.yield %14 : ui1
+            } else {
+              %9 = hwarith.constant 0 : ui1
+              scf.yield %9 : ui1
+            }
+            %9 = coredsl.cast %7 : ui1 to i1
+            scf.condition(%9) %3 : ui32
+          } do {
+          ^bb0(%3: ui32):
+            %4 = hwarith.constant 2 : ui2
+            %5 = coredsl.get @X[1] : ui32
+            %6 = hwarith.add %5, %4 : (ui32, ui2) -> ui33
+            %7 = coredsl.cast %6 : ui33 to ui32
+            coredsl.set @X[1] = %7 : ui32
+            %8 = hwarith.constant 1 : ui1
+            %9 = hwarith.add %3, %8 : (ui32, ui1) -> ui33
+            %10 = coredsl.cast %9 : ui33 to ui32
+            scf.yield %10 : ui32
+          }
+          coredsl.set @X[2] = %3 : ui32\
+      """));
+    // clang-format on
+  }
 }
