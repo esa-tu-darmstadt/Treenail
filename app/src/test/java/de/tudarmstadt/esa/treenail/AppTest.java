@@ -278,4 +278,3 @@ class AppTest {
     // clang-format on
   }
 }
-
