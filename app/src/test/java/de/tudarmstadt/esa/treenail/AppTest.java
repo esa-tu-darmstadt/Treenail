@@ -278,6 +278,7 @@ class AppTest {
     // clang-format on
   }
 
+  @Test
   void nestedLValuesTest() {
     var appInst = App.getInstance();
     var fileName = getClass().getResource("nested_lvalues.core_desc").getPath();
