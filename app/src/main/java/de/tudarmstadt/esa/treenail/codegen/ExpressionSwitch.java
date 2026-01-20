@@ -43,8 +43,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   class StoreSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
     private boolean isNestedLvalue = false;
-    // TODO: currently, isBitAccess is always true, as multidimensional arrays
-    // are not implemented yet
     private record StoreInfo(boolean isBitAccess,
                              RangeAnalyzer.RangeResult index,
                              // The original value modified through this store
