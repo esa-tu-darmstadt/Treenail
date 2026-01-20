@@ -157,6 +157,7 @@ class AppTest {
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
     // clang-format off
+    // LogicalAndTest
     assertTrue(mlirCode.contains("""
           %7 = coredsl.cast %4 : ui1 to i1
           %6 = scf.if %7 -> (ui1) {
@@ -167,8 +168,9 @@ class AppTest {
           } else {
             %8 = hwarith.constant 0 : ui1
             scf.yield %8 : ui1
-          }\
+          }
       """));
+    // LogicalOrTest
     assertTrue(mlirCode.contains("""
           %7 = coredsl.cast %4 : ui1 to i1
           %6 = scf.if %7 -> (ui1) {
@@ -179,8 +181,9 @@ class AppTest {
             %10 = hwarith.icmp gt %2, %8 : ui32, ui4
             %9 = hwarith.cast %10 : (i1) -> ui1
             scf.yield %9 : ui1
-          }\
+          }
       """));
+    // ConvertToBoolTest
     assertTrue(mlirCode.contains("""
           %4 = hwarith.constant 0 : ui32
           %5 = hwarith.icmp ne %0 %4
@@ -192,8 +195,9 @@ class AppTest {
             %7 = hwarith.constant 0 : ui32
             %8 = hwarith.icmp ne %2 %7
             scf.yield %8 : ui1
-          }\
+          }
       """));
+    // MultipleShortCircuitTest
     assertTrue(mlirCode.contains("""
           %7 = coredsl.cast %4 : ui1 to i1
           %6 = scf.if %7 -> (ui1) {
@@ -234,8 +238,9 @@ class AppTest {
               scf.yield %18 : ui1
             }
             scf.yield %15 : ui1
-          }\
+          }
       """));
+    // LoopShortCircuitWithSideEffect
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 0 : ui32
           %1 = hwarith.constant 0 : ui1
@@ -273,7 +278,7 @@ class AppTest {
             %10 = coredsl.cast %9 : ui33 to ui32
             scf.yield %10 : ui32
           }
-          coredsl.set @X[2] = %3 : ui32\
+          coredsl.set @X[2] = %3 : ui32
       """));
     // clang-format on
   }
@@ -287,22 +292,26 @@ class AppTest {
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
     // clang-format off
+    // SimpleRegStore
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 43 : ui6
           %1 = coredsl.cast %0 : ui6 to ui32
-          coredsl.set @X[%rs2 : ui5] = %1 : ui32\
+          coredsl.set @X[%rs2 : ui5] = %1 : ui32
       """));
+    // SimpleBitAccessStore
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 3 : ui2
           %1 = coredsl.get @PC : ui32
           %2 = coredsl.cast %0 : ui2 to ui5
           %3 = coredsl.bitset %1[4:0] = %2 : (ui32, ui5) -> ui32
-          coredsl.set @PC = %3 : ui32\
+          coredsl.set @PC = %3 : ui32
       """));
+    // SimpleRangedAddressSpaceStore
     assertTrue(mlirCode.contains("""
           %0 = coredsl.get @MEM[8:4] : ui40
-          coredsl.set @MEM[4:0] = %0 : ui40\
+          coredsl.set @MEM[4:0] = %0 : ui40
       """));
+    // RegScalarThenBitAccessStore
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 100 : ui7
           %1 = coredsl.get @X[%rs2 : ui5] : ui32
@@ -310,6 +319,7 @@ class AppTest {
           %3 = coredsl.bitset %1[0:10] = %2 : (ui32, ui11) -> ui32
           coredsl.set @X[%rs2 : ui5] = %3 : ui32
       """));
+    // MemScalarThenBitAccessStore
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 8 : ui4
           %1 = coredsl.cast %rs2 : ui5 to ui32
@@ -318,6 +328,7 @@ class AppTest {
           %4 = coredsl.bitset %2[0:4] = %3 : (ui8, ui5) -> ui8
           coredsl.set @MEM[%1 : ui32] = %4 : ui8
       """));
+    // NestedBitAccess
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 42 : ui6
           %1 = coredsl.get @PC : ui32
@@ -327,6 +338,7 @@ class AppTest {
           %5 = coredsl.bitset %1[16:0] = %4 : (ui32, ui17) -> ui32
           coredsl.set @PC = %5 : ui32
       """));
+    // TripleNestedBitAccess
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 42 : ui6
           %1 = coredsl.get @PC : ui32
@@ -336,8 +348,9 @@ class AppTest {
           %5 = coredsl.bitset %3[7:0] = %4 : (ui16, ui8) -> ui16
           %6 = coredsl.bitset %2[15:0] = %5 : (ui32, ui16) -> ui32
           %7 = coredsl.bitset %1[31:0] = %6 : (ui32, ui32) -> ui32
-          coredsl.set @PC = %7 : ui32\
+          coredsl.set @PC = %7 : ui32
       """));
+    // ScalarThenTwoBitAccesses
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 3 : ui2
           %1 = coredsl.cast %rs2 : ui5 to ui32
@@ -346,8 +359,9 @@ class AppTest {
           %4 = coredsl.cast %0 : ui2 to ui3
           %5 = coredsl.bitset %3[2:0] = %4 : (ui5, ui3) -> ui5
           %6 = coredsl.bitset %2[4:0] = %5 : (ui8, ui5) -> ui8
-          coredsl.set @MEM[%1 : ui32] = %6 : ui8\
+          coredsl.set @MEM[%1 : ui32] = %6 : ui8
       """));
+    // LocalNestedBitAccess
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 10 : ui4
           %1 = coredsl.cast %0 : ui4 to ui32
@@ -356,8 +370,9 @@ class AppTest {
           %4 = coredsl.cast %2 : ui2 to ui8
           %5 = coredsl.bitset %3[7:0] = %4 : (ui16, ui8) -> ui16
           %6 = coredsl.bitset %1[15:0] = %5 : (ui32, ui16) -> ui32
-          coredsl.set @X[1] = %6 : ui32\
+          coredsl.set @X[1] = %6 : ui32
       """));
+    // LocalTripleNestedBitAccess
     assertTrue(mlirCode.contains("""
           %0 = hwarith.constant 10 : ui4
           %1 = coredsl.cast %0 : ui4 to ui32
