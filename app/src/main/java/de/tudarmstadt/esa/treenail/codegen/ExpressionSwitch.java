@@ -137,7 +137,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         assert target instanceof IndexAccessExpression
             : "NYI: Nested Lvalues other than IndexAccessExpression: " +
               target.getClass();
-        // For nested IndexAccessExpressions, we need to generate code like this:
+        // For nested IndexAccessExpressions, we need to generate code like
+        // this:
         // CoreDSL: "a[b][c][d] = res;"
         // 1. tmp1 = a[b]
         // 2. tmp2 = tmp1[c]
