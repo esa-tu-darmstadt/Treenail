@@ -95,6 +95,11 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       final boolean isTopLevel = !isNestedLvalue;
       MLIRValue returnValue = null;
       if (target instanceof EntityReference) {
+        // For non-nested stores, we need to differentiate between top-level
+        // and non-top-level accesses, as non-top-level accesses need to load
+        // their corresponding values into a temporary
+        // The stores for this are always emitted later, even if this is a
+        // top-level store, to avoid code duplication
         var entity = ((EntityReference)target).getTarget();
         assert ac.getDeclaredType(entity) == targetType;
         var isLocal = cc.hasValue(entity);
@@ -129,13 +134,24 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         finalStore = new FinalStoreInfo(isBitAccess, index, entity,
                                         bitAccessOldValue, accessType);
       } else {
-        // While descending the expression tree, load all the necessary original
-        // values, while pushing the stores into those values that need to
-        // happen later into storeStack, as the stores all depend on the lowest
-        // level store
         assert target instanceof IndexAccessExpression
             : "NYI: Nested Lvalues other than IndexAccessExpression: " +
               target.getClass();
+        // For nested IndexAccessExpressions, we need to generate code like this:
+        // CoreDSL: "a[b][c][d] = res;"
+        // 1. tmp1 = a[b]
+        // 2. tmp2 = tmp1[c]
+        // 3. tmp2[d] = res
+        // 4. tmp1[c] = tmp2
+        // 5. a[b] = tmp1
+        // To achieve this, we first need to descend to the lowest level access
+        // ("a[b]" in the example). From there, we can load the subsequent
+        // temporaries (Steps 1-2). As we need to generate the stores after
+        // loading all the temporaries, each load pushes its corresponding
+        // store onto storeStack, so it can be emitted by the topmost store
+        // (Steps 3-4).
+        // Note that the output MLIR needs to create new temporaries for each
+        // store into a temporary, due to being in SSA form
         isNestedLvalue = true;
         var valueToStore = doSwitch(target);
         returnValue = valueToStore;
@@ -155,7 +171,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       if (isTopLevel) {
         var castValue = cc.makeCast(newValue, accessType);
         var toStore = castValue;
-        ;
+
         while (!storeStack.isEmpty()) {
           final StoreInfo store = storeStack.pop();
           // TODO: this needs to be fixed when multi dimensional arrays are
