@@ -47,7 +47,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                              RangeAnalyzer.RangeResult index,
                              // The original value modified through this store
                              MLIRValue modifiedValue, MLIRType accessType) {}
-    private final Stack<StoreInfo> storeStack;
+    private final Stack<StoreInfo> storeStack = new Stack<>();
     // The final store is special, because we are not setting an MLIRValue, but
     // a NamedEntity
     private record
@@ -60,7 +60,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     private FinalStoreInfo finalStore = null;
     StoreSwitch(MLIRValue newValue) {
       this.newValue = newValue;
-      this.storeStack = new Stack<>();
     }
 
     @Override
