@@ -175,8 +175,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
         while (!storeStack.isEmpty()) {
           final StoreInfo store = storeStack.pop();
-          // TODO: this needs to be fixed when multi dimensional arrays are
-          // implemented (only for local arrays)
+          // TODO: This can only be implemented when multi dimensional arrays
+          // are implemented, which is only possible with local arrays
           assert store.isBitAccess
               : ("Non-bit accesses should be impossible if they follow an "
                  + "IndexAccessExpression as long as multi-dimensional arrays "
