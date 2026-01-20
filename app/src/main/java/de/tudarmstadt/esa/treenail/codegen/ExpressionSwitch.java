@@ -58,9 +58,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                    // value originally loaded from entity, then set it
                    MLIRValue bitAccessOldValue, MLIRType accessType) {}
     private FinalStoreInfo finalStore = null;
-    StoreSwitch(MLIRValue newValue) {
-      this.newValue = newValue;
-    }
+    StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
 
     @Override
     public MLIRValue caseEntityReference(EntityReference reference) {
