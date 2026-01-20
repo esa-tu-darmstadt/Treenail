@@ -1,0 +1,77 @@
+InstructionSet NestedLValues {
+  architectural_state {
+    register unsigned<32> X[32] [[is_main_reg]];
+    register unsigned<32> PC;
+    extern unsigned char MEM[0x100000000] [[is_main_mem]];
+  }
+
+  instructions {
+    SimpleRegStore {
+       encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+       behavior: {
+         X[rs2] = 43;
+       }
+    }
+    SimpleBitAccessStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        PC[4:0] = 3;
+      }
+    }
+    SimpleRangedAddressSpaceStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        MEM[4:0] = MEM[8:4];
+      }
+    }
+    RegScalarThenBitAccessStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        X[rs2][0:10] = 100;
+      }
+    }
+    MemScalarThenBitAccessStore {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        MEM[rs2][0:4] = 8;
+      }
+    }
+    NestedBitAccess {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        PC[16:0][8:0] = 42;
+      }
+    }
+    TripleNestedBitAccess {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        PC[31:0][15:0][7:0] = 42;
+      }
+    }
+    ScalarThenTwoBitAccesses {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        MEM[rs2][4:0][2:0] = 3;
+      }
+    }
+    LocalNestedBitAccess {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        unsigned<32> x = 10;
+        x[15:0][7:0] = 3;
+        X[1] = x;
+      }
+    }
+    LocalTripleNestedBitAccess {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+      behavior: {
+        unsigned<32> x = 10;
+        x[15:0][7:0][4:0] = 3;
+        X[1] = x;
+      }
+    }
+    // TODO: when local arrays are implemented, test:
+    // - Nested element accesses
+    // - Element access then bit access
+  }
+}
