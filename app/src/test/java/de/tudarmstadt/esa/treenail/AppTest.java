@@ -285,77 +285,90 @@ class AppTest {
     assertNotNull(content, "app should be able to parse a simple CoreDSL file");
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
-    assertTrue(mlirCode.contains("    %0 = hwarith.constant 43 : ui6\n"
-                                 + "    %1 = coredsl.cast %0 : ui6 to ui32\n"
-                                 +
-                                 "    coredsl.set @X[%rs2 : ui5] = %1 : ui32"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 3 : ui2\n"
-        + "    %1 = coredsl.get @PC : ui32\n"
-        + "    %2 = coredsl.cast %0 : ui2 to ui5\n"
-        + "    %3 = coredsl.bitset %1[4:0] = %2 : (ui32, ui5) -> ui32\n"
-        + "    coredsl.set @PC = %3 : ui32"));
-    assertTrue(mlirCode.contains("    %0 = coredsl.get @MEM[8:4] : ui40\n"
-                                 + "    coredsl.set @MEM[4:0] = %0 : ui40"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 100 : ui7\n"
-        + "    %1 = coredsl.get @X[%rs2 : ui5] : ui32\n"
-        + "    %2 = coredsl.cast %0 : ui7 to ui11\n"
-        + "    %3 = coredsl.bitset %1[0:10] = %2 : (ui32, ui11) -> ui32\n"
-        + "    coredsl.set @X[%rs2 : ui5] = %3 : ui32\n"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 8 : ui4\n"
-        + "    %1 = coredsl.cast %rs2 : ui5 to ui32\n"
-        + "    %2 = coredsl.get @MEM[%1 : ui32] : ui8\n"
-        + "    %3 = coredsl.cast %0 : ui4 to ui5\n"
-        + "    %4 = coredsl.bitset %2[0:4] = %3 : (ui8, ui5) -> ui8\n"
-        + "    coredsl.set @MEM[%1 : ui32] = %4 : ui8\n"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 42 : ui6\n"
-        + "    %1 = coredsl.get @PC : ui32\n"
-        + "    %2 = coredsl.bitextract %1[16:0] : (ui32) -> ui17\n"
-        + "    %3 = coredsl.cast %0 : ui6 to ui9\n"
-        + "    %4 = coredsl.bitset %2[8:0] = %3 : (ui17, ui9) -> ui17\n"
-        + "    %5 = coredsl.bitset %1[16:0] = %4 : (ui32, ui17) -> ui32\n"
-        + "    coredsl.set @PC = %5 : ui32\n"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 42 : ui6\n"
-        + "    %1 = coredsl.get @PC : ui32\n"
-        + "    %2 = coredsl.bitextract %1[31:0] : (ui32) -> ui32\n"
-        + "    %3 = coredsl.bitextract %2[15:0] : (ui32) -> ui16\n"
-        + "    %4 = coredsl.cast %0 : ui6 to ui8\n"
-        + "    %5 = coredsl.bitset %3[7:0] = %4 : (ui16, ui8) -> ui16\n"
-        + "    %6 = coredsl.bitset %2[15:0] = %5 : (ui32, ui16) -> ui32\n"
-        + "    %7 = coredsl.bitset %1[31:0] = %6 : (ui32, ui32) -> ui32\n"
-        + "    coredsl.set @PC = %7 : ui32"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 3 : ui2\n"
-        + "    %1 = coredsl.cast %rs2 : ui5 to ui32\n"
-        + "    %2 = coredsl.get @MEM[%1 : ui32] : ui8\n"
-        + "    %3 = coredsl.bitextract %2[4:0] : (ui8) -> ui5\n"
-        + "    %4 = coredsl.cast %0 : ui2 to ui3\n"
-        + "    %5 = coredsl.bitset %3[2:0] = %4 : (ui5, ui3) -> ui5\n"
-        + "    %6 = coredsl.bitset %2[4:0] = %5 : (ui8, ui5) -> ui8\n"
-        + "    coredsl.set @MEM[%1 : ui32] = %6 : ui8"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 10 : ui4\n"
-        + "    %1 = coredsl.cast %0 : ui4 to ui32\n"
-        + "    %2 = hwarith.constant 3 : ui2\n"
-        + "    %3 = coredsl.bitextract %1[15:0] : (ui32) -> ui16\n"
-        + "    %4 = coredsl.cast %2 : ui2 to ui8\n"
-        + "    %5 = coredsl.bitset %3[7:0] = %4 : (ui16, ui8) -> ui16\n"
-        + "    %6 = coredsl.bitset %1[15:0] = %5 : (ui32, ui16) -> ui32\n"
-        + "    coredsl.set @X[1] = %6 : ui32"));
-    assertTrue(mlirCode.contains(
-        "    %0 = hwarith.constant 10 : ui4\n"
-        + "    %1 = coredsl.cast %0 : ui4 to ui32\n"
-        + "    %2 = hwarith.constant 3 : ui2\n"
-        + "    %3 = coredsl.bitextract %1[15:0] : (ui32) -> ui16\n"
-        + "    %4 = coredsl.bitextract %3[7:0] : (ui16) -> ui8\n"
-        + "    %5 = coredsl.cast %2 : ui2 to ui5\n"
-        + "    %6 = coredsl.bitset %4[4:0] = %5 : (ui8, ui5) -> ui8\n"
-        + "    %7 = coredsl.bitset %3[7:0] = %6 : (ui16, ui8) -> ui16\n"
-        + "    %8 = coredsl.bitset %1[15:0] = %7 : (ui32, ui16) -> ui32\n"
-        + "    coredsl.set @X[1] = %8 : ui32\n"));
+    // clang-format off
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 43 : ui6
+          %1 = coredsl.cast %0 : ui6 to ui32
+          coredsl.set @X[%rs2 : ui5] = %1 : ui32\
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 3 : ui2
+          %1 = coredsl.get @PC : ui32
+          %2 = coredsl.cast %0 : ui2 to ui5
+          %3 = coredsl.bitset %1[4:0] = %2 : (ui32, ui5) -> ui32
+          coredsl.set @PC = %3 : ui32\
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = coredsl.get @MEM[8:4] : ui40
+          coredsl.set @MEM[4:0] = %0 : ui40\
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 100 : ui7
+          %1 = coredsl.get @X[%rs2 : ui5] : ui32
+          %2 = coredsl.cast %0 : ui7 to ui11
+          %3 = coredsl.bitset %1[0:10] = %2 : (ui32, ui11) -> ui32
+          coredsl.set @X[%rs2 : ui5] = %3 : ui32
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 8 : ui4
+          %1 = coredsl.cast %rs2 : ui5 to ui32
+          %2 = coredsl.get @MEM[%1 : ui32] : ui8
+          %3 = coredsl.cast %0 : ui4 to ui5
+          %4 = coredsl.bitset %2[0:4] = %3 : (ui8, ui5) -> ui8
+          coredsl.set @MEM[%1 : ui32] = %4 : ui8
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 42 : ui6
+          %1 = coredsl.get @PC : ui32
+          %2 = coredsl.bitextract %1[16:0] : (ui32) -> ui17
+          %3 = coredsl.cast %0 : ui6 to ui9
+          %4 = coredsl.bitset %2[8:0] = %3 : (ui17, ui9) -> ui17
+          %5 = coredsl.bitset %1[16:0] = %4 : (ui32, ui17) -> ui32
+          coredsl.set @PC = %5 : ui32
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 42 : ui6
+          %1 = coredsl.get @PC : ui32
+          %2 = coredsl.bitextract %1[31:0] : (ui32) -> ui32
+          %3 = coredsl.bitextract %2[15:0] : (ui32) -> ui16
+          %4 = coredsl.cast %0 : ui6 to ui8
+          %5 = coredsl.bitset %3[7:0] = %4 : (ui16, ui8) -> ui16
+          %6 = coredsl.bitset %2[15:0] = %5 : (ui32, ui16) -> ui32
+          %7 = coredsl.bitset %1[31:0] = %6 : (ui32, ui32) -> ui32
+          coredsl.set @PC = %7 : ui32\
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 3 : ui2
+          %1 = coredsl.cast %rs2 : ui5 to ui32
+          %2 = coredsl.get @MEM[%1 : ui32] : ui8
+          %3 = coredsl.bitextract %2[4:0] : (ui8) -> ui5
+          %4 = coredsl.cast %0 : ui2 to ui3
+          %5 = coredsl.bitset %3[2:0] = %4 : (ui5, ui3) -> ui5
+          %6 = coredsl.bitset %2[4:0] = %5 : (ui8, ui5) -> ui8
+          coredsl.set @MEM[%1 : ui32] = %6 : ui8\
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 10 : ui4
+          %1 = coredsl.cast %0 : ui4 to ui32
+          %2 = hwarith.constant 3 : ui2
+          %3 = coredsl.bitextract %1[15:0] : (ui32) -> ui16
+          %4 = coredsl.cast %2 : ui2 to ui8
+          %5 = coredsl.bitset %3[7:0] = %4 : (ui16, ui8) -> ui16
+          %6 = coredsl.bitset %1[15:0] = %5 : (ui32, ui16) -> ui32
+          coredsl.set @X[1] = %6 : ui32\
+      """));
+    assertTrue(mlirCode.contains("""
+          %0 = hwarith.constant 10 : ui4
+          %1 = coredsl.cast %0 : ui4 to ui32
+          %2 = hwarith.constant 3 : ui2
+          %3 = coredsl.bitextract %1[15:0] : (ui32) -> ui16
+          %4 = coredsl.bitextract %3[7:0] : (ui16) -> ui8
+          %5 = coredsl.cast %2 : ui2 to ui5
+          %6 = coredsl.bitset %4[4:0] = %5 : (ui8, ui5) -> ui8
+          %7 = coredsl.bitset %3[7:0] = %6 : (ui16, ui8) -> ui16
+          %8 = coredsl.bitset %1[15:0] = %7 : (ui32, ui16) -> ui32
+          coredsl.set @X[1] = %8 : ui32
+      """));
+    // clang-format on
   }
 }
