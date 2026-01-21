@@ -391,7 +391,10 @@ class AppTest {
   @Test
   void architecturalStateInRangeSpecWorks() {
     var appInst = App.getInstance();
-    var fileName = getClass().getResource("architectural_state_in_range_spec.core_desc").getPath();
+    var fileName =
+        getClass()
+            .getResource("architectural_state_in_range_spec.core_desc")
+            .getPath();
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
