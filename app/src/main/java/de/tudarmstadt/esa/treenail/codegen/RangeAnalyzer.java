@@ -76,6 +76,20 @@ class RangeAnalyzer {
     return MLIRType.getType(numElems.bitLength() - 1, false);
   }
 
+  static MLIRValue getEntityValue(NamedEntity entity, ConstructionContext cc,
+                                  MLIRType castType) {
+    var value = cc.getValue(entity);
+    if (value == null) {
+      var ac = cc.getAnalysisContext();
+      var architecturalStateType = MLIRType.mapType(ac.getDeclaredType(entity));
+      var architecturalStateVal = cc.makeAnonymousValue(architecturalStateType);
+      cc.emitLn("%s = coredsl.get @%s : %s", architecturalStateVal,
+                entity.getName(), architecturalStateType);
+      value = architecturalStateVal;
+    }
+    return cc.makeCast(value, castType);
+  }
+
   static RangeResult analyze(Expression fromExpr, Expression toExpr,
                              CoreDslType baseType, ConstructionContext cc,
                              ExpressionSwitch exprSwitch) {
@@ -109,9 +123,7 @@ class RangeAnalyzer {
     if (entity != null) {
       var offset = getOffset(fromExpr, entity, cc);
       if (offset != null) {
-        assert cc.getValue(entity) != null
-            : "NYI: Architectural state element in range specifier";
-        res.base = cc.makeCast(cc.getValue(entity), indexType);
+        res.base = getEntityValue(entity, cc, indexType);
         res.from = offset;
         res.to = BigInteger.ZERO;
         return res;
@@ -123,17 +135,15 @@ class RangeAnalyzer {
     if (entity != null) {
       var offset = getOffset(toExpr, entity, cc);
       if (offset != null) {
-        assert cc.getValue(entity) != null
-            : "NYI: Architectural state element in range specifier";
-        res.base = cc.makeCast(cc.getValue(entity), indexType);
+        res.base = getEntityValue(entity, cc, indexType);
         res.from = BigInteger.ZERO;
         res.to = offset;
-        assert res.base != null
-            : "NYI: Architectural state element in range specifier";
         return res;
       }
     }
 
+    assert false : ("NYI: more complicated range expressions, such as "
+                    + "X[MEM[0] : MEM[0] + 1]");
     return null;
   }
 }

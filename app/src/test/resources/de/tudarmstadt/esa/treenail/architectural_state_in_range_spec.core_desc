@@ -1,0 +1,43 @@
+InstructionSet ArchitecturalStateInRangeSpec {
+    architectural_state {
+      unsigned int XLEN = 32;
+      unsigned int RFS = 32;
+
+      register unsigned<XLEN> X[RFS] [[is_main_reg]];
+      register unsigned<XLEN> TEST_REG;
+      register unsigned<64> TEST_REG_64;
+
+      extern unsigned<8> MEM[1 << XLEN] [[is_main_mem]];
+    }
+
+  instructions {
+    TestArchStateIsFrom {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[TEST_REG:TEST_REG+1];
+        X[0] = val;
+      }
+    }
+    TestArchStateIsTo {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[TEST_REG-1:TEST_REG];
+        X[0] = val;
+      }
+    }
+    TestArchStateIsFromIndexCast {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[TEST_REG_64:TEST_REG_64+1];
+        X[0] = val;
+      }
+    }
+    TestArchStateIsToIndexCast {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[TEST_REG_64-1:TEST_REG_64];
+        X[0] = val;
+      }
+    }
+  }
+}
