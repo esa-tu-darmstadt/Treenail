@@ -80,7 +80,8 @@ class RangeAnalyzer {
                                   MLIRType castType) {
     var value = cc.getValue(entity);
     if (value == null) {
-      var architecturalStateType = MLIRType.mapType(cc.getElementType(entity));
+      var ac = cc.getAnalysisContext();
+      var architecturalStateType = MLIRType.mapType(ac.getDeclaredType(entity));
       var architecturalStateVal = cc.makeAnonymousValue(architecturalStateType);
       cc.emitLn("%s = coredsl.get @%s : %s", architecturalStateVal,
                 entity.getName(), architecturalStateType);
@@ -122,8 +123,6 @@ class RangeAnalyzer {
     if (entity != null) {
       var offset = getOffset(fromExpr, entity, cc);
       if (offset != null) {
-        assert cc.getValue(entity) != null
-            : "NYI: Architectural state element in range specifier";
         res.base = getEntityValue(entity, cc, indexType);
         res.from = offset;
         res.to = BigInteger.ZERO;
@@ -136,8 +135,6 @@ class RangeAnalyzer {
     if (entity != null) {
       var offset = getOffset(toExpr, entity, cc);
       if (offset != null) {
-        assert cc.getValue(entity) != null
-            : "NYI: Architectural state element in range specifier";
         res.base = getEntityValue(entity, cc, indexType);
         res.from = BigInteger.ZERO;
         res.to = offset;
