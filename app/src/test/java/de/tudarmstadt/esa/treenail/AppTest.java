@@ -387,4 +387,47 @@ class AppTest {
       """));
     // clang-format on
   }
+
+  @Test
+  void architecturalStateInRangeSpecWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("architectural_state_in_range_spec.core_desc").getPath();
+    System.out.println(fileName);
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    System.out.println(mlirCode);
+    // clang-format off
+    // TestArchStateIsFrom
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.get @TEST_REG : ui32
+          %0 = coredsl.get @MEM[%1 : ui32, 0:1] : ui16
+          %2 = coredsl.cast %0 : ui16 to ui32
+          coredsl.set @X[0] = %2 : ui32
+      """));
+    // TestArchStateIsTo
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.get @TEST_REG : ui32
+          %0 = coredsl.get @MEM[%1 : ui32, -1:0] : ui16
+          %2 = coredsl.cast %0 : ui16 to ui32
+          coredsl.set @X[0] = %2 : ui32
+      """));
+    // TestArchStateIsFromIndexCast
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.get @TEST_REG_64 : ui64
+          %2 = coredsl.cast %1 : ui64 to ui32
+          %0 = coredsl.get @MEM[%2 : ui32, 0:1] : ui16
+          %3 = coredsl.cast %0 : ui16 to ui32
+          coredsl.set @X[0] = %3 : ui32
+      """));
+    // TestArchStateIsToIndexCast
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.get @TEST_REG_64 : ui64
+          %2 = coredsl.cast %1 : ui64 to ui32
+          %0 = coredsl.get @MEM[%2 : ui32, -1:0] : ui16
+          %3 = coredsl.cast %0 : ui16 to ui32
+          coredsl.set @X[0] = %3 : ui32
+      """));
+    // clang-format on
+  }
 }
