@@ -142,6 +142,8 @@ class RangeAnalyzer {
       }
     }
 
+    assert false : ("NYI: more complicated range expressions, such as " +
+                    "X[MEM[0] : MEM[0] + 1]");
     return null;
   }
 }
