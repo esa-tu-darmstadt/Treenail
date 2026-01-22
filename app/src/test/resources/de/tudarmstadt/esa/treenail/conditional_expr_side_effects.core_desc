@@ -12,7 +12,7 @@ InstructionSet ConditionalExprSideEffects {
     TestModificationInThen {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
-        unsigned<16> val = MEM[4:3];
+        unsigned<32> val = MEM[4:1];
         unsigned<16> other_val = X[0] == 645 ? (unsigned<16>)(val++ - 1) : (unsigned<16>)(val * 2);
         X[0] = val;
         X[1] = other_val;
@@ -22,7 +22,7 @@ InstructionSet ConditionalExprSideEffects {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
         unsigned<16> val = MEM[3:2];
-        unsigned<16> other_val = X[0] == 645 ? (unsigned<16>)(val - 1) : (unsigned<16>)(++val * 2);
+        unsigned<32> other_val = X[0] == 645 ? (unsigned<32>)(val - 1) : (unsigned<32>)(++val * 2);
         X[0] = val;
         X[1] = other_val;
       }
@@ -36,6 +36,18 @@ InstructionSet ConditionalExprSideEffects {
         X[1] = other_val;
       }
     }
-    // TODO: nested conditional, more than one modified variable
+    TestMultipleModifiedVariables {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[1:0];
+        unsigned<32> val2 = (unsigned<32>)X[0];
+        unsigned<64> val3 = X[0] == 645 ? (unsigned<64>)(--val - 1) : (unsigned<64>)(++val * (val2 = 10));
+        X[0] = val;
+        X[1] = val2;
+        X[2] = val3[31:0];
+        X[3] = val3[63:32];
+      }
+    }
+    // TODO: nested conditional, modifying architectural state (to check if architectural state variables won't be wrongly returned)
   }
 }
