@@ -4,6 +4,7 @@ InstructionSet ConditionalExprSideEffects {
       unsigned int RFS = 32;
 
       register unsigned<XLEN> X[RFS] [[is_main_reg]];
+      register unsigned<XLEN> SINGLE_REG;
 
       extern unsigned<8> MEM[1 << XLEN] [[is_main_mem]];
     }
@@ -48,6 +49,17 @@ InstructionSet ConditionalExprSideEffects {
         X[3] = val3[63:32];
       }
     }
-    // TODO: nested conditional, modifying architectural state (to check if architectural state variables won't be wrongly returned)
+    // For checking if modified architectural state will be erroneously added
+    // to the return values of the conditional
+    TestModifyingArchState {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> val = MEM[4:1];
+        unsigned<16> other_val = X[0] == 645 ? (unsigned<16>)(val++ - 1) : (unsigned<16>)(SINGLE_REG++ * 2);
+        X[0] = val;
+        X[1] = other_val;
+      }
+    }
+    // TODO: nested conditional
   }
 }

@@ -559,6 +559,39 @@ class AppTest {
           %12 = coredsl.bitextract %9[63:32] : (ui64) -> ui32
           coredsl.set @X[3] = %12 : ui32
       """));
+    // TestModifyingArchState
+    assertTrue(mlirCode.contains("""
+          %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+          %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+          %0 = coredsl.get @MEM[4:1] : ui32
+          %1 = coredsl.get @X[0] : ui32
+          %2 = hwarith.constant 645 : ui10
+          %4 = hwarith.icmp eq %1, %2 : ui32, ui10
+          %3 = hwarith.cast %4 : (i1) -> ui1
+          %5 = coredsl.cast %3 : ui1 to i1
+          %6, %7 = scf.if %5 -> (ui32, ui16) {
+            %6 = hwarith.constant 1 : ui1
+            %7 = hwarith.add %0, %6 : (ui32, ui1) -> ui33
+            %8 = coredsl.cast %7 : ui33 to ui32
+            %9 = hwarith.constant 1 : ui1
+            %10 = hwarith.sub %0, %9 : (ui32, ui1) -> si33
+            %11 = coredsl.cast %10 : si33 to ui16
+            scf.yield %8, %11 : ui32, ui16
+          } else {
+            %6 = coredsl.get @SINGLE_REG : ui32
+            %7 = hwarith.constant 1 : ui1
+            %8 = hwarith.add %6, %7 : (ui32, ui1) -> ui33
+            %9 = coredsl.cast %8 : ui33 to ui32
+            coredsl.set @SINGLE_REG = %9 : ui32
+            %10 = hwarith.constant 2 : ui2
+            %11 = hwarith.mul %6, %10 : (ui32, ui2) -> ui34
+            %12 = coredsl.cast %11 : ui34 to ui16
+            scf.yield %0, %12 : ui32, ui16
+          }
+          coredsl.set @X[0] = %6 : ui32
+          %8 = coredsl.cast %7 : ui16 to ui32
+          coredsl.set @X[1] = %8 : ui32
+      """));
     // clang-format on
   }
 }
