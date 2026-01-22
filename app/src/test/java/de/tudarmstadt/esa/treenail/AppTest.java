@@ -431,4 +431,101 @@ class AppTest {
       """));
     // clang-format on
   }
+
+  @Test
+  void conditionalExprWithSideEffectsWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass()
+                       .getResource("conditional_expr_side_effects.core_desc")
+                       .getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    // clang-format off
+    // TestModificationInThen
+    assertTrue(mlirCode.contains("""
+          %0 = coredsl.get @MEM[4:3] : ui16
+          %1 = coredsl.get @X[0] : ui32
+          %2 = hwarith.constant 645 : ui10
+          %4 = hwarith.icmp eq %1, %2 : ui32, ui10
+          %3 = hwarith.cast %4 : (i1) -> ui1
+          %5 = coredsl.cast %3 : ui1 to i1
+          %6, %7 = scf.if %5 -> (ui16, ui16) {
+            %6 = hwarith.constant 1 : ui1
+            %7 = hwarith.add %0, %6 : (ui16, ui1) -> ui17
+            %8 = coredsl.cast %7 : ui17 to ui16
+            %9 = hwarith.constant 1 : ui1
+            %10 = hwarith.sub %0, %9 : (ui16, ui1) -> si17
+            %11 = coredsl.cast %10 : si17 to ui16
+            scf.yield %8, %11 : ui16, ui16
+          } else {
+            %6 = hwarith.constant 2 : ui2
+            %7 = hwarith.mul %0, %6 : (ui16, ui2) -> ui18
+            %8 = coredsl.cast %7 : ui18 to ui16
+            scf.yield %0, %8 : ui16, ui16
+          }
+          %8 = coredsl.cast %6 : ui16 to ui32
+          coredsl.set @X[0] = %8 : ui32
+          %9 = coredsl.cast %7 : ui16 to ui32
+          coredsl.set @X[1] = %9 : ui32
+      """));
+    // TestModificationInElse
+    assertTrue(mlirCode.contains("""
+          %0 = coredsl.get @MEM[3:2] : ui16
+          %1 = coredsl.get @X[0] : ui32
+          %2 = hwarith.constant 645 : ui10
+          %4 = hwarith.icmp eq %1, %2 : ui32, ui10
+          %3 = hwarith.cast %4 : (i1) -> ui1
+          %5 = coredsl.cast %3 : ui1 to i1
+          %6, %7 = scf.if %5 -> (ui16, ui16) {
+            %6 = hwarith.constant 1 : ui1
+            %7 = hwarith.sub %0, %6 : (ui16, ui1) -> si17
+            %8 = coredsl.cast %7 : si17 to ui16
+            scf.yield %0, %8 : ui16, ui16
+          } else {
+            %6 = hwarith.constant 1 : ui1
+            %7 = hwarith.add %0, %6 : (ui16, ui1) -> ui17
+            %8 = coredsl.cast %7 : ui17 to ui16
+            %9 = hwarith.constant 2 : ui2
+            %10 = hwarith.mul %8, %9 : (ui16, ui2) -> ui18
+            %11 = coredsl.cast %10 : ui18 to ui16
+            scf.yield %8, %11 : ui16, ui16
+          }
+          %8 = coredsl.cast %6 : ui16 to ui32
+          coredsl.set @X[0] = %8 : ui32
+          %9 = coredsl.cast %7 : ui16 to ui32
+          coredsl.set @X[1] = %9 : ui32
+      """));
+    // TestModificationInThenAndIf
+    assertTrue(mlirCode.contains("""
+          %0 = coredsl.get @MEM[1:0] : ui16
+          %1 = coredsl.get @X[0] : ui32
+          %2 = hwarith.constant 645 : ui10
+          %4 = hwarith.icmp eq %1, %2 : ui32, ui10
+          %3 = hwarith.cast %4 : (i1) -> ui1
+          %5 = coredsl.cast %3 : ui1 to i1
+          %6, %7 = scf.if %5 -> (ui16, ui16) {
+            %6 = hwarith.constant 1 : ui1
+            %7 = hwarith.sub %0, %6 : (ui16, ui1) -> si17
+            %8 = coredsl.cast %7 : si17 to ui16
+            %9 = hwarith.constant 1 : ui1
+            %10 = hwarith.sub %8, %9 : (ui16, ui1) -> si17
+            %11 = coredsl.cast %10 : si17 to ui16
+            scf.yield %8, %11 : ui16, ui16
+          } else {
+            %6 = hwarith.constant 1 : ui1
+            %7 = hwarith.add %0, %6 : (ui16, ui1) -> ui17
+            %8 = coredsl.cast %7 : ui17 to ui16
+            %9 = hwarith.constant 2 : ui2
+            %10 = hwarith.mul %8, %9 : (ui16, ui2) -> ui18
+            %11 = coredsl.cast %10 : ui18 to ui16
+            scf.yield %8, %11 : ui16, ui16
+          }
+          %8 = coredsl.cast %6 : ui16 to ui32
+          coredsl.set @X[0] = %8 : ui32
+          %9 = coredsl.cast %7 : ui16 to ui32
+          coredsl.set @X[1] = %9 : ui32
+      """));
+    // clang-format on
+  }
 }

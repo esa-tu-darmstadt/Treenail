@@ -1,0 +1,41 @@
+InstructionSet ConditionalExprSideEffects {
+    architectural_state {
+      unsigned int XLEN = 32;
+      unsigned int RFS = 32;
+
+      register unsigned<XLEN> X[RFS] [[is_main_reg]];
+
+      extern unsigned<8> MEM[1 << XLEN] [[is_main_mem]];
+    }
+
+  instructions {
+    TestModificationInThen {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[4:3];
+        unsigned<16> other_val = X[0] == 645 ? (unsigned<16>)(val++ - 1) : (unsigned<16>)(val * 2);
+        X[0] = val;
+        X[1] = other_val;
+      }
+    }
+    TestModificationInElse {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[3:2];
+        unsigned<16> other_val = X[0] == 645 ? (unsigned<16>)(val - 1) : (unsigned<16>)(++val * 2);
+        X[0] = val;
+        X[1] = other_val;
+      }
+    }
+    TestModificationInThenAndIf {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[1:0];
+        unsigned<16> other_val = X[0] == 645 ? (unsigned<16>)(--val - 1) : (unsigned<16>)(++val * 2);
+        X[0] = val;
+        X[1] = other_val;
+      }
+    }
+    // TODO: nested conditional, more than one modified variable
+  }
+}
