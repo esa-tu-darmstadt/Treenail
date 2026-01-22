@@ -60,6 +60,23 @@ InstructionSet ConditionalExprSideEffects {
         X[1] = other_val;
       }
     }
-    // TODO: nested conditional
+    TestNestedConditional {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<16> val = MEM[1:0];
+        unsigned<32> val2 = (unsigned<32>)X[0];
+        unsigned<64> val3 = X[0] == 645
+          ? (X[1] == 21
+            ? (unsigned<64>)(--val - 1)
+            : (val = 2))
+          : (X[1] == 42
+            ? (unsigned<64>)(++val * (val2 = 10))
+            : 42);
+        X[0] = val;
+        X[1] = val2;
+        X[2] = val3[31:0];
+        X[3] = val3[63:32];
+      }
+    }
   }
 }

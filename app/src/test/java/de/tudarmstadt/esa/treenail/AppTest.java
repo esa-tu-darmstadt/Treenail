@@ -592,6 +592,66 @@ class AppTest {
           %8 = coredsl.cast %7 : ui16 to ui32
           coredsl.set @X[1] = %8 : ui32
       """));
+    // TestMultipleModifiedVariables
+    assertTrue(mlirCode.contains("""
+          %0 = coredsl.get @MEM[1:0] : ui16
+          %1 = coredsl.get @X[0] : ui32
+          %2 = coredsl.get @X[0] : ui32
+          %3 = hwarith.constant 645 : ui10
+          %5 = hwarith.icmp eq %2, %3 : ui32, ui10
+          %4 = hwarith.cast %5 : (i1) -> ui1
+          %6 = coredsl.cast %4 : ui1 to i1
+          %7, %8, %9 = scf.if %6 -> (ui32, ui16, ui64) {
+            %7 = coredsl.get @X[1] : ui32
+            %8 = hwarith.constant 21 : ui5
+            %10 = hwarith.icmp eq %7, %8 : ui32, ui5
+            %9 = hwarith.cast %10 : (i1) -> ui1
+            %11 = coredsl.cast %9 : ui1 to i1
+            %12, %13 = scf.if %11 -> (ui16, ui64) {
+              %12 = hwarith.constant 1 : ui1
+              %13 = hwarith.sub %0, %12 : (ui16, ui1) -> si17
+              %14 = coredsl.cast %13 : si17 to ui16
+              %15 = hwarith.constant 1 : ui1
+              %16 = hwarith.sub %14, %15 : (ui16, ui1) -> si17
+              %17 = coredsl.cast %16 : si17 to ui64
+              scf.yield %14, %17 : ui16, ui64
+            } else {
+              %12 = hwarith.constant 2 : ui2
+              %13 = coredsl.cast %12 : ui2 to ui16
+              %14 = coredsl.cast %13 : ui16 to ui64
+              scf.yield %13, %14 : ui16, ui64
+            }
+            scf.yield %1, %12, %13 : ui32, ui16, ui64
+          } else {
+            %7 = coredsl.get @X[1] : ui32
+            %8 = hwarith.constant 42 : ui6
+            %10 = hwarith.icmp eq %7, %8 : ui32, ui6
+            %9 = hwarith.cast %10 : (i1) -> ui1
+            %11 = coredsl.cast %9 : ui1 to i1
+            %12, %13, %14 = scf.if %11 -> (ui32, ui16, ui64) {
+              %12 = hwarith.constant 1 : ui1
+              %13 = hwarith.add %0, %12 : (ui16, ui1) -> ui17
+              %14 = coredsl.cast %13 : ui17 to ui16
+              %15 = hwarith.constant 10 : ui4
+              %16 = coredsl.cast %15 : ui4 to ui32
+              %17 = hwarith.mul %14, %16 : (ui16, ui32) -> ui48
+              %18 = coredsl.cast %17 : ui48 to ui64
+              scf.yield %16, %14, %18 : ui32, ui16, ui64
+            } else {
+              %12 = hwarith.constant 42 : ui6
+              %13 = coredsl.cast %12 : ui6 to ui64
+              scf.yield %1, %0, %13 : ui32, ui16, ui64
+            }
+            scf.yield %12, %13, %14 : ui32, ui16, ui64
+          }
+          %10 = coredsl.cast %8 : ui16 to ui32
+          coredsl.set @X[0] = %10 : ui32
+          coredsl.set @X[1] = %7 : ui32
+          %11 = coredsl.bitextract %9[31:0] : (ui64) -> ui32
+          coredsl.set @X[2] = %11 : ui32
+          %12 = coredsl.bitextract %9[63:32] : (ui64) -> ui32
+          coredsl.set @X[3] = %12 : ui32
+      """));
     // clang-format on
   }
 }
