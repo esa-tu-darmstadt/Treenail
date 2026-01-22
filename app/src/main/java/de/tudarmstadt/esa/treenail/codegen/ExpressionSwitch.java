@@ -27,7 +27,10 @@ import java.util.AbstractMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Stack;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
 
@@ -553,23 +556,62 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         new LinkedHashMap<NamedEntity, MLIRValue>(values),
         new AtomicInteger(counter), ac, new StringBuilder());
 
+    var updatedEntities = new HashSet<NamedEntity>();
+    var returnedValues = new ArrayList<MLIRValue>();
     Streams.forEachPair(
         Stream.of(thenCC, elseCC),
         Stream.of(expr.getThenExpression(), expr.getElseExpression()),
         (xCC, xExpr) -> {
           var xVal = new ExpressionSwitch(xCC).doSwitch(xExpr);
-          assert xCC.getUpdatedEntities().isEmpty()
-              : "NYI: conditional expressions with side-effects";
+          var updated = xCC.getUpdatedEntities()
+                            .stream()
+                            .filter(cc::hasValue)
+                            .collect(Collectors.toSet());
+          updatedEntities.addAll(updated);
           var xCast = xCC.makeCast(xVal, type);
-          xCC.emitLn("scf.yield %s : %s", xCast, type);
+          returnedValues.add(xCast);
         });
+    var thenValues = thenCC.getValues();
+    var elseValues = elseCC.getValues();
+    var thenYieldValues = updatedEntities.stream()
+                              .map(thenValues::get)
+                              .collect(Collectors.toCollection(ArrayList::new));
+    thenYieldValues.add(returnedValues.get(0));
+    var elseYieldValues = updatedEntities.stream()
+                              .map(elseValues::get)
+                              .collect(Collectors.toCollection(ArrayList::new));
+    elseYieldValues.add(returnedValues.get(1));
 
-    var result = cc.makeAnonymousValue(type);
-    cc.emitLn("%s = scf.if %s -> (%s) {\n%s} else {\n%s}", result, cast, type,
-              thenCC.getStringBuilder().toString().indent(N_SPACES),
-              elseCC.getStringBuilder().toString().indent(N_SPACES));
+    var resultTypes = thenYieldValues.stream()
+                          .map(v -> v.type)
+                          .collect(Collectors.toCollection(ArrayList::new));
+    var resultValues = resultTypes.stream()
+                           .map(cc::makeAnonymousValue)
+                           .collect(Collectors.toCollection(ArrayList::new));
+    // The last value (our return value) will not be set, because
+    // updatedEntities has one less element than resultValues
+    Streams.forEachPair(updatedEntities.stream(), resultValues.stream(),
+                        cc::setValue);
 
-    return result;
+    final String resultTypesStr =
+        resultTypes.stream().map(Object::toString).collect(joining(", "));
+
+    thenCC.emitLn(
+        "scf.yield %s : %s",
+        thenYieldValues.stream().map(Object::toString).collect(joining(", ")),
+        resultTypesStr);
+    elseCC.emitLn(
+        "scf.yield %s : %s",
+        elseYieldValues.stream().map(Object::toString).collect(joining(", ")),
+        resultTypesStr);
+
+    cc.emitLn(
+        "%s = scf.if %s -> (%s) {\n%s} else {\n%s}",
+        resultValues.stream().map(Object::toString).collect(joining(", ")),
+        cast, resultTypesStr,
+        thenCC.getStringBuilder().toString().indent(N_SPACES),
+        elseCC.getStringBuilder().toString().indent(N_SPACES));
+    return resultValues.getLast();
   }
 
   @Override
