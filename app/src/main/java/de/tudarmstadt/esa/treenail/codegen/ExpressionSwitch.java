@@ -24,14 +24,13 @@ import com.minres.coredsl.coreDsl.PrefixExpression;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.math.BigInteger;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Stack;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import org.eclipse.emf.ecore.EObject;
 
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
@@ -538,49 +537,36 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     return head;
   }
 
-  @Override
-  public MLIRValue caseConditionalExpression(ConditionalExpression expr) {
-    var type = mapType(ac.getExpressionType(expr));
+  // This function expects the code for the corresponding branches to be already
+  // emitted into thenCC and elseCC Emits the conditional expression and returns
+  // the return value of the expression
+  private MLIRValue emitConditionalWithSideEffects(
+      ConstructionContext cc, MLIRValue condition, ConstructionContext thenCC,
+      ConstructionContext elseCC, MLIRValue thenRetVal, MLIRValue elseRetVal) {
+    assert thenRetVal.type == elseRetVal.type;
+    var updatedEntities = new LinkedHashSet<NamedEntity>();
 
-    var cond = doSwitch(expr.getCondition());
-    var cast = cc.makeI1Cast(cond);
+    var thenUpdated = thenCC.getUpdatedEntities()
+                          .stream()
+                          .filter(cc::hasValue)
+                          .collect(Collectors.toCollection(LinkedHashSet::new));
+    var elseUpdated = elseCC.getUpdatedEntities()
+                          .stream()
+                          .filter(cc::hasValue)
+                          .collect(Collectors.toCollection(LinkedHashSet::new));
+    updatedEntities.addAll(thenUpdated);
+    updatedEntities.addAll(elseUpdated);
 
-    var values = cc.getValues();
-    var counter = cc.getCounter();
-
-    var thenCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
-
-    var elseCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
-
-    var updatedEntities = new HashSet<NamedEntity>();
-    var returnedValues = new ArrayList<MLIRValue>();
-    Streams.forEachPair(
-        Stream.of(thenCC, elseCC),
-        Stream.of(expr.getThenExpression(), expr.getElseExpression()),
-        (xCC, xExpr) -> {
-          var xVal = new ExpressionSwitch(xCC).doSwitch(xExpr);
-          var updated = xCC.getUpdatedEntities()
-                            .stream()
-                            .filter(cc::hasValue)
-                            .collect(Collectors.toSet());
-          updatedEntities.addAll(updated);
-          var xCast = xCC.makeCast(xVal, type);
-          returnedValues.add(xCast);
-        });
     var thenValues = thenCC.getValues();
     var elseValues = elseCC.getValues();
     var thenYieldValues = updatedEntities.stream()
                               .map(thenValues::get)
                               .collect(Collectors.toCollection(ArrayList::new));
-    thenYieldValues.add(returnedValues.get(0));
+    thenYieldValues.add(thenRetVal);
     var elseYieldValues = updatedEntities.stream()
                               .map(elseValues::get)
                               .collect(Collectors.toCollection(ArrayList::new));
-    elseYieldValues.add(returnedValues.get(1));
+    elseYieldValues.add(elseRetVal);
 
     var resultTypes = thenYieldValues.stream()
                           .map(v -> v.type)
@@ -604,14 +590,43 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         "scf.yield %s : %s",
         elseYieldValues.stream().map(Object::toString).collect(joining(", ")),
         resultTypesStr);
-
     cc.emitLn(
         "%s = scf.if %s -> (%s) {\n%s} else {\n%s}",
         resultValues.stream().map(Object::toString).collect(joining(", ")),
-        cast, resultTypesStr,
+        condition, resultTypesStr,
         thenCC.getStringBuilder().toString().indent(N_SPACES),
         elseCC.getStringBuilder().toString().indent(N_SPACES));
     return resultValues.getLast();
+  }
+
+  @Override
+  public MLIRValue caseConditionalExpression(ConditionalExpression expr) {
+    var type = mapType(ac.getExpressionType(expr));
+
+    var cond = doSwitch(expr.getCondition());
+    var cast = cc.makeI1Cast(cond);
+
+    var values = cc.getValues();
+    var counter = cc.getCounter();
+
+    var thenCC = new ConstructionContext(
+        new LinkedHashMap<NamedEntity, MLIRValue>(values),
+        new AtomicInteger(counter), ac, new StringBuilder());
+
+    var elseCC = new ConstructionContext(
+        new LinkedHashMap<NamedEntity, MLIRValue>(values),
+        new AtomicInteger(counter), ac, new StringBuilder());
+
+    var thenResult =
+        new ExpressionSwitch(thenCC).doSwitch(expr.getThenExpression());
+    var thenRetVal = thenCC.makeCast(thenResult, type);
+    var elseResult =
+        new ExpressionSwitch(elseCC).doSwitch(expr.getElseExpression());
+    var elseRetVal = elseCC.makeCast(elseResult, type);
+    var retVal = emitConditionalWithSideEffects(cc, cast, thenCC, elseCC,
+                                                thenRetVal, elseRetVal);
+    assert retVal.type == type;
+    return retVal;
   }
 
   @Override
