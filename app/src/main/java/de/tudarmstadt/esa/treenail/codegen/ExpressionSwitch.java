@@ -540,7 +540,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   // This function expects the code for the corresponding branches to be already
   // emitted into thenCC and elseCC Emits the conditional expression and returns
   // the return value of the expression
-  private MLIRValue emitConditionalWithSideEffects(
+  static private MLIRValue emitConditionalWithSideEffects(
       ConstructionContext cc, MLIRValue condition, ConstructionContext thenCC,
       ConstructionContext elseCC, MLIRValue thenRetVal, MLIRValue elseRetVal) {
     assert thenRetVal.type == elseRetVal.type;
