@@ -89,5 +89,42 @@ InstructionSet ShortCircuitEvaluation {
         X[0] = x;
       }
     }
+    MultipleModifiedLocalVars {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<8> y = MEM[rs1];
+        if (x < 10 && x++ < ++y) {
+          X[0] = x;
+          X[1] = y;
+        }
+        X[rs1] = x;
+        X[rd] = y;
+      }
+    }
+    NestedLocalSideEffects {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[3:0];
+        unsigned<8> y = MEM[0];
+        unsigned<16> z = MEM[4:3];
+        if (x++ < 25 || (y < x-- && z-- > ++y)) {
+           X[0] = 1;
+        }
+        X[Imm6] = x;
+        MEM[0] = y;
+        MEM[1:0] = z;
+      }
+    }
+    LocalSideEffectInLhs {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        if (x++ < 10 && x < 5) {
+          X[0] = x;
+        }
+        X[rs1] = x;
+      }
+    }
   }
 }
