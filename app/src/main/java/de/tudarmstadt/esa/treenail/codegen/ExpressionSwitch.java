@@ -537,9 +537,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     return head;
   }
 
-  // This function expects the code for the corresponding branches to be already
-  // emitted into thenCC and elseCC Emits the conditional expression and returns
-  // the return value of the expression
+  // This method expects the code for the corresponding branches to already be
+  // emitted into thenCC and elseCC.
+  // Emits the conditional expression and returns the return value of the
+  // expression
   static private MLIRValue emitConditionalWithSideEffects(
       ConstructionContext cc, MLIRValue condition, ConstructionContext thenCC,
       ConstructionContext elseCC, MLIRValue thenRetVal, MLIRValue elseRetVal) {
@@ -574,6 +575,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var resultValues = resultTypes.stream()
                            .map(cc::makeAnonymousValue)
                            .collect(Collectors.toCollection(ArrayList::new));
+    assert resultValues.size() == updatedEntities.size() + 1;
     // The last value (our return value) will not be set, because
     // updatedEntities has one less element than resultValues
     Streams.forEachPair(updatedEntities.stream(), resultValues.stream(),
