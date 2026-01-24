@@ -65,14 +65,26 @@ InstructionSet ShortCircuitEvaluation {
         X[2] = i;
       }
     }
-    LogicalAndSideEffect {
+    LogicalAndLocalSideEffect {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
         unsigned<32> x = MEM[Imm6];
         if (x > 5 && (x = 10)) {
           X[rd] = x;
         } else {
-          X[rd] = 0;
+          X[rd + 1] = x;
+        }
+        X[0] = x;
+      }
+    }
+    LogicalOrLocalSideEffect {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        if (x > 5 || x++ < 10) {
+          X[rd] = x;
+        } else {
+          X[rd + 1] = x;
         }
         X[0] = x;
       }

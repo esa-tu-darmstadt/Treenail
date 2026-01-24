@@ -280,7 +280,66 @@ class AppTest {
           }
           coredsl.set @X[2] = %3 : ui32
       """));
-    // TODO: LogicalAndSideEffect, LogicalOrSideEffect
+    // LogicalAndLocalSideEffect
+    assertTrue(mlirCode.contains("""
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = hwarith.constant 5 : ui3
+          %5 = hwarith.icmp gt %2, %3 : ui32, ui3
+          %4 = hwarith.cast %5 : (i1) -> ui1
+          %6 = coredsl.cast %4 : ui1 to i1
+          %7, %8 = scf.if %6 -> (ui32, ui1) {
+            %7 = hwarith.constant 10 : ui4
+            %8 = coredsl.cast %7 : ui4 to ui32
+            %9 = hwarith.constant 0 : ui32
+            %10 = hwarith.icmp ne %8 %9
+            scf.yield %8, %10 : ui32, ui1
+          } else {
+            %7 = hwarith.constant 0 : ui1
+            scf.yield %2, %7 : ui32, ui1
+          }
+          %9 = coredsl.cast %8 : ui1 to i1
+          scf.if %9 {
+            coredsl.set @X[%rd : ui5] = %7 : ui32
+          } else {
+            %10 = hwarith.constant 1 : ui1
+            %11 = hwarith.add %rd, %10 : (ui5, ui1) -> ui6
+            %12 = coredsl.cast %11 : ui6 to ui5
+            coredsl.set @X[%12 : ui5] = %7 : ui32
+          }
+          coredsl.set @X[0] = %7 : ui32
+      """));
+    // LogicalOrLocalSideEffect
+    assertTrue(mlirCode.contains("""
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = hwarith.constant 5 : ui3
+          %5 = hwarith.icmp gt %2, %3 : ui32, ui3
+          %4 = hwarith.cast %5 : (i1) -> ui1
+          %6 = coredsl.cast %4 : ui1 to i1
+          %7, %8 = scf.if %6 -> (ui32, ui1) {
+            %7 = hwarith.constant 1 : ui1
+            scf.yield %2, %7 : ui32, ui1
+          } else {
+            %7 = hwarith.constant 1 : ui1
+            %8 = hwarith.add %2, %7 : (ui32, ui1) -> ui33
+            %9 = coredsl.cast %8 : ui33 to ui32
+            %10 = hwarith.constant 10 : ui4
+            %12 = hwarith.icmp lt %2, %10 : ui32, ui4
+            %11 = hwarith.cast %12 : (i1) -> ui1
+            scf.yield %9, %11 : ui32, ui1
+          }
+          %9 = coredsl.cast %8 : ui1 to i1
+          scf.if %9 {
+            coredsl.set @X[%rd : ui5] = %7 : ui32
+          } else {
+            %10 = hwarith.constant 1 : ui1
+            %11 = hwarith.add %rd, %10 : (ui5, ui1) -> ui6
+            %12 = coredsl.cast %11 : ui6 to ui5
+            coredsl.set @X[%12 : ui5] = %7 : ui32
+          }
+          coredsl.set @X[0] = %7 : ui32
+      """));
     // clang-format on
   }
 
