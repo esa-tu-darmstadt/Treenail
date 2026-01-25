@@ -9,20 +9,25 @@ import static java.util.stream.Collectors.toSet;
 import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.StorageClass;
+import com.minres.coredsl.coreDsl.BreakStatement;
+import com.minres.coredsl.coreDsl.CaseSection;
 import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
+import com.minres.coredsl.coreDsl.DefaultSection;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IfStatement;
+import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ReturnStatement;
 import com.minres.coredsl.coreDsl.SpawnStatement;
+import com.minres.coredsl.coreDsl.SwitchStatement;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
-import com.minres.coredsl.type.IntegerType;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -30,6 +35,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
@@ -110,6 +116,118 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var retVal = cc.makeCast(exprSwitch.doSwitch(expr), retTy);
     cc.emitLn("return %s : %s", retVal, retTy);
     cc.setTerminatorWasEmitted();
+    return this;
+  }
+
+  record ConditionalResults(String typesString, String returnValsString) {}
+  // Resolves updated entities and emits the corresponding yield instructions
+  // into the given ConstructionContexts
+  private static ConditionalResults
+  emitYieldsForConditionals(ConstructionContext cc,
+                            List<ConstructionContext> condCCs) {
+    var updatedEntities = new LinkedHashSet<NamedEntity>();
+    // Collect all updated entities
+    for (var xCC : condCCs) {
+      // TODO: toSet might give nondeterministic set
+      var currUpdated = xCC.getUpdatedEntities()
+                            .stream()
+                            .filter(cc::hasValue)
+                            .collect(Collectors.toSet());
+      updatedEntities.addAll(currUpdated);
+    }
+    var ac = cc.getAnalysisContext();
+    var returnTypes = updatedEntities.stream()
+                          .map(ac::getDeclaredType)
+                          .map(MLIRType::mapType)
+                          .toList();
+    final String returnTypesStr =
+        returnTypes.stream().map(Object::toString).collect(joining(", "));
+    // Emit yield instructions
+    for (var xCC : condCCs) {
+      var values = xCC.getValues();
+      var yieldValues = updatedEntities.stream().map(values::get).toList();
+      var yieldValuesStr =
+          yieldValues.stream().map(Object::toString).collect(joining(", "));
+      xCC.emitLn("scf.yield %s : %s", yieldValuesStr, returnTypesStr);
+    }
+    var resultValues =
+        returnTypes.stream().map(cc::makeAnonymousValue).toList();
+    Streams.forEachPair(updatedEntities.stream(), resultValues.stream(),
+                        cc::setValue);
+    var returnValsStr =
+        resultValues.stream().map(Object::toString).collect(joining(", "));
+    return new ConditionalResults(returnTypesStr, returnValsStr);
+  }
+
+  @Override
+  public Object caseBreakStatement(BreakStatement breakStmt) {
+    // TODO: this only works if the break statement is the final statement of
+    // the block
+    return this;
+  }
+
+  @Override
+  public Object caseSwitchStatement(SwitchStatement switchStmt) {
+    var condVal = new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+    var sections = switchStmt.getSections();
+    var sectionCCs = new ArrayList<ConstructionContext>();
+
+    var values = cc.getValues();
+    var counter = cc.getCounter();
+    // TODO: fallthrough and breaks that are not the last instruction
+    // - scf.index_switch does not have fallthrough
+    // - without using a different extension such as e.g. cf, we would have to
+    // copy code when fallthrough happens
+    // - breaks that are not the last instruction are complicated
+    //   - would need to record local variable state at the point of the break
+    //   and later format the yield into the string
+    //   - Idea: emit %s from break and later format in the yield
+    for (var section : sections) {
+      assert section.getBody().getLast() instanceof BreakStatement
+          : "NYI: Fallthrough in switch statement";
+      var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
+                                              new AtomicInteger(counter), ac,
+                                              new StringBuilder());
+      // Generate code for body
+      for (var stmt : section.getBody()) {
+        // TODO: first should always be a labelled statement, this should be
+        // skipped
+        // TODO: what to do with return value?
+        new StatementSwitch(sectionCC).doSwitch(stmt);
+      }
+      sectionCCs.add(sectionCC);
+    }
+    var res = emitYieldsForConditionals(cc, sectionCCs);
+    // TODO: index_switch only works for certain types (<= ui32 I think)
+    cc.emitLn("%s = scf.index_switch %s : index -> (%s) {",
+              res.returnValsString, condVal, res.typesString);
+    assert sectionCCs.size() == sections.size();
+    boolean gotDefaultCase = false;
+    for (int i = 0; i < sectionCCs.size(); ++i) {
+      var xCC = sectionCCs.get(i);
+      var sectionContent = xCC.getStringBuilder().toString().indent(N_SPACES);
+      var section = sections.get(i);
+      String sectionCode;
+      if (section instanceof CaseSection caseSection) {
+        var condition = caseSection.getCondition();
+        assert condition instanceof IntegerConstant
+            : "NYI non integer constant switch statement values";
+        sectionCode =
+            format("case %s {\n%s}", ((IntegerConstant)condition).getValue(),
+                   sectionContent);
+      } else {
+        assert section instanceof DefaultSection
+            : "SwitchSection other than CaseSection and DefaultSection: " +
+              section.getClass().getName();
+        assert !gotDefaultCase : "Duplicate default case";
+        sectionCode = format("default {\n%s}", sectionContent);
+        gotDefaultCase = true;
+      }
+      cc.emitLn("%s", sectionCode.indent(N_SPACES).stripTrailing());
+    }
+    // TODO: index_switch always needs a default case
+    assert gotDefaultCase : "NYI: switch statement without default case";
+    cc.emitLn("}");
     return this;
   }
 
