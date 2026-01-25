@@ -839,6 +839,7 @@ class AppTest {
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
     // clang-format off
+    // Simple
     assertTrue(mlirCode.contains("""
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
@@ -870,6 +871,38 @@ class AppTest {
               %9 = hwarith.constant 1 : ui1
               %10 = coredsl.cast %9 : ui1 to ui8
               scf.yield %6, %8, %10 : ui32, ui16, ui8
+            }
+          }
+          coredsl.set @X[%rs1 : ui5] = %5 : ui32
+          coredsl.set @MEM[1:0] = %6 : ui16
+          coredsl.set @MEM[2] = %7 : ui8
+      """));
+    // SimpleNoDefaultCase
+    assertTrue(mlirCode.contains("""
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          %5, %6, %7 = scf.index_switch %rs2 : index -> (ui32, ui16, ui8) {
+            case 0 {
+              scf.yield %2, %3, %4 : ui32, ui16, ui8
+            }
+            case 1 {
+              %5 = hwarith.constant 10 : ui4
+              %6 = coredsl.cast %5 : ui4 to ui32
+              scf.yield %6, %3, %4 : ui32, ui16, ui8
+            }
+            case 2 {
+              %5 = hwarith.constant 5 : ui3
+              %6 = coredsl.cast %5 : ui3 to ui16
+              scf.yield %2, %6, %4 : ui32, ui16, ui8
+            }
+            case 3 {
+              %5 = hwarith.constant 7 : ui3
+              %6 = coredsl.cast %5 : ui3 to ui8
+              scf.yield %2, %3, %6 : ui32, ui16, ui8
+            }
+            default {
+              scf.yield %2, %3, %4 : ui32, ui16, ui8
             }
           }
           coredsl.set @X[%rs1 : ui5] = %5 : ui32
