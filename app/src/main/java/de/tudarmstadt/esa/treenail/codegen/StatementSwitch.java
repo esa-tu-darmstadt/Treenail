@@ -164,6 +164,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // TODO: this only works if the break statement is the final statement of
     // the block
     // TODO: find a way to assert that this is not in the middle of a block
+    // TODO: also make sure that this is not a break in a loop!!!
     return this;
   }
 
@@ -186,6 +187,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     //   - Idea: emit %s from break and later format in the yield instruction
     //   - This would require changes to emitYieldsForConditionals as well
     //     - would have to at least return a list of the modified entities
+    //   - recording local variable state would probably need some sort of
+    //   stack for nested switch statements
     for (var section : sections) {
       assert section.getBody().getLast() instanceof BreakStatement
           : "NYI: Fallthrough in switch statement";
@@ -212,6 +215,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     }
     var res = emitYieldsForConditionals(cc, sectionCCs);
     // TODO: index_switch only works for certain types (<= ui32 I think)
+    // - might need to fall back to if statements if that is the case
     cc.emitLn("%s = scf.index_switch %s : index -> (%s) {",
               res.returnValsString, condVal, res.typesString);
     assert sectionCCs.size() == sections.size() ||
@@ -225,6 +229,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       String sectionCode;
       if (section instanceof CaseSection caseSection) {
         var condition = caseSection.getCondition();
+        // TODO: architecture parameters are allowed here as well
         assert condition instanceof IntegerConstant
             : "NYI non integer constant switch statement values";
         sectionCode =
