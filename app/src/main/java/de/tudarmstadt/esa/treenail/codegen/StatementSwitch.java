@@ -174,6 +174,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
     var values = cc.getValues();
     var counter = cc.getCounter();
+    boolean gotDefaultCase = false;
     // TODO: fallthrough and breaks that are not the last instruction
     // - scf.index_switch does not have fallthrough
     // - without using a different extension such as e.g. cf, we would have to
@@ -188,6 +189,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
                                               new AtomicInteger(counter), ac,
                                               new StringBuilder());
+      if (section instanceof DefaultSection) {
+        gotDefaultCase = true;
+      }
       // Generate code for body
       for (var stmt : section.getBody()) {
         // TODO: first should always be a labelled statement, this should be
@@ -197,16 +201,25 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       }
       sectionCCs.add(sectionCC);
     }
+    if (!gotDefaultCase) {
+      // Add an artificial default case that just passes the unmodified results
+      var defaultCC = new ConstructionContext(new LinkedHashMap<>(values),
+                                              new AtomicInteger(counter), ac,
+                                              new StringBuilder());
+      sectionCCs.add(defaultCC);
+    }
     var res = emitYieldsForConditionals(cc, sectionCCs);
     // TODO: index_switch only works for certain types (<= ui32 I think)
     cc.emitLn("%s = scf.index_switch %s : index -> (%s) {",
               res.returnValsString, condVal, res.typesString);
-    assert sectionCCs.size() == sections.size();
-    boolean gotDefaultCase = false;
+    assert sectionCCs.size() == sections.size() ||
+        sectionCCs.size() == sections.size() + 1;
     for (int i = 0; i < sectionCCs.size(); ++i) {
       var xCC = sectionCCs.get(i);
       var sectionContent = xCC.getStringBuilder().toString().indent(N_SPACES);
-      var section = sections.get(i);
+      // If we added an artificial default statement, we will be one past the
+      // end of sections
+      var section = i < sections.size() ? sections.get(i) : null;
       String sectionCode;
       if (section instanceof CaseSection caseSection) {
         var condition = caseSection.getCondition();
@@ -216,17 +229,13 @@ class StatementSwitch extends CoreDslSwitch<Object> {
             format("case %s {\n%s}", ((IntegerConstant)condition).getValue(),
                    sectionContent);
       } else {
-        assert section instanceof DefaultSection
-            : "SwitchSection other than CaseSection and DefaultSection: " +
+        assert section == null || section instanceof DefaultSection
+            : "SwitchSection other than CaseSection or DefaultSection: " +
               section.getClass().getName();
-        assert !gotDefaultCase : "Duplicate default case";
         sectionCode = format("default {\n%s}", sectionContent);
-        gotDefaultCase = true;
       }
       cc.emitLn("%s", sectionCode.indent(N_SPACES).stripTrailing());
     }
-    // TODO: index_switch always needs a default case
-    assert gotDefaultCase : "NYI: switch statement without default case";
     cc.emitLn("}");
     return this;
   }
