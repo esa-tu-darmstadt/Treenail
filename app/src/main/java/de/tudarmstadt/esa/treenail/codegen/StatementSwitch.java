@@ -163,6 +163,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   public Object caseBreakStatement(BreakStatement breakStmt) {
     // TODO: this only works if the break statement is the final statement of
     // the block
+    // TODO: find a way to assert that this is not in the middle of a block
     return this;
   }
 
@@ -182,7 +183,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // - breaks that are not the last instruction are complicated
     //   - would need to record local variable state at the point of the break
     //   and later format the yield into the string
-    //   - Idea: emit %s from break and later format in the yield
+    //   - Idea: emit %s from break and later format in the yield instruction
+    //   - This would require changes to emitYieldsForConditionals as well
+    //     - would have to at least return a list of the modified entities
     for (var section : sections) {
       assert section.getBody().getLast() instanceof BreakStatement
           : "NYI: Fallthrough in switch statement";
@@ -194,15 +197,14 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       }
       // Generate code for body
       for (var stmt : section.getBody()) {
-        // TODO: first should always be a labelled statement, this should be
-        // skipped
-        // TODO: what to do with return value?
+        // TODO: can we ignore the return value?
         new StatementSwitch(sectionCC).doSwitch(stmt);
       }
       sectionCCs.add(sectionCC);
     }
     if (!gotDefaultCase) {
-      // Add an artificial default case that just passes the unmodified results
+      // If there is no default case, add an empty one, as index_switch always
+      // needs a default case
       var defaultCC = new ConstructionContext(new LinkedHashMap<>(values),
                                               new AtomicInteger(counter), ac,
                                               new StringBuilder());
@@ -217,8 +219,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     for (int i = 0; i < sectionCCs.size(); ++i) {
       var xCC = sectionCCs.get(i);
       var sectionContent = xCC.getStringBuilder().toString().indent(N_SPACES);
-      // If we added an artificial default statement, we will be one past the
-      // end of sections
+      // If we added an artificial default case, we will be one past the end of
+      // sections
       var section = i < sections.size() ? sections.get(i) : null;
       String sectionCode;
       if (section instanceof CaseSection caseSection) {
