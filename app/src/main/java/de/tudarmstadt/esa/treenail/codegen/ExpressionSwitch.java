@@ -451,7 +451,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
       var thenRetVal = isLAnd ? hwarithBoolRhs : constToYield;
       var elseRetVal = isLAnd ? constToYield : hwarithBoolRhs;
-      return emitConditionalWithSideEffects(cc, boolLhs, thenCC, elseCC, thenRetVal, elseRetVal);
+      return emitConditionalWithSideEffects(cc, boolLhs, thenCC, elseCC,
+                                            thenRetVal, elseRetVal);
     }
     var rhs = doSwitch(expr.getRight());
 
