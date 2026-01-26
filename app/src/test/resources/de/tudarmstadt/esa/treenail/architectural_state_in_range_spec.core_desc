@@ -21,7 +21,7 @@ InstructionSet ArchitecturalStateInRangeSpec {
     TestArchStateIsTo {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
-        unsigned<16> val = MEM[TEST_REG-1:TEST_REG];
+        unsigned<16> val = MEM[TEST_REG+1:TEST_REG];
         X[0] = val;
       }
     }
@@ -35,7 +35,7 @@ InstructionSet ArchitecturalStateInRangeSpec {
     TestArchStateIsToIndexCast {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
-        unsigned<16> val = MEM[TEST_REG_64-1:TEST_REG_64];
+        unsigned<16> val = MEM[TEST_REG_64+1:TEST_REG_64];
         X[0] = val;
       }
     }
