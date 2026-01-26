@@ -4,9 +4,9 @@ InstructionSet TestConstVolatile {
       unsigned int RFS = 32;
       // Register files with qualifiers
       register unsigned<XLEN> X[RFS] [[is_main_reg]];
-      register const unsigned<XLEN> CONST_REG_FILE[10];
+      register const unsigned<XLEN> CONST_REG_FILE[3] = {0, 0, 0};
       register volatile unsigned<XLEN> VOLATILE_REG_FILE[12];
-      register const volatile unsigned<XLEN> CONST_VOLATILE_REG_FILE[14];
+      register const volatile unsigned<XLEN> CONST_VOLATILE_REG_FILE[2] = {1, 2};
 
       // Scalar registers with qualifiers
       register unsigned<XLEN> NORMAL_REG = 5;
@@ -15,12 +15,12 @@ InstructionSet TestConstVolatile {
       register const volatile unsigned<XLEN> CONST_VOLATILE_REG = 42;
 
       extern unsigned<8> MEM[1 << XLEN] [[is_main_mem]];
-      extern const unsigned<8> CONST_MEM[1 << 64] [[is_main_mem]];
+      extern const unsigned<8> CONST_MEM[1 << XLEN] [[is_main_mem]];
       // It probably does not make sense for multiple address spaces to
       // be marked "is_main_mem"
       // TODO: remove [[is_main_mem]] when custom address spaces are supported
-      extern volatile unsigned<8> VOLATILE_MEM[1 << 8] [[is_main_mem]];
-      extern const volatile unsigned<8> CONST_VOLATILE_MEM[1 << 16] [[is_main_mem]];
+      extern volatile unsigned<8> VOLATILE_MEM[1 << XLEN] [[is_main_mem]];
+      extern const volatile unsigned<8> CONST_VOLATILE_MEM[1 << XLEN] [[is_main_mem]];
 
       // const and volatile aliases
       unsigned<8> &FIRST_MEM_VAL = MEM[0];

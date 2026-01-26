@@ -91,11 +91,11 @@ class AppTest {
     // Test register files with qualifiers
     assertTrue(mlirCode.contains("coredsl.register core_x @X[32] : ui32"));
     assertTrue(mlirCode.contains(
-        "coredsl.register local const @CONST_REG_FILE[10] : ui32"));
+        "coredsl.register local const @CONST_REG_FILE[3] = [0, 0, 0] : ui32"));
     assertTrue(mlirCode.contains(
         "coredsl.register local volatile @VOLATILE_REG_FILE[12] : ui32"));
     assertTrue(mlirCode.contains("coredsl.register local const volatile "
-                                 + "@CONST_VOLATILE_REG_FILE[14] : ui32"));
+                                 + "@CONST_VOLATILE_REG_FILE[2] = [1, 2] : ui32"));
     // test scalar registers with qualifiers
     assertTrue(
         mlirCode.contains("coredsl.register local @NORMAL_REG = 5 : ui32"));
@@ -109,11 +109,11 @@ class AppTest {
     assertTrue(
         mlirCode.contains("coredsl.addrspace core_mem @MEM : (ui32) -> ui8"));
     assertTrue(mlirCode.contains(
-        "coredsl.addrspace core_mem const @CONST_MEM : (ui64) -> ui8"));
+        "coredsl.addrspace core_mem const @CONST_MEM : (ui32) -> ui8"));
     assertTrue(mlirCode.contains(
-        "coredsl.addrspace core_mem volatile @VOLATILE_MEM : (ui8) -> ui8"));
+        "coredsl.addrspace core_mem volatile @VOLATILE_MEM : (ui32) -> ui8"));
     assertTrue(mlirCode.contains("coredsl.addrspace core_mem const volatile "
-                                 + "@CONST_VOLATILE_MEM : (ui16) -> ui8"));
+                                 + "@CONST_VOLATILE_MEM : (ui32) -> ui8"));
 
     assertTrue(mlirCode.contains("coredsl.alias @FIRST_MEM_VAL = @MEM[0]"));
     assertTrue(mlirCode.contains(
