@@ -186,15 +186,17 @@ class AppTest {
     // ConvertToBoolTest
     assertTrue(mlirCode.contains("""
           %3 = hwarith.constant 0 : ui32
-          %4 = hwarith.icmp ne %0 %3
-          %5 = coredsl.cast %4 : ui1 to i1
-          %6 = scf.if %5 -> (ui1) {
-            %6 = hwarith.constant 1 : ui1
-            scf.yield %6 : ui1
-          } else {
-            %6 = hwarith.constant 0 : ui32
-            %7 = hwarith.icmp ne %2 %6
+          %4 = hwarith.icmp ne %0, %3 : ui32, ui32
+          %5 = hwarith.cast %4 : (i1) -> ui1
+          %6 = coredsl.cast %5 : ui1 to i1
+          %7 = scf.if %6 -> (ui1) {
+            %7 = hwarith.constant 1 : ui1
             scf.yield %7 : ui1
+          } else {
+            %7 = hwarith.constant 0 : ui32
+            %8 = hwarith.icmp ne %2, %7 : ui32, ui32
+            %9 = hwarith.cast %8 : (i1) -> ui1
+            scf.yield %9 : ui1
           }
       """));
     // MultipleShortCircuitTest
@@ -292,8 +294,9 @@ class AppTest {
             %7 = hwarith.constant 10 : ui4
             %8 = coredsl.cast %7 : ui4 to ui32
             %9 = hwarith.constant 0 : ui32
-            %10 = hwarith.icmp ne %8 %9
-            scf.yield %8, %10 : ui32, ui1
+            %10 = hwarith.icmp ne %8, %9 : ui32, ui32
+            %11 = hwarith.cast %10 : (i1) -> ui1
+            scf.yield %8, %11 : ui32, ui1
           } else {
             %7 = hwarith.constant 0 : ui1
             scf.yield %2, %7 : ui32, ui1
