@@ -187,8 +187,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     //   - Idea: emit %s from break and later format in the yield instruction
     //   - This would require changes to emitYieldsForConditionals as well
     //     - would have to at least return a list of the modified entities
-    //   - recording local variable state would probably need some sort of
-    //   stack for nested switch statements
+    //   - for recording local variable state, we don't need a stack, as a new
+    //   Statement switch is created for each SwitchSection
     for (var section : sections) {
       assert section.getBody().getLast() instanceof BreakStatement
           : "NYI: Fallthrough in switch statement";
