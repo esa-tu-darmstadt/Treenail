@@ -24,11 +24,13 @@ import com.minres.coredsl.coreDsl.PrefixExpression;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.math.BigInteger;
 import java.util.AbstractMap;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.Stream;
+import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
@@ -535,6 +537,70 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     return head;
   }
 
+  // This method expects the code for the corresponding branches to already be
+  // emitted into thenCC and elseCC.
+  // Emits the conditional expression and returns the return value of the
+  // expression
+  static private MLIRValue emitConditionalWithSideEffects(
+      ConstructionContext cc, MLIRValue condition, ConstructionContext thenCC,
+      ConstructionContext elseCC, MLIRValue thenRetVal, MLIRValue elseRetVal) {
+    assert thenRetVal.type == elseRetVal.type;
+    var updatedEntities = new LinkedHashSet<NamedEntity>();
+
+    var thenUpdated = thenCC.getUpdatedEntities()
+                          .stream()
+                          .filter(cc::hasValue)
+                          .collect(Collectors.toCollection(LinkedHashSet::new));
+    var elseUpdated = elseCC.getUpdatedEntities()
+                          .stream()
+                          .filter(cc::hasValue)
+                          .collect(Collectors.toCollection(LinkedHashSet::new));
+    updatedEntities.addAll(thenUpdated);
+    updatedEntities.addAll(elseUpdated);
+
+    var thenValues = thenCC.getValues();
+    var elseValues = elseCC.getValues();
+    var thenYieldValues = updatedEntities.stream()
+                              .map(thenValues::get)
+                              .collect(Collectors.toCollection(ArrayList::new));
+    thenYieldValues.add(thenRetVal);
+    var elseYieldValues = updatedEntities.stream()
+                              .map(elseValues::get)
+                              .collect(Collectors.toCollection(ArrayList::new));
+    elseYieldValues.add(elseRetVal);
+
+    var resultTypes = thenYieldValues.stream()
+                          .map(v -> v.type)
+                          .collect(Collectors.toCollection(ArrayList::new));
+    var resultValues = resultTypes.stream()
+                           .map(cc::makeAnonymousValue)
+                           .collect(Collectors.toCollection(ArrayList::new));
+    assert resultValues.size() == updatedEntities.size() + 1;
+    // The last value (our return value) will not be set, because
+    // updatedEntities has one less element than resultValues
+    Streams.forEachPair(updatedEntities.stream(), resultValues.stream(),
+                        cc::setValue);
+
+    final String resultTypesStr =
+        resultTypes.stream().map(Object::toString).collect(joining(", "));
+
+    thenCC.emitLn(
+        "scf.yield %s : %s",
+        thenYieldValues.stream().map(Object::toString).collect(joining(", ")),
+        resultTypesStr);
+    elseCC.emitLn(
+        "scf.yield %s : %s",
+        elseYieldValues.stream().map(Object::toString).collect(joining(", ")),
+        resultTypesStr);
+    cc.emitLn(
+        "%s = scf.if %s -> (%s) {\n%s} else {\n%s}",
+        resultValues.stream().map(Object::toString).collect(joining(", ")),
+        condition, resultTypesStr,
+        thenCC.getStringBuilder().toString().indent(N_SPACES),
+        elseCC.getStringBuilder().toString().indent(N_SPACES));
+    return resultValues.getLast();
+  }
+
   @Override
   public MLIRValue caseConditionalExpression(ConditionalExpression expr) {
     var type = mapType(ac.getExpressionType(expr));
@@ -553,23 +619,16 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         new LinkedHashMap<NamedEntity, MLIRValue>(values),
         new AtomicInteger(counter), ac, new StringBuilder());
 
-    Streams.forEachPair(
-        Stream.of(thenCC, elseCC),
-        Stream.of(expr.getThenExpression(), expr.getElseExpression()),
-        (xCC, xExpr) -> {
-          var xVal = new ExpressionSwitch(xCC).doSwitch(xExpr);
-          assert xCC.getUpdatedEntities().isEmpty()
-              : "NYI: conditional expressions with side-effects";
-          var xCast = xCC.makeCast(xVal, type);
-          xCC.emitLn("scf.yield %s : %s", xCast, type);
-        });
-
-    var result = cc.makeAnonymousValue(type);
-    cc.emitLn("%s = scf.if %s -> (%s) {\n%s} else {\n%s}", result, cast, type,
-              thenCC.getStringBuilder().toString().indent(N_SPACES),
-              elseCC.getStringBuilder().toString().indent(N_SPACES));
-
-    return result;
+    var thenResult =
+        new ExpressionSwitch(thenCC).doSwitch(expr.getThenExpression());
+    var thenRetVal = thenCC.makeCast(thenResult, type);
+    var elseResult =
+        new ExpressionSwitch(elseCC).doSwitch(expr.getElseExpression());
+    var elseRetVal = elseCC.makeCast(elseResult, type);
+    var retVal = emitConditionalWithSideEffects(cc, cast, thenCC, elseCC,
+                                                thenRetVal, elseRetVal);
+    assert retVal.type == type;
+    return retVal;
   }
 
   @Override
