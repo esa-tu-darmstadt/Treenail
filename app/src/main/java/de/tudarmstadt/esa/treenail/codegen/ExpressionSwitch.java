@@ -400,7 +400,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     final boolean isLAnd = "&&".equals(opr);
     final boolean isLOr = "||".equals(opr);
     if (isLAnd || isLOr) {
-      var result = cc.makeAnonymousValue(type);
       var hwarithBoolLhs = convertIntToBool(lhs, cc);
       var boolLhs = cc.makeI1Cast(hwarithBoolLhs);
 
@@ -447,14 +446,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       assert yieldConstCC != emitRhsCC;
       var rhs = new ExpressionSwitch(emitRhsCC).doSwitch(expr.getRight());
       var hwarithBoolRhs = convertIntToBool(rhs, emitRhsCC);
-      emitRhsCC.emitLn("scf.yield %s : %s", hwarithBoolRhs, type);
 
       var constToYield = yieldConstCC.makeConst(constValToYield, type);
-      yieldConstCC.emitLn("scf.yield %s : %s", constToYield, type);
-      cc.emitLn("%s = scf.if %s -> (%s) {\n%s} else {\n%s}", result, boolLhs,
-                type, thenCC.getStringBuilder().toString().indent(N_SPACES),
-                elseCC.getStringBuilder().toString().indent(N_SPACES));
-      return result;
+
+      var thenRetVal = isLAnd ? hwarithBoolRhs : constToYield;
+      var elseRetVal = isLAnd ? constToYield : hwarithBoolRhs;
+      return emitConditionalWithSideEffects(cc, boolLhs, thenCC, elseCC,
+                                            thenRetVal, elseRetVal);
     }
     var rhs = doSwitch(expr.getRight());
 
