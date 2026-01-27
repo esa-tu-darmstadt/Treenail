@@ -235,7 +235,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     ^case_3(%c3_x : i32):
       %new_y = 5
       cf.br ^end_bb(%c3_x, %new_y)
-    ^case_4:
+    ^case_4():
       %new_x = 5
       %new_z = 10
       cf.br ^end_bb(%new_x, %y, %new_z)
