@@ -184,18 +184,66 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var values = cc.getValues();
     var counter = cc.getCounter();
     boolean gotDefaultCase = false;
-    // TODO: fallthrough and breaks that are not the last instruction
-    // - scf.index_switch does not have fallthrough
-    // - without using a different extension such as e.g. cf, we would have to
-    // copy code when fallthrough happens
-    // - breaks that are not the last instruction are complicated
-    //   - would need to record local variable state at the point of the break
-    //   and later format the yield into the string
-    //   - Idea: emit %s from break and later format in the yield instruction
-    //   - This would require changes to emitYieldsForConditionals as well
-    //     - would have to at least return a list of the modified entities
-    //   - for recording local variable state, we don't need a stack, as a new
-    //   Statement switch is created for each SwitchSection
+    /*
+    TODO: fallthrough and breaks in the middle of statements
+    - scf.index_switch does not have fallthrough
+    - would need cf dialect to implement fallthrough
+    - breaks in arbitrary positions could still be difficult
+      - using cf.br from inside scf.if is not allowed
+        - if (cond) break would not work
+        - would need to reimplement if using cf in that case
+      - Otherwise, could emit %s for all breaks and then format the cf.br
+      instructions in as a final step
+        - Each break would have to record variable state when visited, so the
+        right values can be used in the cf.br later
+    Example code if using cf extension:
+    CoreDSL:
+    switch (a) {
+      case 1:
+      case 2:
+        x = 10;
+      case 3:
+        y = 5;
+        break;
+      case 4:
+        x = 5;
+        z = 10;
+        break;
+      default:
+        break;
+    }
+    MLIR:
+    cf.switch %a : i32, [
+      ; NOTE: to make the implementation simpler, we could have all bbs take
+      ; all modified variables as inputs
+      1: ^case_1(),
+      2: ^case_2(),
+      3: ^case_3(%x, i32),
+      4: ^case_4(),
+      default: ^default()
+    ]
+    ; NOTE: opening new ConstructionContexts for each block will probably no
+    ; longer work here, as blocks can always read variables from blocks that
+    ; dominate them
+    ; All blocks here are dominated by the block before the switch, so they
+    ; can read all variables of that block
+    ^case_1():
+      cf.br ^case_2()
+    ^case_2():
+      %new_x = 10
+      cf.br ^case_3(%new_x : i32)
+    ^case_3(%c3_x : i32):
+      %new_y = 5
+      cf.br ^end_bb(%c3_x, %new_y)
+    ^case_4:
+      %new_x = 5
+      %new_z = 10
+      cf.br ^end_bb(%new_x, %y, %new_z)
+    ^default():
+      cf.br ^end_bb(%x, %y, %z)
+    ^end_bb(%res_x, %res_y, %res_z):
+      ; Now x = %res_x, y = %res_y, z = %res_z
+     */
     for (var section : sections) {
       var lastStatement = section.getBody().getLast();
       assert lastStatement instanceof BreakStatement
