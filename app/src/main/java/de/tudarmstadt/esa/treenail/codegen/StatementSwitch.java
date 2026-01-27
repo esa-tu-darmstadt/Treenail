@@ -210,7 +210,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       }
       // Generate code for body
       for (var stmt : section.getBody()) {
-        // TODO: can we ignore the return value?
         new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
       }
       sectionCCs.add(sectionCC);
