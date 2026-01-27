@@ -188,7 +188,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     TODO: fallthrough and breaks in the middle of statements
     - scf.index_switch does not have fallthrough
     - would need cf dialect to implement fallthrough
-    - breaks in arbitrary positions could still be difficult
+    - Problem: breaks in arbitrary positions could still be difficult
       - using cf.br from inside scf.if is not allowed
         - if (cond) break would not work
         - would need to reimplement if using cf in that case
