@@ -386,9 +386,11 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     if (value.type.isSigned || value.type.width > 1) {
       var zero = cc.makeConst(BigInteger.ZERO, value.type);
       var valueAsBool = cc.makeAnonymousValue(MLIRType.DUMMY);
-      cc.emitLn("%s = hwarith.icmp ne %s, %s : %s, %s", valueAsBool, value, zero, value.type, zero.type);
+      cc.emitLn("%s = hwarith.icmp ne %s, %s : %s, %s", valueAsBool, value,
+                zero, value.type, zero.type);
       var hwarithBoolVal = cc.makeAnonymousValue(MLIRType.getType(1, false));
-      cc.emitLn("%s = hwarith.cast %s : (i1) -> ui1", hwarithBoolVal, valueAsBool);
+      cc.emitLn("%s = hwarith.cast %s : (i1) -> ui1", hwarithBoolVal,
+                valueAsBool);
       return hwarithBoolVal;
     }
     return value;

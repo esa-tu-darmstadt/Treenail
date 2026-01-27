@@ -94,8 +94,9 @@ class AppTest {
         "coredsl.register local const @CONST_REG_FILE[3] = [0, 0, 0] : ui32"));
     assertTrue(mlirCode.contains(
         "coredsl.register local volatile @VOLATILE_REG_FILE[12] : ui32"));
-    assertTrue(mlirCode.contains("coredsl.register local const volatile "
-                                 + "@CONST_VOLATILE_REG_FILE[2] = [1, 2] : ui32"));
+    assertTrue(
+        mlirCode.contains("coredsl.register local const volatile "
+                          + "@CONST_VOLATILE_REG_FILE[2] = [1, 2] : ui32"));
     // test scalar registers with qualifiers
     assertTrue(
         mlirCode.contains("coredsl.register local @NORMAL_REG = 5 : ui32"));
