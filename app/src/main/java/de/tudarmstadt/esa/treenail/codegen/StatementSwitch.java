@@ -42,11 +42,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   private final AnalysisContext ac;
   private final ConstructionContext cc;
   private final ExpressionSwitch exprSwitch;
+  // For detecting break statements that are in locations other than the end of
+  // a SwitchSection, as they are currently unsupported
+  private BreakStatement switchEndBreak = null;
 
   StatementSwitch(ConstructionContext cc) {
     this.ac = cc.getAnalysisContext();
     this.cc = cc;
     exprSwitch = new ExpressionSwitch(cc);
+  }
+
+  StatementSwitch(ConstructionContext cc, BreakStatement breakStatement) {
+    this(cc);
+    this.switchEndBreak = breakStatement;
   }
 
   @Override
@@ -161,10 +169,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
   @Override
   public Object caseBreakStatement(BreakStatement breakStmt) {
-    // TODO: this only works if the break statement is the final statement of
-    // the block
-    // TODO: find a way to assert that this is not in the middle of a block
-    // TODO: also make sure that this is not a break in a loop!!!
+    assert switchEndBreak != null : "NYI: Break statement in loop";
+    assert breakStmt == switchEndBreak
+        : "NYI: Switch statements breaks in position other than the end";
     return this;
   }
 
@@ -190,8 +197,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     //   - for recording local variable state, we don't need a stack, as a new
     //   Statement switch is created for each SwitchSection
     for (var section : sections) {
-      assert section.getBody().getLast() instanceof BreakStatement
+      var lastStatement = section.getBody().getLast();
+      assert lastStatement instanceof BreakStatement
           : "NYI: Fallthrough in switch statement";
+      var endBreak = (BreakStatement)lastStatement;
+
       var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
                                               new AtomicInteger(counter), ac,
                                               new StringBuilder());
@@ -201,7 +211,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       // Generate code for body
       for (var stmt : section.getBody()) {
         // TODO: can we ignore the return value?
-        new StatementSwitch(sectionCC).doSwitch(stmt);
+        new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
       }
       sectionCCs.add(sectionCC);
     }
