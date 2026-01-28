@@ -844,7 +844,7 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5, %6, %7 = scf.index_switch %rs2 : index -> (ui32, ui16, ui8) {
+          %5, %6, %7 = scf.index_switch %rs2 -> ui32, ui16, ui8
             case 0 {
               scf.yield %2, %3, %4 : ui32, ui16, ui8
             }
@@ -872,7 +872,6 @@ class AppTest {
               %10 = coredsl.cast %9 : ui1 to ui8
               scf.yield %6, %8, %10 : ui32, ui16, ui8
             }
-          }
           coredsl.set @X[%rs1 : ui5] = %5 : ui32
           coredsl.set @MEM[1:0] = %6 : ui16
           coredsl.set @MEM[2] = %7 : ui8
@@ -882,7 +881,7 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5, %6, %7 = scf.index_switch %rs2 : index -> (ui32, ui16, ui8) {
+          %5, %6, %7 = scf.index_switch %rs2 -> ui32, ui16, ui8
             case 0 {
               scf.yield %2, %3, %4 : ui32, ui16, ui8
             }
@@ -904,7 +903,6 @@ class AppTest {
             default {
               scf.yield %2, %3, %4 : ui32, ui16, ui8
             }
-          }
           coredsl.set @X[%rs1 : ui5] = %5 : ui32
           coredsl.set @MEM[1:0] = %6 : ui16
           coredsl.set @MEM[2] = %7 : ui8
