@@ -275,8 +275,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var res = emitYieldsForConditionals(cc, sectionCCs);
     // TODO: index_switch only works for certain types (<= ui32 I think)
     // - might need to fall back to if statements if that is the case
-    cc.emitLn("%s = scf.index_switch %s -> %s",
-              res.returnValsString, condVal, res.typesString);
+    cc.emitLn("%s = scf.index_switch %s -> %s", res.returnValsString, condVal,
+              res.typesString);
     assert sectionCCs.size() == sections.size() ||
         sectionCCs.size() == sections.size() + 1;
     for (int i = 0; i < sectionCCs.size(); ++i) {
