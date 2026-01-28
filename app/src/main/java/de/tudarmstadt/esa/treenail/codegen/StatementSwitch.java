@@ -222,9 +222,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       4: ^case_4(),
       default: ^default()
     ]
-    ; NOTE: opening new ConstructionContexts for each block will probably no
-    ; longer work here, as blocks can always read variables from blocks that
-    ; dominate them
+    ; NOTE: opening new ConstructionContexts (and thereby duplicating variable
+    ; names) for each BB will work here, as MLIR BBs can only read variables
+    ; implicitly from its dominators. As cases in switch statements cannot
+    ; dominate other cases, we won't run into duplicate variable definition
+    ; errors
     ; All blocks here are dominated by the block before the switch, so they
     ; can read all variables of that block
     ^case_1():
