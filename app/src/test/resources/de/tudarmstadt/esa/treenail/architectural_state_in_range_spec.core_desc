@@ -21,7 +21,10 @@ InstructionSet ArchitecturalStateInRangeSpec {
     TestArchStateIsTo {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
-        unsigned<16> val = MEM[TEST_REG-1:TEST_REG];
+        // TODO: this was MEM[TEST_REG-1:TEST_REG] before, but shortnail does
+        // not support negative indices in range specifiers. Change back when
+        // supported by shortnail
+        unsigned<16> val = MEM[TEST_REG+1:TEST_REG];
         X[0] = val;
       }
     }
@@ -35,7 +38,9 @@ InstructionSet ArchitecturalStateInRangeSpec {
     TestArchStateIsToIndexCast {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
-        unsigned<16> val = MEM[TEST_REG_64-1:TEST_REG_64];
+        // TODO: used to be MEM[TEST_REG_64-1:TEST_REG_64]. Change back when
+        // supported by shortnail
+        unsigned<16> val = MEM[TEST_REG_64+1:TEST_REG_64];
         X[0] = val;
       }
     }

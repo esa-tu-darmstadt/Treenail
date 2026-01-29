@@ -91,11 +91,12 @@ class AppTest {
     // Test register files with qualifiers
     assertTrue(mlirCode.contains("coredsl.register core_x @X[32] : ui32"));
     assertTrue(mlirCode.contains(
-        "coredsl.register local const @CONST_REG_FILE[10] : ui32"));
+        "coredsl.register local const @CONST_REG_FILE[3] = [0, 0, 0] : ui32"));
     assertTrue(mlirCode.contains(
         "coredsl.register local volatile @VOLATILE_REG_FILE[12] : ui32"));
-    assertTrue(mlirCode.contains("coredsl.register local const volatile "
-                                 + "@CONST_VOLATILE_REG_FILE[14] : ui32"));
+    assertTrue(
+        mlirCode.contains("coredsl.register local const volatile "
+                          + "@CONST_VOLATILE_REG_FILE[2] = [1, 2] : ui32"));
     // test scalar registers with qualifiers
     assertTrue(
         mlirCode.contains("coredsl.register local @NORMAL_REG = 5 : ui32"));
@@ -109,11 +110,11 @@ class AppTest {
     assertTrue(
         mlirCode.contains("coredsl.addrspace core_mem @MEM : (ui32) -> ui8"));
     assertTrue(mlirCode.contains(
-        "coredsl.addrspace core_mem const @CONST_MEM : (ui64) -> ui8"));
+        "coredsl.addrspace core_mem const @CONST_MEM : (ui32) -> ui8"));
     assertTrue(mlirCode.contains(
-        "coredsl.addrspace core_mem volatile @VOLATILE_MEM : (ui8) -> ui8"));
+        "coredsl.addrspace core_mem volatile @VOLATILE_MEM : (ui32) -> ui8"));
     assertTrue(mlirCode.contains("coredsl.addrspace core_mem const volatile "
-                                 + "@CONST_VOLATILE_MEM : (ui16) -> ui8"));
+                                 + "@CONST_VOLATILE_MEM : (ui32) -> ui8"));
 
     assertTrue(mlirCode.contains("coredsl.alias @FIRST_MEM_VAL = @MEM[0]"));
     assertTrue(mlirCode.contains(
@@ -186,15 +187,17 @@ class AppTest {
     // ConvertToBoolTest
     assertTrue(mlirCode.contains("""
           %3 = hwarith.constant 0 : ui32
-          %4 = hwarith.icmp ne %0 %3
-          %5 = coredsl.cast %4 : ui1 to i1
-          %6 = scf.if %5 -> (ui1) {
-            %6 = hwarith.constant 1 : ui1
-            scf.yield %6 : ui1
-          } else {
-            %6 = hwarith.constant 0 : ui32
-            %7 = hwarith.icmp ne %2 %6
+          %4 = hwarith.icmp ne %0, %3 : ui32, ui32
+          %5 = hwarith.cast %4 : (i1) -> ui1
+          %6 = coredsl.cast %5 : ui1 to i1
+          %7 = scf.if %6 -> (ui1) {
+            %7 = hwarith.constant 1 : ui1
             scf.yield %7 : ui1
+          } else {
+            %7 = hwarith.constant 0 : ui32
+            %8 = hwarith.icmp ne %2, %7 : ui32, ui32
+            %9 = hwarith.cast %8 : (i1) -> ui1
+            scf.yield %9 : ui1
           }
       """));
     // MultipleShortCircuitTest
@@ -292,8 +295,9 @@ class AppTest {
             %7 = hwarith.constant 10 : ui4
             %8 = coredsl.cast %7 : ui4 to ui32
             %9 = hwarith.constant 0 : ui32
-            %10 = hwarith.icmp ne %8 %9
-            scf.yield %8, %10 : ui32, ui1
+            %10 = hwarith.icmp ne %8, %9 : ui32, ui32
+            %11 = hwarith.cast %10 : (i1) -> ui1
+            scf.yield %8, %11 : ui32, ui1
           } else {
             %7 = hwarith.constant 0 : ui1
             scf.yield %2, %7 : ui32, ui1
@@ -578,7 +582,7 @@ class AppTest {
     // TestArchStateIsTo
     assertTrue(mlirCode.contains("""
           %1 = coredsl.get @TEST_REG : ui32
-          %0 = coredsl.get @MEM[%1 : ui32, -1:0] : ui16
+          %0 = coredsl.get @MEM[%1 : ui32, 1:0] : ui16
           %2 = coredsl.cast %0 : ui16 to ui32
           coredsl.set @X[0] = %2 : ui32
       """));
@@ -594,7 +598,7 @@ class AppTest {
     assertTrue(mlirCode.contains("""
           %1 = coredsl.get @TEST_REG_64 : ui64
           %2 = coredsl.cast %1 : ui64 to ui32
-          %0 = coredsl.get @MEM[%2 : ui32, -1:0] : ui16
+          %0 = coredsl.get @MEM[%2 : ui32, 1:0] : ui16
           %3 = coredsl.cast %0 : ui16 to ui32
           coredsl.set @X[0] = %3 : ui32
       """));
