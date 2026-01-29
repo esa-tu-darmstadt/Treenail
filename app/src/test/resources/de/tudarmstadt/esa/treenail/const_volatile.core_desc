@@ -6,6 +6,9 @@ InstructionSet TestConstVolatile {
       register unsigned<XLEN> X[RFS] [[is_main_reg]];
       register const unsigned<XLEN> CONST_REG_FILE[3] = {0, 0, 0};
       register volatile unsigned<XLEN> VOLATILE_REG_FILE[12];
+      // TODO: Shortnail requires const volatile register files to be
+      // initialized, but this does not make sense. Remove initializer when
+      // shortnail supports it
       register const volatile unsigned<XLEN> CONST_VOLATILE_REG_FILE[2] = {1, 2};
 
       // Scalar registers with qualifiers
