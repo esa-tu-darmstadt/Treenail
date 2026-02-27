@@ -118,8 +118,8 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
       MLIRValue tmpVal = null;
       List<String> immPartAttrs = new ArrayList<>();
       for (var v : parts) {
-        var immAttrStr = format("[\"%s\", %d, %d, %d]", v.val, v.start, v.end,
-                                v.reversed ? 1 : 0);
+        var immAttrStr = format("[\"%s\", %d, %d, %d, \"%s\"]", v.val, v.start,
+                                v.end, v.reversed ? 1 : 0, v.name.getName());
         immPartAttrs.add(immAttrStr);
 
         var partVal = v.val;
