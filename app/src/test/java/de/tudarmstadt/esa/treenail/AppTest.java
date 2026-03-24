@@ -844,7 +844,7 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5, %6, %7 = scf.index_switch %rs2 -> ui32, ui16, ui8
+          %5, %6, %7 = coredsl.switch %rs2 : ui5 -> ui32, ui16, ui8
             case 0 {
               scf.yield %2, %3, %4 : ui32, ui16, ui8
             }
@@ -881,7 +881,7 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5, %6, %7 = scf.index_switch %rs2 -> ui32, ui16, ui8
+          %5, %6, %7 = coredsl.switch %rs2 : ui5 -> ui32, ui16, ui8
             case 0 {
               scf.yield %2, %3, %4 : ui32, ui16, ui8
             }

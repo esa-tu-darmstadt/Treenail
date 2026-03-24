@@ -136,11 +136,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var updatedEntities = new LinkedHashSet<NamedEntity>();
     // Collect all updated entities
     for (var xCC : condCCs) {
-      // TODO: toSet might give nondeterministic set
-      var currUpdated = xCC.getUpdatedEntities()
-                            .stream()
-                            .filter(cc::hasValue)
-                            .collect(Collectors.toSet());
+      var currUpdated =
+          xCC.getUpdatedEntities()
+              .stream()
+              .filter(cc::hasValue)
+              .collect(Collectors.toCollection(LinkedHashSet::new));
       updatedEntities.addAll(currUpdated);
     }
     var ac = cc.getAnalysisContext();
@@ -273,10 +273,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       sectionCCs.add(defaultCC);
     }
     var res = emitYieldsForConditionals(cc, sectionCCs);
-    // TODO: index_switch only works for certain types (<= ui32 I think)
-    // - might need to fall back to if statements if that is the case
-    cc.emitLn("%s = scf.index_switch %s -> %s", res.returnValsString, condVal,
-              res.typesString);
+    cc.emitLn("%s = coredsl.switch %s : %s -> %s", res.returnValsString,
+              condVal, condVal.type, res.typesString);
     assert sectionCCs.size() == sections.size() ||
         sectionCCs.size() == sections.size() + 1;
     for (int i = 0; i < sectionCCs.size(); ++i) {
