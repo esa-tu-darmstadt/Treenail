@@ -158,7 +158,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       var yieldValues = updatedEntities.stream().map(values::get).toList();
       var yieldValuesStr =
           yieldValues.stream().map(Object::toString).collect(joining(", "));
-      xCC.emitLn("scf.yield %s : %s", yieldValuesStr, returnTypesStr);
+      xCC.emitLn("coredsl.yield %s : %s", yieldValuesStr, returnTypesStr);
     }
     var resultValues =
         returnTypes.stream().map(cc::makeAnonymousValue).toList();
@@ -290,8 +290,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         var condition = caseSection.getCondition();
         ConstantValue constantValue = ac.getExpressionValue(condition);
         assert constantValue.isValid()
-            : ("Parser should error on a non-compile-time value in switch " +
-               "case");
+            : ("Parser should error on a non-compile-time value in switch "
+               + "case");
         BigInteger val = constantValue.getValue();
         sectionCode = format("case %s {\n%s}", val, sectionContent);
       } else {

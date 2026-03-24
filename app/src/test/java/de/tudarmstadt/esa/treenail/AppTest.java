@@ -846,22 +846,22 @@ class AppTest {
           %4 = coredsl.get @MEM[2] : ui8
           %5, %6, %7 = coredsl.switch %rs2 : ui5 -> ui32, ui16, ui8
             case 0 {
-              scf.yield %2, %3, %4 : ui32, ui16, ui8
+              coredsl.yield %2, %3, %4 : ui32, ui16, ui8
             }
             case 1 {
               %5 = hwarith.constant 10 : ui4
               %6 = coredsl.cast %5 : ui4 to ui32
-              scf.yield %6, %3, %4 : ui32, ui16, ui8
+              coredsl.yield %6, %3, %4 : ui32, ui16, ui8
             }
             case 2 {
               %5 = hwarith.constant 5 : ui3
               %6 = coredsl.cast %5 : ui3 to ui16
-              scf.yield %2, %6, %4 : ui32, ui16, ui8
+              coredsl.yield %2, %6, %4 : ui32, ui16, ui8
             }
             case 3 {
               %5 = hwarith.constant 7 : ui3
               %6 = coredsl.cast %5 : ui3 to ui8
-              scf.yield %2, %3, %6 : ui32, ui16, ui8
+              coredsl.yield %2, %3, %6 : ui32, ui16, ui8
             }
             default {
               %5 = hwarith.constant 1 : ui1
@@ -870,7 +870,7 @@ class AppTest {
               %8 = coredsl.cast %7 : ui1 to ui16
               %9 = hwarith.constant 1 : ui1
               %10 = coredsl.cast %9 : ui1 to ui8
-              scf.yield %6, %8, %10 : ui32, ui16, ui8
+              coredsl.yield %6, %8, %10 : ui32, ui16, ui8
             }
           coredsl.set @X[%rs1 : ui5] = %5 : ui32
           coredsl.set @MEM[1:0] = %6 : ui16
@@ -883,28 +883,79 @@ class AppTest {
           %4 = coredsl.get @MEM[2] : ui8
           %5, %6, %7 = coredsl.switch %rs2 : ui5 -> ui32, ui16, ui8
             case 0 {
-              scf.yield %2, %3, %4 : ui32, ui16, ui8
+              coredsl.yield %2, %3, %4 : ui32, ui16, ui8
             }
             case 1 {
               %5 = hwarith.constant 10 : ui4
               %6 = coredsl.cast %5 : ui4 to ui32
-              scf.yield %6, %3, %4 : ui32, ui16, ui8
+              coredsl.yield %6, %3, %4 : ui32, ui16, ui8
             }
             case 2 {
               %5 = hwarith.constant 5 : ui3
               %6 = coredsl.cast %5 : ui3 to ui16
-              scf.yield %2, %6, %4 : ui32, ui16, ui8
+              coredsl.yield %2, %6, %4 : ui32, ui16, ui8
             }
             case 3 {
               %5 = hwarith.constant 7 : ui3
               %6 = coredsl.cast %5 : ui3 to ui8
-              scf.yield %2, %3, %6 : ui32, ui16, ui8
+              coredsl.yield %2, %3, %6 : ui32, ui16, ui8
             }
             default {
-              scf.yield %2, %3, %4 : ui32, ui16, ui8
+              coredsl.yield %2, %3, %4 : ui32, ui16, ui8
             }
           coredsl.set @X[%rs1 : ui5] = %5 : ui32
           coredsl.set @MEM[1:0] = %6 : ui16
+          coredsl.set @MEM[2] = %7 : ui8
+      """));
+    System.out.println(mlirCode);
+    // NestedSwitch
+    assertTrue(mlirCode.contains("""
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          %5, %6, %7 = coredsl.switch %rs2 : ui5 -> ui16, ui32, ui8
+            case 0 {
+              %5 = coredsl.switch %rd : ui5 -> ui16
+                case 16 {
+                  %5 = hwarith.constant 1 : ui1
+                  %6 = hwarith.sub %3, %5 : (ui16, ui1) -> si17
+                  %7 = coredsl.cast %6 : si17 to ui16
+                  coredsl.yield %7 : ui16
+                }
+                case 2 {
+                  %5 = hwarith.constant 1 : ui1
+                  %6 = hwarith.add %3, %5 : (ui16, ui1) -> ui17
+                  %7 = coredsl.cast %6 : ui17 to ui16
+                  coredsl.yield %7 : ui16
+                }
+                default {
+                  %5 = hwarith.constant 2 : ui2
+                  %6 = hwarith.add %3, %5 : (ui16, ui2) -> ui17
+                  %7 = coredsl.cast %6 : ui17 to ui16
+                  coredsl.yield %7 : ui16
+                }
+              coredsl.yield %5, %2, %4 : ui16, ui32, ui8
+            }
+            case 1 {
+              %5 = hwarith.constant 10 : ui4
+              %6 = coredsl.cast %5 : ui4 to ui32
+              coredsl.yield %3, %6, %4 : ui16, ui32, ui8
+            }
+            case 2 {
+              %5 = hwarith.constant 5 : ui3
+              %6 = coredsl.cast %5 : ui3 to ui16
+              coredsl.yield %6, %2, %4 : ui16, ui32, ui8
+            }
+            case 3 {
+              %5 = hwarith.constant 7 : ui3
+              %6 = coredsl.cast %5 : ui3 to ui8
+              coredsl.yield %3, %2, %6 : ui16, ui32, ui8
+            }
+            default {
+              coredsl.yield %3, %2, %4 : ui16, ui32, ui8
+            }
+          coredsl.set @X[%rs1 : ui5] = %6 : ui32
+          coredsl.set @MEM[1:0] = %5 : ui16
           coredsl.set @MEM[2] = %7 : ui8
       """));
     // clang-format on

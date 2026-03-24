@@ -60,5 +60,40 @@ InstructionSet SwitchStmt {
          MEM[2] = z;
        }
     }
+    NestedSwitch {
+        encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+        behavior: {
+          unsigned<32> x = MEM[rd];
+          unsigned<16> y = MEM[1:0];
+          unsigned<8> z = MEM[2];
+          switch (rs2) {
+            case 0:
+              switch (rd) {
+                case 16:
+                   y -= 1;
+                   break;
+                case 2:
+                   y += 1;
+                   break;
+                default:
+                    y += 2;
+                    break;
+              }
+              break;
+            case 1:
+              x = 10;
+              break;
+            case 2:
+              y = 5;
+              break;
+            case 3:
+              z = 7;
+              break;
+          }
+          X[rs1] = x;
+          MEM[1:0] = y;
+          MEM[2] = z;
+        }
+    }
   }
 }
