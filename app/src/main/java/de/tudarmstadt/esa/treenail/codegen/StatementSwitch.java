@@ -8,6 +8,7 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
+import com.minres.coredsl.analysis.ConstantValue;
 import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.BreakStatement;
 import com.minres.coredsl.coreDsl.CaseSection;
@@ -15,6 +16,7 @@ import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.DefaultSection;
+import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
@@ -185,8 +187,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var counter = cc.getCounter();
     boolean gotDefaultCase = false;
     /*
-    TODO: fallthrough and breaks in the middle of statements
-    - scf.index_switch does not have fallthrough
+    TODO: fallthrough and breaks that are not at the end of case regions
+    - coredsl.switch does not have fallthrough
     - would need cf dialect to implement fallthrough
     - Problem: breaks in arbitrary positions could still be difficult
       - using cf.br from inside scf.if is not allowed
@@ -286,12 +288,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       String sectionCode;
       if (section instanceof CaseSection caseSection) {
         var condition = caseSection.getCondition();
-        // TODO: architecture parameters are allowed here as well
-        assert condition instanceof IntegerConstant
-            : "NYI non integer constant switch statement values";
-        sectionCode =
-            format("case %s {\n%s}", ((IntegerConstant)condition).getValue(),
-                   sectionContent);
+        ConstantValue constantValue = ac.getExpressionValue(condition);
+        assert constantValue.isValid()
+            : ("Parser should error on a non-compile-time value in switch " +
+               "case");
+        BigInteger val = constantValue.getValue();
+        sectionCode = format("case %s {\n%s}", val, sectionContent);
       } else {
         assert section == null || section instanceof DefaultSection
             : "SwitchSection other than CaseSection or DefaultSection: " +

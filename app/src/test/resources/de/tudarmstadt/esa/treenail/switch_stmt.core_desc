@@ -3,6 +3,7 @@ InstructionSet SwitchStmt {
     register unsigned<32> X[32] [[is_main_reg]];
     register unsigned<32> PC;
     extern unsigned char MEM[0x100000000] [[is_main_mem]];
+    const unsigned<32> MY_CONST = 3;
   }
 
   instructions {
@@ -15,13 +16,13 @@ InstructionSet SwitchStmt {
          switch (rs2) {
            case 0:
              break;
-           case 1:
+           case MY_CONST - 2:
              x = 10;
              break;
-           case 2:
+           case 1 + 1:
              y = 5;
              break;
-           case 3:
+           case MY_CONST:
              z = 7;
              break;
            default:
