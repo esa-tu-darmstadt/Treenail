@@ -907,7 +907,6 @@ class AppTest {
           coredsl.set @MEM[1:0] = %6 : ui16
           coredsl.set @MEM[2] = %7 : ui8
       """));
-    System.out.println(mlirCode);
     // NestedSwitch
     assertTrue(mlirCode.contains("""
           %2 = coredsl.cast %0 : ui8 to ui32
