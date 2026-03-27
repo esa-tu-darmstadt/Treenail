@@ -954,6 +954,6 @@ class AppTest {
           coredsl.set @MEM[1:0] = %5 : ui16
           coredsl.set @MEM[2] = %7 : ui8
       """));
-    // clang-format on
-  }
+// clang-format on
+}
 }
