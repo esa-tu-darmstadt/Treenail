@@ -831,10 +831,7 @@ class AppTest {
   @Test
   void switchStmtWorks() {
     var appInst = App.getInstance();
-    var fileName =
-            getClass()
-                    .getResource("switch_stmt.core_desc")
-                    .getPath();
+    var fileName = getClass().getResource("switch_stmt.core_desc").getPath();
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
@@ -957,6 +954,6 @@ class AppTest {
           coredsl.set @MEM[1:0] = %5 : ui16
           coredsl.set @MEM[2] = %7 : ui8
       """));
-    // clang-format on
-  }
+// clang-format on
+}
 }
