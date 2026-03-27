@@ -835,6 +835,7 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
+
     // clang-format off
     // Simple
     assertTrue(mlirCode.contains("""
