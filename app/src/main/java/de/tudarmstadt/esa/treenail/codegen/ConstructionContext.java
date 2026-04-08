@@ -160,9 +160,24 @@ class ConstructionContext {
 
   StringBuilder getStringBuilder() { return sb; }
 
+  // Create a ConstructionContext with a copy of the current value map
   ConstructionContext createDerivedCC() {
     return new ConstructionContext(new LinkedHashMap<>(values),
                                    new AtomicInteger(getValueCounter()), ac,
                                    new StringBuilder());
+  }
+
+  // This should only be used for contexts gotten from createDerivedCC
+  // Useful for operations that we don't know yet whether they are needed or
+  // not. These can be emitted into a derived context, which is then merged
+  // using this function when we know that the operations are needed in the
+  // main context
+  void appendDerivedCC(ConstructionContext derived) {
+    assert counter.get() <= derived.counter.get();
+    counter.set(derived.counter.get());
+    // TODO: make this check if all values of values are in derived.values (not
+    //  necessarily the same value but same key)
+    values.putAll(derived.values);
+    emit("%s", derived.sb.toString());
   }
 }
