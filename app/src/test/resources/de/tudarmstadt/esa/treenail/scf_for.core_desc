@@ -1,0 +1,87 @@
+InstructionSet TestScfForLoop {
+    architectural_state {
+      unsigned int XLEN = 32;
+      unsigned int RFS = 32;
+      register unsigned<XLEN> X[RFS] [[is_main_reg]];
+      extern unsigned<8> MEM[1 << XLEN] [[is_main_mem]];
+    }
+
+  instructions {
+    ConstBoundsLT {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = 0; i < 20; ++i) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    ConstBoundsLE {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = 0; i <= 20; i++) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    ConstBoundsStep2 {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = 0; i < 20; i += 2) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeInitBound {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = x; i < y; ++i) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeInitBoundStep {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> step = X[rs1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = x; i < y; i += step) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeBoundedNotViableBoundModified {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = x; i < y; ++i) {
+          if (MEM[rs1 + i] == 123) {
+            y += 10; // bound modified -> can't use scf.for
+          }
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+  }
+}

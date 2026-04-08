@@ -1022,4 +1022,17 @@ class AppTest {
       """));
     // clang-format on
   }
+
+  @Test
+  void dynamicBoundedForLoopWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("scf_for.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    System.out.println(mlirCode);
+    assertFalse(true);
+    // clang-format off
+    // clang-format on
+  }
 }
