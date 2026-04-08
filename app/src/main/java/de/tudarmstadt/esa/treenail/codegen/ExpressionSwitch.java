@@ -217,16 +217,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
   }
 
-  private int getAddSubResultWidth(MLIRType lhsTy, MLIRType rhsTy) {
-    if (lhsTy.isSigned == rhsTy.isSigned)
-      return Math.max(lhsTy.width, rhsTy.width) + 1;
-
-    // Extra bit necessary if the respective operand is _unsigned_.
-    int lhsExtraBit = lhsTy.isSigned ? 0 : 1;
-    int rhsExtraBit = rhsTy.isSigned ? 0 : 1;
-    return Math.max(lhsTy.width + lhsExtraBit, rhsTy.width + rhsExtraBit) + 1;
-  }
-
   @Override
   public MLIRValue caseAssignmentExpression(AssignmentExpression assign) {
     var lhs = assign.getTarget();
@@ -255,11 +245,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         type = lhsTy;
         break;
       case "+":
-        type = getType(getAddSubResultWidth(lhsTy, rhsTy),
-                       lhsTy.isSigned | rhsTy.isSigned);
+        type = MLIRType.getAddResultType(lhsTy, rhsTy);
         break;
       case "-":
-        type = getType(getAddSubResultWidth(lhsTy, rhsTy), true);
+        type = MLIRType.getSubResultType(lhsTy, rhsTy);
         break;
       case "*":
         type =

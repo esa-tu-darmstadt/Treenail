@@ -45,5 +45,23 @@ class MLIRType {
     return getType(bits, isNegative);
   }
 
+  private static int getAddSubResultWidth(MLIRType lhsTy, MLIRType rhsTy) {
+    if (lhsTy.isSigned == rhsTy.isSigned)
+      return Math.max(lhsTy.width, rhsTy.width) + 1;
+
+    // Extra bit necessary if the respective operand is _unsigned_.
+    int lhsExtraBit = lhsTy.isSigned ? 0 : 1;
+    int rhsExtraBit = rhsTy.isSigned ? 0 : 1;
+    return Math.max(lhsTy.width + lhsExtraBit, rhsTy.width + rhsExtraBit) + 1;
+  }
+
+  public static MLIRType getAddResultType(MLIRType lhsTy, MLIRType rhsTy) {
+    return getType(getAddSubResultWidth(lhsTy, rhsTy), lhsTy.isSigned | rhsTy.isSigned);
+  }
+
+  public static MLIRType getSubResultType(MLIRType lhsTy, MLIRType rhsTy) {
+    return getType(getAddSubResultWidth(lhsTy, rhsTy), true);
+  }
+
   public String toString() { return (isSigned ? "si" : "ui") + width; }
 }
