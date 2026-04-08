@@ -1031,8 +1031,56 @@ class AppTest {
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
     System.out.println(mlirCode);
-    assertFalse(true);
     // clang-format off
+    // ConstBoundsLT
+    assertTrue(mlirCode.contains("""
+        %10 = hw.constant 0 : i6
+        %11 = hw.constant 20 : i6
+        %12 = hw.constant 1 : i6
+        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i6 {
+          %14 = hwarith.cast %13 : (i6) -> ui6
+          %15 = coredsl.cast %14 : ui6 to ui32
+          %18 = hwarith.add %rs1, %15 : (ui5, ui32) -> ui33
+          %19 = coredsl.cast %18 : ui33 to ui32
+          %17 = coredsl.get @MEM[%19 : ui32] : ui8
+          %20 = hwarith.add %16, %17 : (ui32, ui8) -> ui33
+          %21 = coredsl.cast %20 : ui33 to ui32
+          scf.yield %21 : ui32
+        }
+    """));
+    // ConstBoundsLE
+    assertTrue(mlirCode.contains("""
+        %10 = hw.constant 0 : i6
+        %11 = hw.constant 21 : i6
+        %12 = hw.constant 1 : i6
+        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i6 {
+          %14 = hwarith.cast %13 : (i6) -> ui6
+          %15 = coredsl.cast %14 : ui6 to ui32
+          %18 = hwarith.add %rs1, %15 : (ui5, ui32) -> ui33
+          %19 = coredsl.cast %18 : ui33 to ui32
+          %17 = coredsl.get @MEM[%19 : ui32] : ui8
+          %20 = hwarith.add %16, %17 : (ui32, ui8) -> ui33
+          %21 = coredsl.cast %20 : ui33 to ui32
+          scf.yield %21 : ui32
+        }
+    """));
+    // ConstBoundsStep2
+    assertTrue(mlirCode.contains("""
+        %10 = hw.constant 0 : i6
+        %11 = hw.constant 20 : i6
+        %12 = hw.constant 2 : i6
+        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i6 {
+          %14 = hwarith.cast %13 : (i6) -> ui6
+          %15 = coredsl.cast %14 : ui6 to ui32
+          %18 = hwarith.add %rs1, %15 : (ui5, ui32) -> ui33
+          %19 = coredsl.cast %18 : ui33 to ui32
+          %17 = coredsl.get @MEM[%19 : ui32] : ui8
+          %20 = hwarith.add %16, %17 : (ui32, ui8) -> ui33
+          %21 = coredsl.cast %20 : ui33 to ui32
+          scf.yield %21 : ui32
+        }
+    """));
     // clang-format on
+    assertFalse(true);
   }
 }
