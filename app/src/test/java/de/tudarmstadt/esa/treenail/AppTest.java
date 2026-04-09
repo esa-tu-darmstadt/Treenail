@@ -1080,6 +1080,42 @@ class AppTest {
           scf.yield %21 : ui32
         }
     """));
+    // ConstBoundsGT
+    assertTrue(mlirCode.contains("""
+        %10 = hw.constant -1 : i7
+        %11 = hw.constant 20 : i7
+        %12 = hw.constant 2 : i7
+        %13 = scf.for %13 = %10 to %11 step %12 iter_args(%18 = %9) -> (ui32) : i7 {
+          %14 = hw.constant 0 : i7
+          %15 = comb.sub %14, %13 : i7
+          %16 = hwarith.cast %15 : (i7) -> ui7
+          %17 = coredsl.cast %16 : ui7 to ui32
+          %20 = hwarith.add %rs1, %17 : (ui5, ui32) -> ui33
+          %21 = coredsl.cast %20 : ui33 to ui32
+          %19 = coredsl.get @MEM[%21 : ui32] : ui8
+          %22 = hwarith.add %18, %19 : (ui32, ui8) -> ui33
+          %23 = coredsl.cast %22 : ui33 to ui32
+          scf.yield %23 : ui32
+        }
+    """));
+    // ConstBoundsGE
+    assertTrue(mlirCode.contains("""
+        %10 = hw.constant -1 : i7
+        %11 = hw.constant 21 : i7
+        %12 = hw.constant 2 : i7
+        %13 = scf.for %13 = %10 to %11 step %12 iter_args(%18 = %9) -> (ui32) : i7 {
+          %14 = hw.constant 0 : i7
+          %15 = comb.sub %14, %13 : i7
+          %16 = hwarith.cast %15 : (i7) -> ui7
+          %17 = coredsl.cast %16 : ui7 to ui32
+          %20 = hwarith.add %rs1, %17 : (ui5, ui32) -> ui33
+          %21 = coredsl.cast %20 : ui33 to ui32
+          %19 = coredsl.get @MEM[%21 : ui32] : ui8
+          %22 = hwarith.add %18, %19 : (ui32, ui8) -> ui33
+          %23 = coredsl.cast %22 : ui33 to ui32
+          scf.yield %23 : ui32
+        }
+    """));
     // clang-format on
     assertFalse(true);
   }
