@@ -8,21 +8,17 @@ import static java.util.stream.Collectors.toSet;
 
 import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
-import com.minres.coredsl.analysis.ConstantValue;
 import com.minres.coredsl.analysis.StorageClass;
 import com.minres.coredsl.coreDsl.BreakStatement;
 import com.minres.coredsl.coreDsl.CaseSection;
 import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
-import com.minres.coredsl.coreDsl.DefaultSection;
-import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IfStatement;
-import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ReturnStatement;
 import com.minres.coredsl.coreDsl.SpawnStatement;
@@ -38,12 +34,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
+
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
   private final AnalysisContext ac;
   private final ConstructionContext cc;
   private final ExpressionSwitch exprSwitch;
+
+  static private AtomicInteger switchCount = new AtomicInteger(0);
+
   // For detecting break statements that are in locations other than the end of
   // a SwitchSection, as they are currently unsupported
   private BreakStatement switchEndBreak = null;
@@ -57,6 +57,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   StatementSwitch(ConstructionContext cc, BreakStatement breakStatement) {
     this(cc);
     this.switchEndBreak = breakStatement;
+  }
+
+  // TODO: might be better to do this in ConstructionContext
+  static String getSwitchBBName(String prefix) {
+    return '^' + prefix + '_' + switchCount.get();
   }
 
   @Override
@@ -129,12 +134,13 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     return this;
   }
 
-  record ConditionalResults(String typesString, String returnValsString) {}
   // Resolves updated entities and emits the corresponding yield instructions
   // into the given ConstructionContexts
-  private static ConditionalResults
-  emitYieldsForConditionals(ConstructionContext cc,
-                            List<ConstructionContext> condCCs) {
+  // Returns the inputs to the final basic block as a string
+  private static String
+  emitSwitchFinalBranches(ConstructionContext cc,
+                          List<ConstructionContext> condCCs,
+                          String finalBBName) {
     var updatedEntities = new LinkedHashSet<NamedEntity>();
     // Collect all updated entities
     for (var xCC : condCCs) {
@@ -150,23 +156,27 @@ class StatementSwitch extends CoreDslSwitch<Object> {
                           .map(ac::getDeclaredType)
                           .map(MLIRType::mapType)
                           .toList();
-    final String returnTypesStr =
-        returnTypes.stream().map(Object::toString).collect(joining(", "));
     // Emit yield instructions
     for (var xCC : condCCs) {
       var values = xCC.getValues();
       var yieldValues = updatedEntities.stream().map(values::get).toList();
       var yieldValuesStr =
           yieldValues.stream().map(Object::toString).collect(joining(", "));
-      xCC.emitLn("coredsl.yield %s : %s", yieldValuesStr, returnTypesStr);
+      xCC.emitLn("cf.br %s(%s)", finalBBName, yieldValuesStr);
     }
     var resultValues =
         returnTypes.stream().map(cc::makeAnonymousValue).toList();
     Streams.forEachPair(updatedEntities.stream(), resultValues.stream(),
                         cc::setValue);
-    var returnValsStr =
-        resultValues.stream().map(Object::toString).collect(joining(", "));
-    return new ConditionalResults(returnTypesStr, returnValsStr);
+
+    var builder = new StringBuilder();
+    for (int i = 0; i < resultValues.size(); ++i) {
+      builder.append(resultValues.get(i)).append(": ").append(returnTypes.get(i));
+      if (i != resultValues.size() - 1) {
+        builder.append(", ");
+      }
+    }
+    return builder.toString();
   }
 
   @Override
@@ -182,6 +192,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var condVal = new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
     var sections = switchStmt.getSections();
     var sectionCCs = new ArrayList<ConstructionContext>();
+    var sectionBBNames = new ArrayList<String>();
 
     var values = cc.getValues();
     var counter = cc.getCounter();
@@ -248,6 +259,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     ^end_bb(%res_x, %res_y, %res_z):
       ; Now x = %res_x, y = %res_y, z = %res_z
      */
+    cc.emitLn("cf.switch %s : %s, [", condVal, condVal.type);
     for (var section : sections) {
       var lastStatement = section.getBody().getLast();
       assert lastStatement instanceof BreakStatement
@@ -257,9 +269,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
                                               new AtomicInteger(counter), ac,
                                               new StringBuilder());
-      if (section instanceof DefaultSection) {
+      String valueString;
+      String bbName;
+      if (section instanceof CaseSection caseSection) {
+        var val = ac.getExpressionValue(caseSection.getCondition());
+        valueString = val.toString();
+        bbName = getSwitchBBName("case_" + valueString);
+      } else {
         gotDefaultCase = true;
+        valueString = "default";
+        bbName = getSwitchBBName("default");
       }
+      sectionBBNames.add(bbName);
+      cc.emitLn("  %s: %s,", valueString, bbName);
       // Generate code for body
       for (var stmt : section.getBody()) {
         new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
@@ -273,35 +295,26 @@ class StatementSwitch extends CoreDslSwitch<Object> {
                                               new AtomicInteger(counter), ac,
                                               new StringBuilder());
       sectionCCs.add(defaultCC);
+      var defaultBBName = getSwitchBBName("default");
+      sectionBBNames.add(defaultBBName);
+      // TODO: in this case, we don't need to create a BB I think
+      //  can just go straight to the end bb
+      cc.emitLn("  default: %s,", defaultBBName);
     }
-    var res = emitYieldsForConditionals(cc, sectionCCs);
-    cc.emitLn("%s = coredsl.switch %s : %s -> %s", res.returnValsString,
-              condVal, condVal.type, res.typesString);
+    cc.emitLn("]");
+    var finalBBName = getSwitchBBName("switch_end");
+    var returnValueString = emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
     assert sectionCCs.size() == sections.size() ||
         sectionCCs.size() == sections.size() + 1;
+    assert(sectionCCs.size() == sectionBBNames.size());
     for (int i = 0; i < sectionCCs.size(); ++i) {
       var xCC = sectionCCs.get(i);
       var sectionContent = xCC.getStringBuilder().toString().indent(N_SPACES);
-      // If we added an artificial default case, we will be one past the end of
-      // sections
-      var section = i < sections.size() ? sections.get(i) : null;
-      String sectionCode;
-      if (section instanceof CaseSection caseSection) {
-        var condition = caseSection.getCondition();
-        ConstantValue constantValue = ac.getExpressionValue(condition);
-        assert constantValue.isValid()
-            : ("Parser should error on a non-compile-time value in switch "
-               + "case");
-        BigInteger val = constantValue.getValue();
-        sectionCode = format("case %s {\n%s}", val, sectionContent);
-      } else {
-        assert section == null || section instanceof DefaultSection
-            : "SwitchSection other than CaseSection or DefaultSection: " +
-              section.getClass().getName();
-        sectionCode = format("default {\n%s}", sectionContent);
-      }
-      cc.emitLn("%s", sectionCode.indent(N_SPACES).stripTrailing());
+      String bbName = sectionBBNames.get(i);
+      cc.emitLn("%s():\n%s", bbName, sectionContent.stripTrailing());
     }
+    cc.emitLn("%s(%s):", finalBBName, returnValueString);
+    switchCount.getAndIncrement();
     return this;
   }
 
