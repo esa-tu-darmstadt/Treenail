@@ -127,8 +127,13 @@ class ConstructionContext {
     return result;
   }
 
+  void emit(String format, Object... args) {
+    sb.append(String.format(format, args));
+  }
+
   void emitLn(String format, Object... args) {
-    sb.append(String.format(format, args)).append('\n');
+    emit(format, args);
+    sb.append('\n');
   }
 
   Set<NamedEntity> getUpdatedEntities() {
@@ -141,7 +146,9 @@ class ConstructionContext {
 
   int getValueCounter() { return valueCounter.get(); }
 
-  String getBBName(String prefix) { return '^' + prefix + '_' + bbCounter.get(); }
+  String getBBName(String prefix) {
+    return '^' + prefix + '_' + bbCounter.get();
+  }
 
   boolean getTerminatorWasEmitted() { return terminatorWasEmitted; }
 

@@ -147,29 +147,24 @@ class StatementSwitch extends CoreDslSwitch<Object> {
                           .map(ac::getDeclaredType)
                           .map(MLIRType::mapType)
                           .toList();
+    var returnTypesStr =
+        returnTypes.stream().map(Object::toString).collect(joining(", "));
     // Emit yield instructions
     for (var xCC : condCCs) {
       var values = xCC.getValues();
       var yieldValues = updatedEntities.stream().map(values::get).toList();
       var yieldValuesStr =
           yieldValues.stream().map(Object::toString).collect(joining(", "));
-      xCC.emitLn("cf.br %s(%s)", finalBBName, yieldValuesStr);
+      xCC.emitLn("cf.br %s(%s : %s)", finalBBName, yieldValuesStr,
+                 returnTypesStr);
     }
     var resultValues =
         returnTypes.stream().map(cc::makeAnonymousValue).toList();
     Streams.forEachPair(updatedEntities.stream(), resultValues.stream(),
                         cc::setValue);
-
-    var builder = new StringBuilder();
-    for (int i = 0; i < resultValues.size(); ++i) {
-      builder.append(resultValues.get(i))
-          .append(": ")
-          .append(returnTypes.get(i));
-      if (i != resultValues.size() - 1) {
-        builder.append(", ");
-      }
-    }
-    return builder.toString();
+    return resultValues.stream()
+        .map((MLIRValue val) -> val + ": " + val.type)
+        .collect(joining(", "));
   }
 
   @Override
@@ -249,34 +244,37 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       ; Now x = %res_x, y = %res_y, z = %res_z
      */
     cc.emitLn("cf.switch %s : %s, [", condVal, condVal.type);
+    final var defaultBBName = cc.getBBName("default");
+    // The default case must be the first
+    // TODO: if there is no default case, the default case could just go to the
+    //  final bb immediately
+    cc.emit("  default: %s", defaultBBName);
     boolean gotDefaultCase = false;
     for (var section : sections) {
-      String valueString;
       String bbName;
       if (section instanceof CaseSection caseSection) {
         var val = ac.getExpressionValue(caseSection.getCondition());
-        valueString = val.toString();
+        String valueString = val.toString();
         bbName = cc.getBBName("case_" + valueString);
+        cc.emitLn(", ");
+        cc.emit("  %s: %s", valueString, bbName);
       } else {
         gotDefaultCase = true;
-        valueString = "default";
-        bbName = cc.getBBName("default");
+        bbName = defaultBBName;
       }
       sectionBBNames.add(bbName);
-      cc.emitLn("  %s: %s,", valueString, bbName);
     }
+    final var finalBBName = cc.getBBName("switch_end");
+    // Create the new ConstructionContexts after all BB names have been
+    // assigned to avoid overlap
     if (!gotDefaultCase) {
       // If there is no default case, add an empty one, as index_switch always
       // needs a default case
       var defaultCC = cc.createDerivedCC();
       sectionCCs.add(defaultCC);
-      var defaultBBName = cc.getBBName("default");
       sectionBBNames.add(defaultBBName);
-      // TODO: in this case, we don't need to create a BB I think
-      //  can just go straight to the end bb
-      cc.emitLn("  default: %s,", defaultBBName);
     }
-    // Create the new ccs now, so the counter stays updated
+    cc.emitLn("\n]");
     for (var section : sections) {
       var lastStatement = section.getBody().getLast();
       assert lastStatement instanceof BreakStatement
@@ -288,8 +286,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       }
       sectionCCs.add(sectionCC);
     }
-    cc.emitLn("]");
-    var finalBBName = cc.getBBName("switch_end");
     var returnValueString =
         emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
     assert sectionCCs.size() == sections.size() ||
