@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
@@ -178,21 +179,24 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   @Override
   public Object caseSwitchStatement(SwitchStatement switchStmt) {
     var condVal = new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+    // cf.switch wants signed values
+    if (!condVal.type.isSigned) {
+      var newType = MLIRType.getType(condVal.type.width + 1, true);
+      condVal = cc.makeCast(condVal, newType);
+    }
     var sections = switchStmt.getSections();
     var sectionCCs = new ArrayList<ConstructionContext>();
     var sectionBBNames = new ArrayList<String>();
     /*
     TODO: fallthrough and breaks that are not at the end of case regions
-    - coredsl.switch does not have fallthrough
-    - would need cf dialect to implement fallthrough
     - Problem: breaks in arbitrary positions could still be difficult
       - using cf.br from inside scf.if is not allowed
-        - if (cond) break would not work
-        - would need to reimplement if using cf in that case
-      - Otherwise, could emit %s for all breaks and then format the cf.br
-      instructions in as a final step
-        - Each break would have to record variable state when visited, so the
-        right values can be used in the cf.br later
+        - 'if (cond) break;' would not work
+        - would need to reimplement if statements using cf in that case
+          - Either implement all ifs using cf, or only when inside of a switch
+      - Could store the name of the current break target bb
+        - Because we always create a new StatementSwitch() for each switch
+        case, this would work with nested switch statements as well
     Example code if using cf extension:
     CoreDSL:
     switch (a) {
@@ -210,27 +214,18 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         break;
     }
     MLIR:
-    cf.switch %a : i32, [
-      ; NOTE: to make the implementation simpler, we could have all bbs take
-      ; all modified variables as inputs
+    cf.switch %a : ui32, [
+      default: ^default()
       1: ^case_1(),
       2: ^case_2(),
-      3: ^case_3(%x, i32),
-      4: ^case_4(),
-      default: ^default()
+      3: ^case_3(%x, ui32),
+      4: ^case_4()
     ]
-    ; NOTE: opening new ConstructionContexts (and thereby duplicating variable
-    ; names) for each BB will work here, as MLIR BBs can only read variables
-    ; implicitly from its dominators. As cases in switch statements cannot
-    ; dominate other cases, we won't run into duplicate variable definition
-    ; errors
-    ; All blocks here are dominated by the block before the switch, so they
-    ; can read all variables of that block
     ^case_1():
       cf.br ^case_2()
     ^case_2():
       %new_x = 10
-      cf.br ^case_3(%new_x : i32)
+      cf.br ^case_3(%new_x : ui32)
     ^case_3(%c3_x : i32):
       %new_y = 5
       cf.br ^end_bb(%c3_x, %new_y)
@@ -239,8 +234,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       %new_z = 10
       cf.br ^end_bb(%new_x, %y, %new_z)
     ^default():
-      cf.br ^end_bb(%x, %y, %z)
-    ^end_bb(%res_x, %res_y, %res_z):
+      cf.br ^end_bb(%x, %y, %z : ui32, ui32, ui32)
+    ^end_bb(%res_x : ui32, %res_y : ui32, %res_z : ui32):
       ; Now x = %res_x, y = %res_y, z = %res_z
      */
     cc.emitLn("cf.switch %s : %s, [", condVal, condVal.type);
@@ -267,25 +262,43 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     final var finalBBName = cc.getBBName("switch_end");
     // Create the new ConstructionContexts after all BB names have been
     // assigned to avoid overlap
-    if (!gotDefaultCase) {
-      // If there is no default case, add an empty one, as index_switch always
-      // needs a default case
-      var defaultCC = cc.createDerivedCC();
-      sectionCCs.add(defaultCC);
-      sectionBBNames.add(defaultBBName);
-    }
     cc.emitLn("\n]");
+    var lastCC = cc;
+    // Use the value map from cc (NOT lastCC) throughout the loop, but the
+    // counters from lastCC in order to not have conflicting SSA values
+    // while still using the old value mappings from before the switch
+    final var values = cc.getValues();
     for (var section : sections) {
       var lastStatement = section.getBody().getLast();
       assert lastStatement instanceof BreakStatement
           : "NYI: Fallthrough in switch statement";
       var endBreak = (BreakStatement)lastStatement;
-      var sectionCC = cc.createDerivedCC();
+      var valueCounter = lastCC.getValueCounter();
+      var bbCounter = lastCC.getBBCounter();
+      var sectionCC = new ConstructionContext(
+          new LinkedHashMap<>(values), new AtomicInteger(valueCounter),
+          new AtomicInteger(bbCounter), ac, new StringBuilder());
       for (var stmt : section.getBody()) {
         new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
       }
       sectionCCs.add(sectionCC);
+      lastCC = sectionCC;
     }
+    if (!gotDefaultCase) {
+      // Add the ConstructionContext for the default case now if there is none
+      var valueCounter = lastCC.getValueCounter();
+      var bbCounter = lastCC.getBBCounter();
+      var defaultCC = new ConstructionContext(
+          new LinkedHashMap<>(values), new AtomicInteger(valueCounter),
+          new AtomicInteger(bbCounter), ac, new StringBuilder());
+      sectionCCs.add(defaultCC);
+      lastCC = defaultCC;
+      sectionBBNames.add(defaultBBName);
+    }
+    // Update the counters to avoid duplicate SSA values / BB names without
+    // updating the value mappings
+    cc.setValueCounter(lastCC.getValueCounter());
+    cc.setBBCounter(lastCC.getBBCounter());
     var returnValueString =
         emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
     assert sectionCCs.size() == sections.size() ||
