@@ -76,8 +76,8 @@ InstructionSet SwitchStmt {
                    y += 1;
                    break;
                 default:
-                    y += 2;
-                    break;
+                   y += 2;
+                   break;
               }
               break;
             case 1:
