@@ -407,14 +407,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var hwarithBoolLhs = convertIntToBool(lhs, cc);
       var boolLhs = cc.makeI1Cast(hwarithBoolLhs);
 
-      var values = cc.getValues();
-      var counter = cc.getCounter();
-      var thenCC = new ConstructionContext(new LinkedHashMap<>(values),
-                                           new AtomicInteger(counter), ac,
-                                           new StringBuilder());
-      var elseCC = new ConstructionContext(new LinkedHashMap<>(values),
-                                           new AtomicInteger(counter), ac,
-                                           new StringBuilder());
+      var thenCC = cc.createDerivedCC();
+      var elseCC = cc.createDerivedCC();
       /*
       The logic for outputting both branches of the short-circuiting if for
       '&&' and '||' is equivalent, but the branches are swapped. Thus, assign
@@ -610,16 +604,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var cond = doSwitch(expr.getCondition());
     var cast = cc.makeI1Cast(cond);
 
-    var values = cc.getValues();
-    var counter = cc.getCounter();
-
-    var thenCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
-
-    var elseCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
+    var thenCC = cc.createDerivedCC();
+    var elseCC = cc.createDerivedCC();
 
     var thenResult =
         new ExpressionSwitch(thenCC).doSwitch(expr.getThenExpression());

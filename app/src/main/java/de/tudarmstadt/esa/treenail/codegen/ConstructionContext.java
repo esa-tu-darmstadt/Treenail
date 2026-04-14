@@ -3,13 +3,13 @@ package de.tudarmstadt.esa.treenail.codegen;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.CoreDslConstantExpressionEvaluator;
 import com.minres.coredsl.coreDsl.Expression;
-import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.IntegerType;
 import com.minres.coredsl.util.TypedBigInteger;
 import java.math.BigInteger;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -19,16 +19,19 @@ class ConstructionContext {
   private final Set<NamedEntity> updatedEntities = new LinkedHashSet<>();
 
   private final Map<NamedEntity, MLIRValue> values;
-  private final AtomicInteger counter;
+  private final AtomicInteger valueCounter;
+  private final AtomicInteger bbCounter;
   private final AnalysisContext ac;
   private final StringBuilder sb;
 
   private boolean terminatorWasEmitted = false;
 
-  ConstructionContext(Map<NamedEntity, MLIRValue> values, AtomicInteger counter,
+  ConstructionContext(Map<NamedEntity, MLIRValue> values,
+                      AtomicInteger valueCounter, AtomicInteger bbCounter,
                       AnalysisContext ac, StringBuilder sb) {
     this.values = values;
-    this.counter = counter;
+    this.valueCounter = valueCounter;
+    this.bbCounter = bbCounter;
     this.ac = ac;
     this.sb = sb;
   }
@@ -84,7 +87,8 @@ class ConstructionContext {
   }
 
   MLIRValue makeAnonymousValue(MLIRType type) {
-    return new MLIRValue(Integer.toString(counter.getAndIncrement()), type);
+    return new MLIRValue(Integer.toString(valueCounter.getAndIncrement()),
+                         type);
   }
 
   MLIRValue makeConst(BigInteger value, MLIRType type) {
@@ -135,7 +139,9 @@ class ConstructionContext {
     return Collections.unmodifiableMap(values);
   }
 
-  int getCounter() { return counter.get(); }
+  int getValueCounter() { return valueCounter.get(); }
+
+  String getBBName(String prefix) { return '^' + prefix + bbCounter.get(); }
 
   boolean getTerminatorWasEmitted() { return terminatorWasEmitted; }
 
@@ -144,4 +150,10 @@ class ConstructionContext {
   AnalysisContext getAnalysisContext() { return ac; }
 
   StringBuilder getStringBuilder() { return sb; }
+
+  ConstructionContext createDerivedCC() {
+    return new ConstructionContext(
+        new LinkedHashMap<>(values), new AtomicInteger(valueCounter.get()),
+        new AtomicInteger(bbCounter.get()), ac, new StringBuilder());
+  }
 }

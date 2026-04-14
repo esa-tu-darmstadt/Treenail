@@ -30,19 +30,15 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
-
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
   private final AnalysisContext ac;
   private final ConstructionContext cc;
   private final ExpressionSwitch exprSwitch;
-
-  static private AtomicInteger switchCount = new AtomicInteger(0);
 
   // For detecting break statements that are in locations other than the end of
   // a SwitchSection, as they are currently unsupported
@@ -57,11 +53,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   StatementSwitch(ConstructionContext cc, BreakStatement breakStatement) {
     this(cc);
     this.switchEndBreak = breakStatement;
-  }
-
-  // TODO: might be better to do this in ConstructionContext
-  static String getSwitchBBName(String prefix) {
-    return '^' + prefix + '_' + switchCount.get();
   }
 
   @Override
@@ -171,7 +162,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
     var builder = new StringBuilder();
     for (int i = 0; i < resultValues.size(); ++i) {
-      builder.append(resultValues.get(i)).append(": ").append(returnTypes.get(i));
+      builder.append(resultValues.get(i))
+          .append(": ")
+          .append(returnTypes.get(i));
       if (i != resultValues.size() - 1) {
         builder.append(", ");
       }
@@ -193,10 +186,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var sections = switchStmt.getSections();
     var sectionCCs = new ArrayList<ConstructionContext>();
     var sectionBBNames = new ArrayList<String>();
-
-    var values = cc.getValues();
-    var counter = cc.getCounter();
-    boolean gotDefaultCase = false;
     /*
     TODO: fallthrough and breaks that are not at the end of case regions
     - coredsl.switch does not have fallthrough
@@ -260,53 +249,52 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       ; Now x = %res_x, y = %res_y, z = %res_z
      */
     cc.emitLn("cf.switch %s : %s, [", condVal, condVal.type);
+    boolean gotDefaultCase = false;
     for (var section : sections) {
-      var lastStatement = section.getBody().getLast();
-      assert lastStatement instanceof BreakStatement
-          : "NYI: Fallthrough in switch statement";
-      var endBreak = (BreakStatement)lastStatement;
-
-      var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
-                                              new AtomicInteger(counter), ac,
-                                              new StringBuilder());
       String valueString;
       String bbName;
       if (section instanceof CaseSection caseSection) {
         var val = ac.getExpressionValue(caseSection.getCondition());
         valueString = val.toString();
-        bbName = getSwitchBBName("case_" + valueString);
+        bbName = cc.getBBName("case_" + valueString);
       } else {
         gotDefaultCase = true;
         valueString = "default";
-        bbName = getSwitchBBName("default");
+        bbName = cc.getBBName("default");
       }
       sectionBBNames.add(bbName);
       cc.emitLn("  %s: %s,", valueString, bbName);
-      // Generate code for body
-      for (var stmt : section.getBody()) {
-        new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
-      }
-      sectionCCs.add(sectionCC);
     }
     if (!gotDefaultCase) {
       // If there is no default case, add an empty one, as index_switch always
       // needs a default case
-      var defaultCC = new ConstructionContext(new LinkedHashMap<>(values),
-                                              new AtomicInteger(counter), ac,
-                                              new StringBuilder());
+      var defaultCC = cc.createDerivedCC();
       sectionCCs.add(defaultCC);
-      var defaultBBName = getSwitchBBName("default");
+      var defaultBBName = cc.getBBName("default");
       sectionBBNames.add(defaultBBName);
       // TODO: in this case, we don't need to create a BB I think
       //  can just go straight to the end bb
       cc.emitLn("  default: %s,", defaultBBName);
     }
+    // Create the new ccs now, so the counter stays updated
+    for (var section : sections) {
+      var lastStatement = section.getBody().getLast();
+      assert lastStatement instanceof BreakStatement
+          : "NYI: Fallthrough in switch statement";
+      var endBreak = (BreakStatement)lastStatement;
+      var sectionCC = cc.createDerivedCC();
+      for (var stmt : section.getBody()) {
+        new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
+      }
+      sectionCCs.add(sectionCC);
+    }
     cc.emitLn("]");
-    var finalBBName = getSwitchBBName("switch_end");
-    var returnValueString = emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
+    var finalBBName = cc.getBBName("switch_end");
+    var returnValueString =
+        emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
     assert sectionCCs.size() == sections.size() ||
         sectionCCs.size() == sections.size() + 1;
-    assert(sectionCCs.size() == sectionBBNames.size());
+    assert (sectionCCs.size() == sectionBBNames.size());
     for (int i = 0; i < sectionCCs.size(); ++i) {
       var xCC = sectionCCs.get(i);
       var sectionContent = xCC.getStringBuilder().toString().indent(N_SPACES);
@@ -314,7 +302,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       cc.emitLn("%s():\n%s", bbName, sectionContent.stripTrailing());
     }
     cc.emitLn("%s(%s):", finalBBName, returnValueString);
-    switchCount.getAndIncrement();
     return this;
   }
 
@@ -323,18 +310,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var cond = exprSwitch.doSwitch(ifStmt.getCondition());
     var cast = cc.makeI1Cast(cond);
 
-    var values = cc.getValues();
-    var counter = cc.getCounter();
-
     var hasElse = ifStmt.getElseBody() != null;
 
-    var thenCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
+    var thenCC = cc.createDerivedCC();
 
-    var elseCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
+    var elseCC = cc.createDerivedCC();
 
     new StatementSwitch(thenCC).doSwitch(ifStmt.getThenBody());
     if (hasElse)
@@ -403,9 +383,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   private List<NamedEntity> getLoopCarriedVariables(ForLoop loop) {
     // Simulate construction to find loop-carried values, in lieu of proper
     // analysis.
-    var simCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var simCC = cc.createDerivedCC();
     var simExprSwitch = new ExpressionSwitch(simCC);
     var simStmtSwitch = new StatementSwitch(simCC);
 
@@ -498,9 +476,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var step = cc.makeHWConst(actionAna.step, actualIterType.width);
 
     // This nested construction will be used for the loop body.
-    var forCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var forCC = cc.createDerivedCC();
 
     // Make the iterator available as an ui/si value in the body.
     var iterIndex = forCC.makeAnonymousValue(MLIRType.DUMMY);
@@ -595,13 +571,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // Real construction begins here. See
     // https://mlir.llvm.org/docs/Dialects/SCFDialect/#scfwhile-mlirscfwhileop
     // for the use of "before" and "after" terms.
-    var beforeCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
-
-    var afterCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var beforeCC = cc.createDerivedCC();
+    var afterCC = cc.createDerivedCC();
 
     var argTypes = new LinkedList<MLIRType>();
     var beforeArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
@@ -675,9 +646,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
   @Override
   public Object caseSpawnStatement(SpawnStatement spawn) {
-    var spawnCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var spawnCC = cc.createDerivedCC();
     new StatementSwitch(spawnCC).doSwitch(spawn.getBody());
     spawnCC.emitLn("coredsl.end");
     cc.emitLn("coredsl.spawn {\n%s}",
