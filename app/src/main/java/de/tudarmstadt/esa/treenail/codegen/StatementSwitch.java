@@ -189,14 +189,16 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var sectionBBNames = new ArrayList<String>();
     /*
     TODO: fallthrough and breaks that are not at the end of case regions
+    - Fallthrough will require the BBs to take the values that are changed
+    in a predecessor as an argument
     - Problem: breaks in arbitrary positions could still be difficult
       - using cf.br from inside scf.if is not allowed
         - 'if (cond) break;' would not work
         - would need to reimplement if statements using cf in that case
           - Either implement all ifs using cf, or only when inside of a switch
-      - Could store the name of the current break target bb
-        - Because we always create a new StatementSwitch() for each switch
-        case, this would work with nested switch statements as well
+      - Each break needs to know all possible modified values
+        -> can only emit the cf.br when we are done emitting all BBs
+        -> need to record the current value map for each break
     Example code if using cf extension:
     CoreDSL:
     switch (a) {
@@ -215,11 +217,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     }
     MLIR:
     cf.switch %a : ui32, [
-      default: ^default()
-      1: ^case_1(),
-      2: ^case_2(),
+      default: ^default
+      1: ^case_1,
+      2: ^case_2,
       3: ^case_3(%x, ui32),
-      4: ^case_4()
+      4: ^case_4
     ]
     ^case_1():
       cf.br ^case_2()
@@ -251,8 +253,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         var val = ac.getExpressionValue(caseSection.getCondition());
         String valueString = val.toString();
         bbName = cc.getBBName("case_" + valueString);
-        cc.emitLn(", ");
-        cc.emit("  %s: %s", valueString, bbName);
+        cc.emit(",\n  %s: %s", valueString, bbName);
       } else {
         gotDefaultCase = true;
         bbName = defaultBBName;
@@ -310,6 +311,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       String bbName = sectionBBNames.get(i);
       cc.emitLn("%s():\n%s", bbName, sectionContent.stripTrailing());
     }
+    // TODO: this is weirdly formatted (same indentation as following code)
     cc.emitLn("%s(%s):", finalBBName, returnValueString);
     return this;
   }
