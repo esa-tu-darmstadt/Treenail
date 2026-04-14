@@ -141,7 +141,7 @@ class ConstructionContext {
 
   int getValueCounter() { return valueCounter.get(); }
 
-  String getBBName(String prefix) { return '^' + prefix + bbCounter.get(); }
+  String getBBName(String prefix) { return '^' + prefix + '_' + bbCounter.get(); }
 
   boolean getTerminatorWasEmitted() { return terminatorWasEmitted; }
 
