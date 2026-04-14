@@ -146,8 +146,24 @@ class ConstructionContext {
 
   int getValueCounter() { return valueCounter.get(); }
 
+  int getBBCounter() { return bbCounter.get(); }
+
+  void setValueCounter(int newValue) {
+    assert newValue >= valueCounter.get()
+        : ("Setting the value counter to a smaller value than before is " +
+           "almost certainly a bug");
+    valueCounter.set(newValue);
+  }
+
+  void setBBCounter(int newValue) {
+    assert newValue >= bbCounter.get()
+        : ("Setting the bb counter to a smaller value than before is almost " +
+           "certainly a bug");
+    bbCounter.set(newValue);
+  }
+
   String getBBName(String prefix) {
-    return '^' + prefix + '_' + bbCounter.get();
+    return '^' + prefix + '_' + bbCounter.getAndIncrement();
   }
 
   boolean getTerminatorWasEmitted() { return terminatorWasEmitted; }
