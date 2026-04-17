@@ -284,8 +284,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         x -> x.width + (isActualSigned != x.isSigned ? 1 : 0);
     var minBitWidth = Math.max(getBitWidth.apply(minTypeInit),
                                Math.max(getBitWidth.apply(minTypeStep),
-                                        getBitWidth.apply(minTypeBound))) +
-                      1;
+                                        getBitWidth.apply(minTypeBound)));
     var actualIterType = MLIRType.getType(minBitWidth, isActualSigned);
 
     // For now, only loops with constant bounds/trip counts are supported.
