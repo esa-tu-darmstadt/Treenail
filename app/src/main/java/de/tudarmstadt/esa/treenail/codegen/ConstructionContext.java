@@ -120,6 +120,14 @@ class ConstructionContext {
     return result;
   }
 
+  MLIRValue makeSignlessCast(MLIRValue value, int newWidth) {
+    assert value.type.width <= newWidth : "Possibly unintended truncation";
+    var result = makeAnonymousValue(MLIRType.DUMMY);
+    emitLn("%s = hwarith.cast %s : (%s) -> i%d", result, value, value.type,
+           newWidth);
+    return result;
+  }
+
   MLIRValue makeHWConstCast(MLIRValue value, int inputWidth, MLIRType type) {
     var result = makeAnonymousValue(type);
     emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, value, inputWidth,
@@ -150,15 +158,15 @@ class ConstructionContext {
 
   void setValueCounter(int newValue) {
     assert newValue >= valueCounter.get()
-        : ("Setting the value counter to a smaller value than before is " +
-           "almost certainly a bug");
+        : ("Setting the value counter to a smaller value than before is "
+           + "almost certainly a bug");
     valueCounter.set(newValue);
   }
 
   void setBBCounter(int newValue) {
     assert newValue >= bbCounter.get()
-        : ("Setting the bb counter to a smaller value than before is almost " +
-           "certainly a bug");
+        : ("Setting the bb counter to a smaller value than before is almost "
+           + "certainly a bug");
     bbCounter.set(newValue);
   }
 
