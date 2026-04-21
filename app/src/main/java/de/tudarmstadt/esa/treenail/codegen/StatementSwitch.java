@@ -180,6 +180,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   public Object caseSwitchStatement(SwitchStatement switchStmt) {
     final var condVal =
         new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+    // The case values need to fit into a signed n bit integer, so if we have
+    // an unsigned value, the max value of that type may be a case value,
+    // which is not representable as a n bit signed integer
     final int condWidth =
         condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
     // cf.switch wants signless values
