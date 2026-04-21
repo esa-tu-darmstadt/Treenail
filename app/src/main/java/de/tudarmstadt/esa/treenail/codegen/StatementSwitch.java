@@ -178,12 +178,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
   @Override
   public Object caseSwitchStatement(SwitchStatement switchStmt) {
-    var condVal = new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
-    // cf.switch wants signed values
-    if (!condVal.type.isSigned) {
-      var newType = MLIRType.getType(condVal.type.width + 1, true);
-      condVal = cc.makeCast(condVal, newType);
-    }
+    final var condVal =
+        new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+    final int condWidth =
+        condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
+    // cf.switch wants signless values
+    final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
     var sections = switchStmt.getSections();
     var sectionCCs = new ArrayList<ConstructionContext>();
     var sectionBBNames = new ArrayList<String>();
@@ -240,7 +240,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     ^end_bb(%res_x : ui32, %res_y : ui32, %res_z : ui32):
       ; Now x = %res_x, y = %res_y, z = %res_z
      */
-    cc.emitLn("cf.switch %s : %s, [", condVal, condVal.type);
+    cc.emitLn("cf.switch %s : i%d, [", condValSignless, condWidth);
     final var defaultBBName = cc.getBBName("default");
     // The default case must be the first
     // TODO: if there is no default case, the default case could just go to the
