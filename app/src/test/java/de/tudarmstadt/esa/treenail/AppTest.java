@@ -844,8 +844,8 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5 = coredsl.cast %rs2 : ui5 to si6
-          cf.switch %5 : si6, [
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          cf.switch %5 : i6, [
             default: ^default_0,
             0: ^case_0_1,
             1: ^case_1_2,
@@ -886,8 +886,8 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5 = coredsl.cast %rs2 : ui5 to si6
-          cf.switch %5 : si6, [
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          cf.switch %5 : i6, [
             default: ^default_0,
             0: ^case_0_1,
             1: ^case_1_2,
@@ -922,8 +922,8 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5 = coredsl.cast %rs2 : ui5 to si6
-          cf.switch %5 : si6, [
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          cf.switch %5 : i6, [
             default: ^default_0,
             0: ^case_0_1,
             1: ^case_1_2,
@@ -931,8 +931,8 @@ class AppTest {
             3: ^case_3_4
           ]
           ^case_0_1():
-            %6 = coredsl.cast %rd : ui5 to si6
-            cf.switch %6 : si6, [
+            %6 = hwarith.cast %rd : (ui5) -> i6
+            cf.switch %6 : i6, [
               default: ^default_6,
               16: ^case_16_7,
               2: ^case_2_8
@@ -973,6 +973,6 @@ class AppTest {
           coredsl.set @MEM[1:0] = %23 : ui16
           coredsl.set @MEM[2] = %25 : ui8
       """));
-// clang-format on
-}
+    // clang-format on
+  }
 }
