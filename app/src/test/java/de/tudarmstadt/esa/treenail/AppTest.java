@@ -847,35 +847,35 @@ class AppTest {
           %5 = hwarith.cast %rs2 : (ui5) -> i6
           %6, %7, %8 = scf.execute_region -> ui32, ui16, ui8 {
             cf.switch %5 : i6, [
-              default: ^default_0,
-              0: ^case_0_1,
-              1: ^case_1_2,
-              2: ^case_2_3,
-              3: ^case_3_4
+              default: ^default,
+              0: ^case_0,
+              1: ^case_1,
+              2: ^case_2,
+              3: ^case_3
             ]
-            ^case_0_1():
-              cf.br ^switch_end_5(%2, %3, %4 : ui32, ui16, ui8)
-            ^case_1_2():
+            ^case_0():
+              cf.br ^switch_end(%2, %3, %4 : ui32, ui16, ui8)
+            ^case_1():
               %6 = hwarith.constant 10 : ui4
               %7 = coredsl.cast %6 : ui4 to ui32
-              cf.br ^switch_end_5(%7, %3, %4 : ui32, ui16, ui8)
-            ^case_2_3():
+              cf.br ^switch_end(%7, %3, %4 : ui32, ui16, ui8)
+            ^case_2():
               %8 = hwarith.constant 5 : ui3
               %9 = coredsl.cast %8 : ui3 to ui16
-              cf.br ^switch_end_5(%2, %9, %4 : ui32, ui16, ui8)
-            ^case_3_4():
+              cf.br ^switch_end(%2, %9, %4 : ui32, ui16, ui8)
+            ^case_3():
               %10 = hwarith.constant 7 : ui3
               %11 = coredsl.cast %10 : ui3 to ui8
-              cf.br ^switch_end_5(%2, %3, %11 : ui32, ui16, ui8)
-            ^default_0():
+              cf.br ^switch_end(%2, %3, %11 : ui32, ui16, ui8)
+            ^default():
               %12 = hwarith.constant 1 : ui1
               %13 = coredsl.cast %12 : ui1 to ui32
               %14 = hwarith.constant 1 : ui1
               %15 = coredsl.cast %14 : ui1 to ui16
               %16 = hwarith.constant 1 : ui1
               %17 = coredsl.cast %16 : ui1 to ui8
-              cf.br ^switch_end_5(%13, %15, %17 : ui32, ui16, ui8)
-            ^switch_end_5(%18: ui32, %19: ui16, %20: ui8):
+              cf.br ^switch_end(%13, %15, %17 : ui32, ui16, ui8)
+            ^switch_end(%18: ui32, %19: ui16, %20: ui8):
               scf.yield %18, %19, %20 : ui32, ui16, ui8
           }
           coredsl.set @X[%rs1 : ui5] = %6 : ui32
@@ -892,29 +892,29 @@ class AppTest {
           %5 = hwarith.cast %rs2 : (ui5) -> i6
           %6, %7, %8 = scf.execute_region -> ui32, ui16, ui8 {
             cf.switch %5 : i6, [
-              default: ^default_0,
-              0: ^case_0_1,
-              1: ^case_1_2,
-              2: ^case_2_3,
-              3: ^case_3_4
+              default: ^default,
+              0: ^case_0,
+              1: ^case_1,
+              2: ^case_2,
+              3: ^case_3
             ]
-            ^case_0_1():
-              cf.br ^switch_end_5(%2, %3, %4 : ui32, ui16, ui8)
-            ^case_1_2():
+            ^case_0():
+              cf.br ^switch_end(%2, %3, %4 : ui32, ui16, ui8)
+            ^case_1():
               %6 = hwarith.constant 10 : ui4
               %7 = coredsl.cast %6 : ui4 to ui32
-              cf.br ^switch_end_5(%7, %3, %4 : ui32, ui16, ui8)
-            ^case_2_3():
+              cf.br ^switch_end(%7, %3, %4 : ui32, ui16, ui8)
+            ^case_2():
               %8 = hwarith.constant 5 : ui3
               %9 = coredsl.cast %8 : ui3 to ui16
-              cf.br ^switch_end_5(%2, %9, %4 : ui32, ui16, ui8)
-            ^case_3_4():
+              cf.br ^switch_end(%2, %9, %4 : ui32, ui16, ui8)
+            ^case_3():
               %10 = hwarith.constant 7 : ui3
               %11 = coredsl.cast %10 : ui3 to ui8
-              cf.br ^switch_end_5(%2, %3, %11 : ui32, ui16, ui8)
-            ^default_0():
-              cf.br ^switch_end_5(%2, %3, %4 : ui32, ui16, ui8)
-            ^switch_end_5(%12: ui32, %13: ui16, %14: ui8):
+              cf.br ^switch_end(%2, %3, %11 : ui32, ui16, ui8)
+            ^default():
+              cf.br ^switch_end(%2, %3, %4 : ui32, ui16, ui8)
+            ^switch_end(%12: ui32, %13: ui16, %14: ui8):
               scf.yield %12, %13, %14 : ui32, ui16, ui8
           }
           coredsl.set @X[%rs1 : ui5] = %6 : ui32
@@ -931,54 +931,54 @@ class AppTest {
           %5 = hwarith.cast %rs2 : (ui5) -> i6
           %6, %7, %8 = scf.execute_region -> ui16, ui32, ui8 {
             cf.switch %5 : i6, [
-              default: ^default_0,
-              0: ^case_0_1,
-              1: ^case_1_2,
-              2: ^case_2_3,
-              3: ^case_3_4
+              default: ^default,
+              0: ^case_0,
+              1: ^case_1,
+              2: ^case_2,
+              3: ^case_3
             ]
-            ^case_0_1():
+            ^case_0():
               %6 = hwarith.cast %rd : (ui5) -> i6
               %7 = scf.execute_region -> ui16 {
                 cf.switch %6 : i6, [
-                  default: ^default_6,
-                  16: ^case_16_7,
-                  2: ^case_2_8
+                  default: ^default,
+                  16: ^case_16,
+                  2: ^case_2
                 ]
-                ^case_16_7():
+                ^case_16():
                   %7 = hwarith.constant 1 : ui1
                   %8 = hwarith.sub %3, %7 : (ui16, ui1) -> si17
                   %9 = coredsl.cast %8 : si17 to ui16
-                  cf.br ^switch_end_9(%9 : ui16)
-                ^case_2_8():
+                  cf.br ^switch_end(%9 : ui16)
+                ^case_2():
                   %10 = hwarith.constant 1 : ui1
                   %11 = hwarith.add %3, %10 : (ui16, ui1) -> ui17
                   %12 = coredsl.cast %11 : ui17 to ui16
-                  cf.br ^switch_end_9(%12 : ui16)
-                ^default_6():
+                  cf.br ^switch_end(%12 : ui16)
+                ^default():
                   %13 = hwarith.constant 2 : ui2
                   %14 = hwarith.add %3, %13 : (ui16, ui2) -> ui17
                   %15 = coredsl.cast %14 : ui17 to ui16
-                  cf.br ^switch_end_9(%15 : ui16)
-                ^switch_end_9(%16: ui16):
+                  cf.br ^switch_end(%15 : ui16)
+                ^switch_end(%16: ui16):
                   scf.yield %16 : ui16
               }
-              cf.br ^switch_end_5(%7, %2, %4 : ui16, ui32, ui8)
-            ^case_1_2():
+              cf.br ^switch_end(%7, %2, %4 : ui16, ui32, ui8)
+            ^case_1():
               %8 = hwarith.constant 10 : ui4
               %9 = coredsl.cast %8 : ui4 to ui32
-              cf.br ^switch_end_5(%3, %9, %4 : ui16, ui32, ui8)
-            ^case_2_3():
+              cf.br ^switch_end(%3, %9, %4 : ui16, ui32, ui8)
+            ^case_2():
               %10 = hwarith.constant 5 : ui3
               %11 = coredsl.cast %10 : ui3 to ui16
-              cf.br ^switch_end_5(%11, %2, %4 : ui16, ui32, ui8)
-            ^case_3_4():
+              cf.br ^switch_end(%11, %2, %4 : ui16, ui32, ui8)
+            ^case_3():
               %12 = hwarith.constant 7 : ui3
               %13 = coredsl.cast %12 : ui3 to ui8
-              cf.br ^switch_end_5(%3, %2, %13 : ui16, ui32, ui8)
-            ^default_0():
-              cf.br ^switch_end_5(%3, %2, %4 : ui16, ui32, ui8)
-            ^switch_end_5(%14: ui16, %15: ui32, %16: ui8):
+              cf.br ^switch_end(%3, %2, %13 : ui16, ui32, ui8)
+            ^default():
+              cf.br ^switch_end(%3, %2, %4 : ui16, ui32, ui8)
+            ^switch_end(%14: ui16, %15: ui32, %16: ui8):
               scf.yield %14, %15, %16 : ui16, ui32, ui8
           }
           coredsl.set @X[%rs1 : ui5] = %7 : ui32
