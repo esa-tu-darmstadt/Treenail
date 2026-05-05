@@ -14,6 +14,7 @@ import com.minres.coredsl.coreDsl.CaseSection;
 import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
+import com.minres.coredsl.coreDsl.DefaultSection;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
@@ -182,7 +183,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
     // The case values need to fit into a signed n bit integer, so if we have
     // an unsigned value, the max value of that type may be a case value,
-    // which is not representable as a n bit signed integer
+    // which is not representable as n bit signed integer
     final int condWidth =
         condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
     // cf.switch wants signless values
@@ -190,6 +191,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var sections = switchStmt.getSections();
     var sectionCCs = new ArrayList<ConstructionContext>();
     var sectionBBNames = new ArrayList<String>();
+    var sectionValStrings = new ArrayList<String>();
     /*
     TODO: fallthrough and breaks that are not at the end of case regions
     - Fallthrough will require the BBs to take the values that are changed
@@ -243,30 +245,30 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     ^end_bb(%res_x : ui32, %res_y : ui32, %res_z : ui32):
       ; Now x = %res_x, y = %res_y, z = %res_z
      */
-    cc.emitLn("cf.switch %s : i%d, [", condValSignless, condWidth);
     final var defaultBBName = cc.getBBName("default");
     // The default case must be the first
     // TODO: if there is no default case, the default case could just go to the
     //  final bb immediately
-    cc.emit("  default: %s", defaultBBName);
     boolean gotDefaultCase = false;
     for (var section : sections) {
       String bbName;
+      String valueString;
       if (section instanceof CaseSection caseSection) {
         var val = ac.getExpressionValue(caseSection.getCondition());
-        String valueString = val.toString();
+        valueString = val.toString();
         bbName = cc.getBBName("case_" + valueString);
-        cc.emit(",\n  %s: %s", valueString, bbName);
       } else {
+        assert section instanceof DefaultSection;
+        valueString = null;
         gotDefaultCase = true;
         bbName = defaultBBName;
       }
       sectionBBNames.add(bbName);
+      sectionValStrings.add(valueString);
     }
     final var finalBBName = cc.getBBName("switch_end");
     // Create the new ConstructionContexts after all BB names have been
     // assigned to avoid overlap
-    cc.emitLn("\n]");
     var lastCC = cc;
     // Use the value map from cc (NOT lastCC) throughout the loop, but the
     // counters from lastCC in order to not have conflicting SSA values
@@ -299,8 +301,21 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       lastCC = defaultCC;
       sectionBBNames.add(defaultBBName);
     }
+    // TODO: need to put cf.switch into a scf.execute_region
+    cc.emitLn("cf.switch %s : i%d, [", condValSignless, condWidth);
+    cc.emit("  default: %s", defaultBBName);
+    for (int i = 0; i < sectionValStrings.size(); ++i) {
+      String valueString = sectionValStrings.get(i);
+      // Skip default block because it always goes first
+      if (valueString == null)
+        continue;
+      String bbName = sectionBBNames.get(i);
+      cc.emit(",\n  %s: %s", valueString, bbName);
+    }
+    cc.emitLn("\n]");
     // Update the counters to avoid duplicate SSA values / BB names without
     // updating the value mappings
+    // TODO: with execute_region, the new values stay private to the inner CCs
     cc.setValueCounter(lastCC.getValueCounter());
     cc.setBBCounter(lastCC.getBBCounter());
     var returnValueString =
@@ -316,6 +331,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     }
     // TODO: this is weirdly formatted (same indentation as following code)
     cc.emitLn("%s(%s):", finalBBName, returnValueString);
+    // TODO: emit yield and closing bracket for execute_region
     return this;
   }
 
