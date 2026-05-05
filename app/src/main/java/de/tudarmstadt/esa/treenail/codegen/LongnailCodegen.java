@@ -408,8 +408,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                              Map<NamedEntity, MLIRValue> values,
                              String fallbackTerminator) {
     var sb = new StringBuilder();
-    var cc = new ConstructionContext(values, new AtomicInteger(0),
-                                     new AtomicInteger(0), ctx, sb);
+    var cc = new ConstructionContext(values, new AtomicInteger(0), ctx, sb);
     new StatementSwitch(cc).doSwitch(behavior);
     if (!cc.getTerminatorWasEmitted())
       cc.emitLn(fallbackTerminator);
