@@ -316,8 +316,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     if (gotDefaultCase) {
       cc.emit("    default: %s", defaultBBName);
     } else {
-      String finalBBInputs = oldReturnValues.stream().map(Object::toString).collect(joining(", "));
-      cc.emit("    default: %s(%s : %s)", finalBBName, finalBBInputs, returnTypeString);
+      String finalBBInputs =
+          oldReturnValues.stream().map(Object::toString).collect(joining(", "));
+      cc.emit("    default: %s(%s : %s)", finalBBName, finalBBInputs,
+              returnTypeString);
     }
     assert sectionBBNames.size() == sectionValStrings.size();
     for (int i = 0; i < sectionValStrings.size(); ++i) {
