@@ -184,33 +184,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
   @Override
   public Object caseSwitchStatement(SwitchStatement switchStmt) {
-    final var condVal =
-        new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
-    // The case values need to fit into a signed n bit integer, so if we have
-    // an unsigned value, the max value of that type may be a case value,
-    // which is not representable as n bit signed integer
-    final int condWidth =
-        condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
-    // TODO: could move condValSignless into the execute_region region as well
-    // cf.switch wants signless values
-    final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
-    var sections = switchStmt.getSections();
-    var sectionCCs = new ArrayList<ConstructionContext>();
-    var sectionBBNames = new ArrayList<String>();
-    var sectionValStrings = new ArrayList<String>();
     /*
     TODO: fallthrough and breaks that are not at the end of case regions
-    - Fallthrough will require the BBs to take the values that are changed
-    in a predecessor as an argument
+    - Fallthrough will require the BBs to take the values that may be changed
+      in a previous case block as an argument
     - Problem: breaks in arbitrary positions could still be difficult
       - using cf.br from inside scf.if is not allowed
         - 'if (cond) break;' would not work
         - would need to reimplement if statements using cf in that case
           - Either implement all ifs using cf, or only when inside of a switch
       - Each break needs to know all possible modified values
-        -> can only emit the cf.br when we are done emitting all BBs
-        -> need to record the current value map for each break
-    Example code if using cf extension:
+        -> can only emit the cf.br after emitting all BBs
+        -> need to record the current updatedValues for each break
+    Example code:
     CoreDSL:
     switch (a) {
       case 1:
@@ -227,7 +213,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         break;
     }
     MLIR:
-    TODO: Update this to use scf.execute_region
     cf.switch %a : ui32, [
       default: ^default
       1: ^case_1,
@@ -250,8 +235,22 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     ^default():
       cf.br ^end_bb(%x, %y, %z : ui32, ui32, ui32)
     ^end_bb(%res_x : ui32, %res_y : ui32, %res_z : ui32):
-      ; Now x = %res_x, y = %res_y, z = %res_z
+      scf.yield %res_x, %res_y, %res_z : ui32, ui32, ui32
      */
+    final var condVal =
+        new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+    // The case values need to fit into a signed n bit integer, so if we have
+    // an unsigned value, the max value of that type may be a case value,
+    // which is not representable as n bit signed integer
+    final int condWidth =
+        condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
+    // TODO: could move condValSignless into the execute_region region as well
+    // cf.switch wants signless values
+    final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
+    var sections = switchStmt.getSections();
+    var sectionCCs = new ArrayList<ConstructionContext>();
+    var sectionBBNames = new ArrayList<String>();
+    var sectionValStrings = new ArrayList<String>();
     // We don't need unique names for the basic blocks because each switch
     // statement is within an scf.execute_region call and basic blocks are
     // only visible in the same region
