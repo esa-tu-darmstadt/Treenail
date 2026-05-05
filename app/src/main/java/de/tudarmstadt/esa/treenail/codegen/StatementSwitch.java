@@ -127,10 +127,16 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     return this;
   }
 
+  private record SwitchFinalBranchesRes(
+      LinkedHashSet<NamedEntity> updatedEntities, List<MLIRType> returnTypes,
+      String returnTypesString,
+      // The values representing the updated entities after the switch is done
+      List<MLIRValue> resultValues) {}
+
   // Resolves updated entities and emits the corresponding yield instructions
   // into the given ConstructionContexts
   // Returns the inputs to the final basic block as a string
-  private static String
+  private static SwitchFinalBranchesRes
   emitSwitchFinalBranches(ConstructionContext cc,
                           List<ConstructionContext> condCCs,
                           String finalBBName) {
@@ -151,7 +157,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
                           .toList();
     var returnTypesStr =
         returnTypes.stream().map(Object::toString).collect(joining(", "));
-    // Emit yield instructions
+    // Emit branches to final BB
     for (var xCC : condCCs) {
       var values = xCC.getValues();
       var yieldValues = updatedEntities.stream().map(values::get).toList();
@@ -160,13 +166,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       xCC.emitLn("cf.br %s(%s : %s)", finalBBName, yieldValuesStr,
                  returnTypesStr);
     }
-    var resultValues =
-        returnTypes.stream().map(cc::makeAnonymousValue).toList();
-    Streams.forEachPair(updatedEntities.stream(), resultValues.stream(),
-                        cc::setValue);
-    return resultValues.stream()
-        .map((MLIRValue val) -> val + ": " + val.type)
-        .collect(joining(", "));
+    // Input values to the final cc which will immediately be yielded
+    var resultValues = returnTypes.stream()
+                           .map(condCCs.getLast()::makeAnonymousValue)
+                           .toList();
+    return new SwitchFinalBranchesRes(updatedEntities, returnTypes,
+                                      returnTypesStr, resultValues);
   }
 
   @Override
@@ -186,6 +191,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // which is not representable as n bit signed integer
     final int condWidth =
         condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
+    // TODO: could move condValSignless into teh execute_region region as well
     // cf.switch wants signless values
     final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
     var sections = switchStmt.getSections();
@@ -256,6 +262,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       if (section instanceof CaseSection caseSection) {
         var val = ac.getExpressionValue(caseSection.getCondition());
         valueString = val.toString();
+        // TODO: because of scf.execute_region, we don't really need unique bb
+        // names anymore
         bbName = cc.getBBName("case_" + valueString);
       } else {
         assert section instanceof DefaultSection;
@@ -298,40 +306,58 @@ class StatementSwitch extends CoreDslSwitch<Object> {
           new LinkedHashMap<>(values), new AtomicInteger(valueCounter),
           new AtomicInteger(bbCounter), ac, new StringBuilder());
       sectionCCs.add(defaultCC);
+      // TODO: is this useless?
       lastCC = defaultCC;
       sectionBBNames.add(defaultBBName);
     }
-    // TODO: need to put cf.switch into a scf.execute_region
-    cc.emitLn("cf.switch %s : i%d, [", condValSignless, condWidth);
-    cc.emit("  default: %s", defaultBBName);
+    var finalBranchesRes = emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
+    var returnTypes = finalBranchesRes.returnTypes;
+    var updatedEntities = finalBranchesRes.updatedEntities;
+    String returnTypeString = finalBranchesRes.returnTypesString;
+    var returnValues =
+        returnTypes.stream().map(cc::makeAnonymousValue).toList();
+    Streams.forEachPair(updatedEntities.stream(), returnValues.stream(),
+                        cc::setValue);
+    String returnValuesString =
+        returnValues.stream().map(Object::toString).collect(joining(", "));
+    // We need to use scf.execute_region, as the child regions of scf
+    // operations require the region to only consist of one block.
+    // This is not required for top-level switch statements, but it's easier to
+    // do this in a uniform way
+    cc.emitLn("%s = scf.execute_region -> %s {", returnValuesString,
+              returnTypeString);
+    cc.emitLn("  cf.switch %s : i%d, [", condValSignless, condWidth);
+    cc.emit("    default: %s", defaultBBName);
+    assert sectionBBNames.size() >= sectionValStrings.size();
     for (int i = 0; i < sectionValStrings.size(); ++i) {
       String valueString = sectionValStrings.get(i);
       // Skip default block because it always goes first
       if (valueString == null)
         continue;
       String bbName = sectionBBNames.get(i);
-      cc.emit(",\n  %s: %s", valueString, bbName);
+      cc.emit(",\n    %s: %s", valueString, bbName);
     }
-    cc.emitLn("\n]");
-    // Update the counters to avoid duplicate SSA values / BB names without
-    // updating the value mappings
-    // TODO: with execute_region, the new values stay private to the inner CCs
-    cc.setValueCounter(lastCC.getValueCounter());
-    cc.setBBCounter(lastCC.getBBCounter());
-    var returnValueString =
-        emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
+    cc.emitLn("\n  ]");
     assert sectionCCs.size() == sections.size() ||
         sectionCCs.size() == sections.size() + 1;
     assert (sectionCCs.size() == sectionBBNames.size());
     for (int i = 0; i < sectionCCs.size(); ++i) {
       var xCC = sectionCCs.get(i);
-      var sectionContent = xCC.getStringBuilder().toString().indent(N_SPACES);
+      var sectionContent =
+          xCC.getStringBuilder().toString().indent(N_SPACES * 2);
       String bbName = sectionBBNames.get(i);
-      cc.emitLn("%s():\n%s", bbName, sectionContent.stripTrailing());
+      cc.emitLn("  %s():\n%s", bbName, sectionContent.stripTrailing());
     }
-    // TODO: this is weirdly formatted (same indentation as following code)
-    cc.emitLn("%s(%s):", finalBBName, returnValueString);
-    // TODO: emit yield and closing bracket for execute_region
+    final var yieldValues = finalBranchesRes.resultValues;
+    String typedYieldedValueString =
+        yieldValues.stream()
+            .map((MLIRValue val) -> val.toString() + ": " + val.type.toString())
+            .collect(joining(", "));
+    cc.emitLn("  %s(%s):", finalBBName, typedYieldedValueString);
+    String yieldedValueString =
+        yieldValues.stream().map(Object::toString).collect(joining(", "));
+    cc.emitLn("    scf.yield %s : %s", yieldedValueString, returnTypeString);
+    cc.emitLn("}");
     return this;
   }
 
