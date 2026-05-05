@@ -845,7 +845,7 @@ class AppTest {
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
           %5 = hwarith.cast %rs2 : (ui5) -> i6
-          %6, %7, %8 = scf.execute_region -> ui32, ui16, ui8 {
+          %6, %7, %8 = scf.execute_region -> (ui32, ui16, ui8) {
             cf.switch %5 : i6, [
               default: ^default,
               0: ^case_0,
@@ -890,9 +890,9 @@ class AppTest {
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
           %5 = hwarith.cast %rs2 : (ui5) -> i6
-          %6, %7, %8 = scf.execute_region -> ui32, ui16, ui8 {
+          %6, %7, %8 = scf.execute_region -> (ui32, ui16, ui8) {
             cf.switch %5 : i6, [
-              default: ^default,
+              default: ^switch_end(%2, %3, %4 : ui32, ui16, ui8),
               0: ^case_0,
               1: ^case_1,
               2: ^case_2,
@@ -912,8 +912,6 @@ class AppTest {
               %10 = hwarith.constant 7 : ui3
               %11 = coredsl.cast %10 : ui3 to ui8
               cf.br ^switch_end(%2, %3, %11 : ui32, ui16, ui8)
-            ^default():
-              cf.br ^switch_end(%2, %3, %4 : ui32, ui16, ui8)
             ^switch_end(%12: ui32, %13: ui16, %14: ui8):
               scf.yield %12, %13, %14 : ui32, ui16, ui8
           }
@@ -929,9 +927,9 @@ class AppTest {
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
           %5 = hwarith.cast %rs2 : (ui5) -> i6
-          %6, %7, %8 = scf.execute_region -> ui16, ui32, ui8 {
+          %6, %7, %8 = scf.execute_region -> (ui16, ui32, ui8) {
             cf.switch %5 : i6, [
-              default: ^default,
+              default: ^switch_end(%3, %2, %4 : ui16, ui32, ui8),
               0: ^case_0,
               1: ^case_1,
               2: ^case_2,
@@ -939,7 +937,7 @@ class AppTest {
             ]
             ^case_0():
               %6 = hwarith.cast %rd : (ui5) -> i6
-              %7 = scf.execute_region -> ui16 {
+              %7 = scf.execute_region -> (ui16) {
                 cf.switch %6 : i6, [
                   default: ^default,
                   16: ^case_16,
@@ -976,8 +974,6 @@ class AppTest {
               %12 = hwarith.constant 7 : ui3
               %13 = coredsl.cast %12 : ui3 to ui8
               cf.br ^switch_end(%3, %2, %13 : ui16, ui32, ui8)
-            ^default():
-              cf.br ^switch_end(%3, %2, %4 : ui16, ui32, ui8)
             ^switch_end(%14: ui16, %15: ui32, %16: ui8):
               scf.yield %14, %15, %16 : ui16, ui32, ui8
           }
