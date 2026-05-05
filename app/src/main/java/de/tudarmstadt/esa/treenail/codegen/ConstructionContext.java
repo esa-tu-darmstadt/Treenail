@@ -20,18 +20,16 @@ class ConstructionContext {
 
   private final Map<NamedEntity, MLIRValue> values;
   private final AtomicInteger valueCounter;
-  private final AtomicInteger bbCounter;
   private final AnalysisContext ac;
   private final StringBuilder sb;
 
   private boolean terminatorWasEmitted = false;
 
   ConstructionContext(Map<NamedEntity, MLIRValue> values,
-                      AtomicInteger valueCounter, AtomicInteger bbCounter,
-                      AnalysisContext ac, StringBuilder sb) {
+                      AtomicInteger valueCounter, AnalysisContext ac,
+                      StringBuilder sb) {
     this.values = values;
     this.valueCounter = valueCounter;
-    this.bbCounter = bbCounter;
     this.ac = ac;
     this.sb = sb;
   }
@@ -154,26 +152,6 @@ class ConstructionContext {
 
   int getValueCounter() { return valueCounter.get(); }
 
-  int getBBCounter() { return bbCounter.get(); }
-
-  void setValueCounter(int newValue) {
-    assert newValue >= valueCounter.get()
-        : ("Setting the value counter to a smaller value than before is "
-           + "almost certainly a bug");
-    valueCounter.set(newValue);
-  }
-
-  void setBBCounter(int newValue) {
-    assert newValue >= bbCounter.get()
-        : ("Setting the bb counter to a smaller value than before is almost "
-           + "certainly a bug");
-    bbCounter.set(newValue);
-  }
-
-  String getBBName(String prefix) {
-    return '^' + prefix + '_' + bbCounter.getAndIncrement();
-  }
-
   boolean getTerminatorWasEmitted() { return terminatorWasEmitted; }
 
   void setTerminatorWasEmitted() { terminatorWasEmitted = true; }
@@ -183,8 +161,8 @@ class ConstructionContext {
   StringBuilder getStringBuilder() { return sb; }
 
   ConstructionContext createDerivedCC() {
-    return new ConstructionContext(
-        new LinkedHashMap<>(values), new AtomicInteger(valueCounter.get()),
-        new AtomicInteger(bbCounter.get()), ac, new StringBuilder());
+    return new ConstructionContext(new LinkedHashMap<>(values),
+                                   new AtomicInteger(valueCounter.get()), ac,
+                                   new StringBuilder());
   }
 }
