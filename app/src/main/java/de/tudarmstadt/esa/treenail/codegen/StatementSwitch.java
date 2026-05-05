@@ -191,7 +191,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // which is not representable as n bit signed integer
     final int condWidth =
         condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
-    // TODO: could move condValSignless into teh execute_region region as well
+    // TODO: could move condValSignless into the execute_region region as well
     // cf.switch wants signless values
     final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
     var sections = switchStmt.getSections();
@@ -227,6 +227,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         break;
     }
     MLIR:
+    TODO: Update this to use scf.execute_region
     cf.switch %a : ui32, [
       default: ^default
       1: ^case_1,
@@ -251,7 +252,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     ^end_bb(%res_x : ui32, %res_y : ui32, %res_z : ui32):
       ; Now x = %res_x, y = %res_y, z = %res_z
      */
-    final var defaultBBName = cc.getBBName("default");
+    // We don't need unique names for the basic blocks because each switch
+    // statement is within an scf.execute_region call and basic blocks are
+    // only visible in the same region
+    final var defaultBBName = "^default";
     // The default case must be the first
     // TODO: if there is no default case, the default case could just go to the
     //  final bb immediately
@@ -262,9 +266,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       if (section instanceof CaseSection caseSection) {
         var val = ac.getExpressionValue(caseSection.getCondition());
         valueString = val.toString();
-        // TODO: because of scf.execute_region, we don't really need unique bb
-        // names anymore
-        bbName = cc.getBBName("case_" + valueString);
+        bbName = "^case_" + valueString;
       } else {
         assert section instanceof DefaultSection;
         valueString = null;
@@ -274,9 +276,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       sectionBBNames.add(bbName);
       sectionValStrings.add(valueString);
     }
-    final var finalBBName = cc.getBBName("switch_end");
-    // Create the new ConstructionContexts after all BB names have been
-    // assigned to avoid overlap
+    final var finalBBName = "^switch_end";
     var lastCC = cc;
     // Use the value map from cc (NOT lastCC) throughout the loop, but the
     // counters from lastCC in order to not have conflicting SSA values
@@ -288,10 +288,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
           : "NYI: Fallthrough in switch statement";
       var endBreak = (BreakStatement)lastStatement;
       var valueCounter = lastCC.getValueCounter();
-      var bbCounter = lastCC.getBBCounter();
-      var sectionCC = new ConstructionContext(
-          new LinkedHashMap<>(values), new AtomicInteger(valueCounter),
-          new AtomicInteger(bbCounter), ac, new StringBuilder());
+      var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
+                                              new AtomicInteger(valueCounter),
+                                              ac, new StringBuilder());
       for (var stmt : section.getBody()) {
         new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
       }
@@ -301,10 +300,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     if (!gotDefaultCase) {
       // Add the ConstructionContext for the default case now if there is none
       var valueCounter = lastCC.getValueCounter();
-      var bbCounter = lastCC.getBBCounter();
-      var defaultCC = new ConstructionContext(
-          new LinkedHashMap<>(values), new AtomicInteger(valueCounter),
-          new AtomicInteger(bbCounter), ac, new StringBuilder());
+      var defaultCC = new ConstructionContext(new LinkedHashMap<>(values),
+                                              new AtomicInteger(valueCounter),
+                                              ac, new StringBuilder());
       sectionCCs.add(defaultCC);
       // TODO: is this useless?
       lastCC = defaultCC;
