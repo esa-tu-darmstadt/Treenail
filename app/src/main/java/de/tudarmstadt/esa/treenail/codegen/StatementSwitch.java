@@ -255,9 +255,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // statement is within an scf.execute_region call and basic blocks are
     // only visible in the same region
     final var defaultBBName = "^default";
-    // The default case must be the first
-    // TODO: if there is no default case, the default case could just go to the
-    //  final bb immediately
     boolean gotDefaultCase = false;
     for (var section : sections) {
       String bbName;
@@ -279,7 +276,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var lastCC = cc;
     // Use the value map from cc (NOT lastCC) throughout the loop, but the
     // counters from lastCC in order to not have conflicting SSA values
-    // while still using the old value mappings from before the switch
+    // while still using the value assignments from before the switch
+    // Otherwise, the value changes from one case would carry over to the next
     final var values = cc.getValues();
     for (var section : sections) {
       var lastStatement = section.getBody().getLast();
@@ -296,21 +294,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       sectionCCs.add(sectionCC);
       lastCC = sectionCC;
     }
-    if (!gotDefaultCase) {
-      // Add the ConstructionContext for the default case now if there is none
-      var valueCounter = lastCC.getValueCounter();
-      var defaultCC = new ConstructionContext(new LinkedHashMap<>(values),
-                                              new AtomicInteger(valueCounter),
-                                              ac, new StringBuilder());
-      sectionCCs.add(defaultCC);
-      // TODO: is this useless?
-      lastCC = defaultCC;
-      sectionBBNames.add(defaultBBName);
-    }
     var finalBranchesRes = emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
     var returnTypes = finalBranchesRes.returnTypes;
     var updatedEntities = finalBranchesRes.updatedEntities;
     String returnTypeString = finalBranchesRes.returnTypesString;
+    var oldReturnValues = updatedEntities.stream().map(cc::getValue).toList();
     var returnValues =
         returnTypes.stream().map(cc::makeAnonymousValue).toList();
     Streams.forEachPair(updatedEntities.stream(), returnValues.stream(),
@@ -321,11 +309,17 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // operations require the region to only consist of one block.
     // This is not required for top-level switch statements, but it's easier to
     // do this in a uniform way
-    cc.emitLn("%s = scf.execute_region -> %s {", returnValuesString,
+    cc.emitLn("%s = scf.execute_region -> (%s) {", returnValuesString,
               returnTypeString);
     cc.emitLn("  cf.switch %s : i%d, [", condValSignless, condWidth);
-    cc.emit("    default: %s", defaultBBName);
-    assert sectionBBNames.size() >= sectionValStrings.size();
+    // The default case must be the first in the list
+    if (gotDefaultCase) {
+      cc.emit("    default: %s", defaultBBName);
+    } else {
+      String finalBBInputs = oldReturnValues.stream().map(Object::toString).collect(joining(", "));
+      cc.emit("    default: %s(%s : %s)", finalBBName, finalBBInputs, returnTypeString);
+    }
+    assert sectionBBNames.size() == sectionValStrings.size();
     for (int i = 0; i < sectionValStrings.size(); ++i) {
       String valueString = sectionValStrings.get(i);
       // Skip default block because it always goes first
@@ -335,8 +329,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       cc.emit(",\n    %s: %s", valueString, bbName);
     }
     cc.emitLn("\n  ]");
-    assert sectionCCs.size() == sections.size() ||
-        sectionCCs.size() == sections.size() + 1;
+    assert sectionCCs.size() == sections.size();
     assert (sectionCCs.size() == sectionBBNames.size());
     for (int i = 0; i < sectionCCs.size(); ++i) {
       var xCC = sectionCCs.get(i);
