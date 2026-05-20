@@ -232,16 +232,14 @@ class ForLoopAnalyzer {
     if (aliases == null) {
       return true;
     }
-    boolean allConst = true;
     var nonConstAliases = new HashSet<NamedEntity>();
     for (NamedEntity e : aliases) {
       Declaration d = (Declaration)e.eContainer();
       if (!d.getQualifiers().contains(TypeQualifier.CONST)) {
         nonConstAliases.add(e);
-        allConst = false;
       }
     }
-    if (allConst) {
+    if (nonConstAliases.isEmpty()) {
       return false;
     }
     // TODO: check if any of the given entities is modified in the for loop
