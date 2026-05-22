@@ -140,6 +140,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   emitSwitchFinalBranches(ConstructionContext cc,
                           List<ConstructionContext> condCCs,
                           String finalBBName) {
+    assert !condCCs.isEmpty();
     var updatedEntities = new LinkedHashSet<NamedEntity>();
     // Collect all updated entities
     for (var xCC : condCCs) {
@@ -244,10 +245,13 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // which is not representable as n bit signed integer
     final int condWidth =
         condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
-    // TODO: could move condValSignless into the execute_region region as well
     // cf.switch wants signless values
     final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
     var sections = switchStmt.getSections();
+    if (switchStmt.getSections().isEmpty()) {
+      // For an empty switch statement, there is nothing to do
+      return this;
+    }
     var sectionCCs = new ArrayList<ConstructionContext>();
     var sectionBBNames = new ArrayList<String>();
     var sectionValStrings = new ArrayList<String>();
