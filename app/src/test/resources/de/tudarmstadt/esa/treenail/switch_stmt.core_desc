@@ -95,6 +95,24 @@ InstructionSet SwitchStmt {
           MEM[2] = z;
         }
     }
+    DefaultOnlySwitch {
+        encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+        behavior: {
+          unsigned<32> x = MEM[rd];
+          unsigned<16> y = MEM[1:0];
+          unsigned<8> z = MEM[2];
+          switch (rs2) {
+            default:
+              x = MEM[rs1];
+              y = 10;
+              z = 5;
+              break;
+          }
+          X[rs1] = x;
+          MEM[1:0] = y;
+          MEM[2] = z;
+        }
+    }
     EmptySwitch {
         encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
         behavior: {

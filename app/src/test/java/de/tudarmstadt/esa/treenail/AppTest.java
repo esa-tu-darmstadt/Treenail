@@ -981,6 +981,34 @@ class AppTest {
           coredsl.set @MEM[1:0] = %6 : ui16
           coredsl.set @MEM[2] = %8 : ui8
       """));
+    // DefaultOnlySwitch
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.cast %rd : ui5 to ui32
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          %6, %7, %8 = scf.execute_region -> (ui32, ui16, ui8) {
+            cf.switch %5 : i6, [
+              default: ^default
+            ]
+            ^default():
+              %7 = coredsl.cast %rs1 : ui5 to ui32
+              %6 = coredsl.get @MEM[%7 : ui32] : ui8
+              %8 = coredsl.cast %6 : ui8 to ui32
+              %9 = hwarith.constant 10 : ui4
+              %10 = coredsl.cast %9 : ui4 to ui16
+              %11 = hwarith.constant 5 : ui3
+              %12 = coredsl.cast %11 : ui3 to ui8
+              cf.br ^switch_end(%8, %10, %12 : ui32, ui16, ui8)
+            ^switch_end(%13: ui32, %14: ui16, %15: ui8):
+              scf.yield %13, %14, %15 : ui32, ui16, ui8
+          }
+          coredsl.set @X[%rs1 : ui5] = %6 : ui32
+          coredsl.set @MEM[1:0] = %7 : ui16
+          coredsl.set @MEM[2] = %8 : ui8
+      """));
     // EmptySwitch
     assertTrue(mlirCode.contains("""
           %1 = coredsl.cast %rd : ui5 to ui32
