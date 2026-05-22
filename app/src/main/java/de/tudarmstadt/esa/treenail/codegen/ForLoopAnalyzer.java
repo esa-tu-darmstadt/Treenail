@@ -196,13 +196,25 @@ class ForLoopAnalyzer {
     return null;
   }
 
+  // Returns null if object is not an alias declaration
+  private static void getAliasDeclarators(EObject object, ArrayList<Declarator> aliasDeclarators) {
+    if (!(object instanceof Declaration decl)) {
+      return;
+    }
+    for (Declarator declarator : decl.getDeclarators()) {
+      if (declarator.isAlias()) {
+        aliasDeclarators.add(declarator);
+      }
+    }
+  }
+
   // TODO: needs to also find other aliases
   // Returns null if any alias initializer could not be resolved
-  private static ArrayList<NamedEntity> getAllEntityAliases(NamedEntity entity) {
+  private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
     Declarator d = getEntityDeclarator(entity);
-    var res = new ArrayList<NamedEntity>();
+    var confirmedAliases = new HashSet<NamedEntity>();
     while (d.isAlias()) {
-      res.addLast(d);
+      confirmedAliases.add(d);
       if (d.getInitializer() instanceof EntityReference entityRef) {
         d = getEntityDeclarator(entityRef.getTarget());
       } else {
@@ -210,13 +222,30 @@ class ForLoopAnalyzer {
         return null;
       }
     }
-    res.addLast(d);
-    return res;
+    confirmedAliases.add(d);
+    var aliasDeclarators = new ArrayList<Declarator>();
+    for (NamedEntity namedEntity : confirmedAliases) {
+      if (namedEntity.eContainer() instanceof Declarator decl) {
+        // TODO: also search the scope of this entity for aliases of it
+        var declParent = decl.eContainer();
+        for (var it = declParent.eAllContents(); it.hasNext(); ) {
+          EObject item = it.next();
+          getAliasDeclarators(item, aliasDeclarators);
+        }
+      }
+    }
+    // iterate alias declarators to see if any reference res
+    for (Declarator aliasDeclarator : aliasDeclarators) {
+      var init = aliasDeclarator.getInitializer();
+      assert init != null : "Alias declarations must have an initializer";
+      // TODO: is that cast allowed?
+      if (containsOneOf((Expression)init, confirmedAliases)) {
+        // TODO: need to insert the NamedEntity into confirmedAliases
+      }
+    }
+    return confirmedAliases;
   }
 
-  // TODO: test a[n] = 10;
-  // TODO: this does not handle a = n = c
-  // It might not need to, as it may be iterated later
   private static boolean containsOneOf(Expression expr, HashSet<NamedEntity> entities) {
     while (expr instanceof IndexAccessExpression indexAccess) {
       expr = indexAccess.getTarget();
