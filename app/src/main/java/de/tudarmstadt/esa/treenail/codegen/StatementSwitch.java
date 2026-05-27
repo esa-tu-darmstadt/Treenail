@@ -265,6 +265,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       String valueString;
       if (section instanceof CaseSection caseSection) {
         var val = ac.getExpressionValue(caseSection.getCondition());
+        assert val.isValid() : "Case value not constant expression";
         valueString = val.toString();
         bbName = "^case_" + valueString;
       } else {
