@@ -162,7 +162,7 @@ class ConstructionContext {
 
   ConstructionContext createDerivedCC() {
     return new ConstructionContext(new LinkedHashMap<>(values),
-                                   new AtomicInteger(valueCounter.get()), ac,
+                                   new AtomicInteger(getValueCounter()), ac,
                                    new StringBuilder());
   }
 }
