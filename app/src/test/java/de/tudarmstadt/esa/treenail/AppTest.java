@@ -827,4 +827,199 @@ class AppTest {
       """));
     // clang-format on
   }
+
+  @Test
+  void switchStmtWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("switch_stmt.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+
+    // clang-format off
+    // Simple
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.cast %rd : ui5 to ui32
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          %6, %7, %8 = scf.execute_region -> (ui32, ui16, ui8) {
+            cf.switch %5 : i6, [
+              default: ^default,
+              0: ^case_0,
+              1: ^case_1,
+              2: ^case_2,
+              3: ^case_3
+            ]
+            ^case_0():
+              cf.br ^switch_end(%2, %3, %4 : ui32, ui16, ui8)
+            ^case_1():
+              %6 = hwarith.constant 10 : ui4
+              %7 = coredsl.cast %6 : ui4 to ui32
+              cf.br ^switch_end(%7, %3, %4 : ui32, ui16, ui8)
+            ^case_2():
+              %8 = hwarith.constant 5 : ui3
+              %9 = coredsl.cast %8 : ui3 to ui16
+              cf.br ^switch_end(%2, %9, %4 : ui32, ui16, ui8)
+            ^case_3():
+              %10 = hwarith.constant 7 : ui3
+              %11 = coredsl.cast %10 : ui3 to ui8
+              cf.br ^switch_end(%2, %3, %11 : ui32, ui16, ui8)
+            ^default():
+              %12 = hwarith.constant 1 : ui1
+              %13 = coredsl.cast %12 : ui1 to ui32
+              %14 = hwarith.constant 1 : ui1
+              %15 = coredsl.cast %14 : ui1 to ui16
+              %16 = hwarith.constant 1 : ui1
+              %17 = coredsl.cast %16 : ui1 to ui8
+              cf.br ^switch_end(%13, %15, %17 : ui32, ui16, ui8)
+            ^switch_end(%18: ui32, %19: ui16, %20: ui8):
+              scf.yield %18, %19, %20 : ui32, ui16, ui8
+          }
+          coredsl.set @X[%rs1 : ui5] = %6 : ui32
+          coredsl.set @MEM[1:0] = %7 : ui16
+          coredsl.set @MEM[2] = %8 : ui8
+      """));
+    // SimpleNoDefaultCase
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.cast %rd : ui5 to ui32
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          %6, %7, %8 = scf.execute_region -> (ui32, ui16, ui8) {
+            cf.switch %5 : i6, [
+              default: ^switch_end(%2, %3, %4 : ui32, ui16, ui8),
+              0: ^case_0,
+              1: ^case_1,
+              2: ^case_2,
+              3: ^case_3
+            ]
+            ^case_0():
+              cf.br ^switch_end(%2, %3, %4 : ui32, ui16, ui8)
+            ^case_1():
+              %6 = hwarith.constant 10 : ui4
+              %7 = coredsl.cast %6 : ui4 to ui32
+              cf.br ^switch_end(%7, %3, %4 : ui32, ui16, ui8)
+            ^case_2():
+              %8 = hwarith.constant 5 : ui3
+              %9 = coredsl.cast %8 : ui3 to ui16
+              cf.br ^switch_end(%2, %9, %4 : ui32, ui16, ui8)
+            ^case_3():
+              %10 = hwarith.constant 7 : ui3
+              %11 = coredsl.cast %10 : ui3 to ui8
+              cf.br ^switch_end(%2, %3, %11 : ui32, ui16, ui8)
+            ^switch_end(%12: ui32, %13: ui16, %14: ui8):
+              scf.yield %12, %13, %14 : ui32, ui16, ui8
+          }
+          coredsl.set @X[%rs1 : ui5] = %6 : ui32
+          coredsl.set @MEM[1:0] = %7 : ui16
+          coredsl.set @MEM[2] = %8 : ui8
+      """));
+    // NestedSwitch
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.cast %rd : ui5 to ui32
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          %6, %7, %8 = scf.execute_region -> (ui16, ui32, ui8) {
+            cf.switch %5 : i6, [
+              default: ^switch_end(%3, %2, %4 : ui16, ui32, ui8),
+              0: ^case_0,
+              1: ^case_1,
+              2: ^case_2,
+              3: ^case_3
+            ]
+            ^case_0():
+              %6 = hwarith.cast %rd : (ui5) -> i6
+              %7 = scf.execute_region -> (ui16) {
+                cf.switch %6 : i6, [
+                  default: ^default,
+                  16: ^case_16,
+                  2: ^case_2
+                ]
+                ^case_16():
+                  %7 = hwarith.constant 1 : ui1
+                  %8 = hwarith.sub %3, %7 : (ui16, ui1) -> si17
+                  %9 = coredsl.cast %8 : si17 to ui16
+                  cf.br ^switch_end(%9 : ui16)
+                ^case_2():
+                  %10 = hwarith.constant 1 : ui1
+                  %11 = hwarith.add %3, %10 : (ui16, ui1) -> ui17
+                  %12 = coredsl.cast %11 : ui17 to ui16
+                  cf.br ^switch_end(%12 : ui16)
+                ^default():
+                  %13 = hwarith.constant 2 : ui2
+                  %14 = hwarith.add %3, %13 : (ui16, ui2) -> ui17
+                  %15 = coredsl.cast %14 : ui17 to ui16
+                  cf.br ^switch_end(%15 : ui16)
+                ^switch_end(%16: ui16):
+                  scf.yield %16 : ui16
+              }
+              cf.br ^switch_end(%7, %2, %4 : ui16, ui32, ui8)
+            ^case_1():
+              %8 = hwarith.constant 10 : ui4
+              %9 = coredsl.cast %8 : ui4 to ui32
+              cf.br ^switch_end(%3, %9, %4 : ui16, ui32, ui8)
+            ^case_2():
+              %10 = hwarith.constant 5 : ui3
+              %11 = coredsl.cast %10 : ui3 to ui16
+              cf.br ^switch_end(%11, %2, %4 : ui16, ui32, ui8)
+            ^case_3():
+              %12 = hwarith.constant 7 : ui3
+              %13 = coredsl.cast %12 : ui3 to ui8
+              cf.br ^switch_end(%3, %2, %13 : ui16, ui32, ui8)
+            ^switch_end(%14: ui16, %15: ui32, %16: ui8):
+              scf.yield %14, %15, %16 : ui16, ui32, ui8
+          }
+          coredsl.set @X[%rs1 : ui5] = %7 : ui32
+          coredsl.set @MEM[1:0] = %6 : ui16
+          coredsl.set @MEM[2] = %8 : ui8
+      """));
+    // DefaultOnlySwitch
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.cast %rd : ui5 to ui32
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          %5 = hwarith.cast %rs2 : (ui5) -> i6
+          %6, %7, %8 = scf.execute_region -> (ui32, ui16, ui8) {
+            cf.switch %5 : i6, [
+              default: ^default
+            ]
+            ^default():
+              %7 = coredsl.cast %rs1 : ui5 to ui32
+              %6 = coredsl.get @MEM[%7 : ui32] : ui8
+              %8 = coredsl.cast %6 : ui8 to ui32
+              %9 = hwarith.constant 10 : ui4
+              %10 = coredsl.cast %9 : ui4 to ui16
+              %11 = hwarith.constant 5 : ui3
+              %12 = coredsl.cast %11 : ui3 to ui8
+              cf.br ^switch_end(%8, %10, %12 : ui32, ui16, ui8)
+            ^switch_end(%13: ui32, %14: ui16, %15: ui8):
+              scf.yield %13, %14, %15 : ui32, ui16, ui8
+          }
+          coredsl.set @X[%rs1 : ui5] = %6 : ui32
+          coredsl.set @MEM[1:0] = %7 : ui16
+          coredsl.set @MEM[2] = %8 : ui8
+      """));
+    // EmptySwitch
+    assertTrue(mlirCode.contains("""
+          %1 = coredsl.cast %rd : ui5 to ui32
+          %0 = coredsl.get @MEM[%1 : ui32] : ui8
+          %2 = coredsl.cast %0 : ui8 to ui32
+          %3 = coredsl.get @MEM[1:0] : ui16
+          %4 = coredsl.get @MEM[2] : ui8
+          coredsl.set @X[%rs1 : ui5] = %2 : ui32
+          coredsl.set @MEM[1:0] = %3 : ui16
+          coredsl.set @MEM[2] = %4 : ui8
+      """));
+    // clang-format on
+  }
 }

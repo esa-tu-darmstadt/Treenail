@@ -3,13 +3,13 @@ package de.tudarmstadt.esa.treenail.codegen;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.CoreDslConstantExpressionEvaluator;
 import com.minres.coredsl.coreDsl.Expression;
-import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.IntegerType;
 import com.minres.coredsl.util.TypedBigInteger;
 import java.math.BigInteger;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
@@ -19,16 +19,17 @@ class ConstructionContext {
   private final Set<NamedEntity> updatedEntities = new LinkedHashSet<>();
 
   private final Map<NamedEntity, MLIRValue> values;
-  private final AtomicInteger counter;
+  private final AtomicInteger valueCounter;
   private final AnalysisContext ac;
   private final StringBuilder sb;
 
   private boolean terminatorWasEmitted = false;
 
-  ConstructionContext(Map<NamedEntity, MLIRValue> values, AtomicInteger counter,
-                      AnalysisContext ac, StringBuilder sb) {
+  ConstructionContext(Map<NamedEntity, MLIRValue> values,
+                      AtomicInteger valueCounter, AnalysisContext ac,
+                      StringBuilder sb) {
     this.values = values;
-    this.counter = counter;
+    this.valueCounter = valueCounter;
     this.ac = ac;
     this.sb = sb;
   }
@@ -84,7 +85,8 @@ class ConstructionContext {
   }
 
   MLIRValue makeAnonymousValue(MLIRType type) {
-    return new MLIRValue(Integer.toString(counter.getAndIncrement()), type);
+    return new MLIRValue(Integer.toString(valueCounter.getAndIncrement()),
+                         type);
   }
 
   MLIRValue makeConst(BigInteger value, MLIRType type) {
@@ -116,6 +118,14 @@ class ConstructionContext {
     return result;
   }
 
+  MLIRValue makeSignlessCast(MLIRValue value, int newWidth) {
+    assert value.type.width <= newWidth : "Possibly unintended truncation";
+    var result = makeAnonymousValue(MLIRType.DUMMY);
+    emitLn("%s = hwarith.cast %s : (%s) -> i%d", result, value, value.type,
+           newWidth);
+    return result;
+  }
+
   MLIRValue makeHWConstCast(MLIRValue value, int inputWidth, MLIRType type) {
     var result = makeAnonymousValue(type);
     emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, value, inputWidth,
@@ -123,8 +133,13 @@ class ConstructionContext {
     return result;
   }
 
+  void emit(String format, Object... args) {
+    sb.append(String.format(format, args));
+  }
+
   void emitLn(String format, Object... args) {
-    sb.append(String.format(format, args)).append('\n');
+    emit(format, args);
+    sb.append('\n');
   }
 
   Set<NamedEntity> getUpdatedEntities() {
@@ -135,7 +150,7 @@ class ConstructionContext {
     return Collections.unmodifiableMap(values);
   }
 
-  int getCounter() { return counter.get(); }
+  int getValueCounter() { return valueCounter.get(); }
 
   boolean getTerminatorWasEmitted() { return terminatorWasEmitted; }
 
@@ -144,4 +159,10 @@ class ConstructionContext {
   AnalysisContext getAnalysisContext() { return ac; }
 
   StringBuilder getStringBuilder() { return sb; }
+
+  ConstructionContext createDerivedCC() {
+    return new ConstructionContext(new LinkedHashMap<>(values),
+                                   new AtomicInteger(getValueCounter()), ac,
+                                   new StringBuilder());
+  }
 }

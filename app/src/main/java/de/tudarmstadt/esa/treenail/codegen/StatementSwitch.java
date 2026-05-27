@@ -9,9 +9,12 @@ import static java.util.stream.Collectors.toSet;
 import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.StorageClass;
+import com.minres.coredsl.coreDsl.BreakStatement;
+import com.minres.coredsl.coreDsl.CaseSection;
 import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
+import com.minres.coredsl.coreDsl.DefaultSection;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ExpressionStatement;
 import com.minres.coredsl.coreDsl.ForLoop;
@@ -20,9 +23,10 @@ import com.minres.coredsl.coreDsl.IfStatement;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ReturnStatement;
 import com.minres.coredsl.coreDsl.SpawnStatement;
+import com.minres.coredsl.coreDsl.SwitchStatement;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
-import com.minres.coredsl.type.IntegerType;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
@@ -30,6 +34,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 
 class StatementSwitch extends CoreDslSwitch<Object> {
@@ -37,10 +42,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   private final ConstructionContext cc;
   private final ExpressionSwitch exprSwitch;
 
+  // For detecting break statements that are in locations other than the end of
+  // a SwitchSection, as they are currently unsupported
+  private BreakStatement switchEndBreak = null;
+
   StatementSwitch(ConstructionContext cc) {
     this.ac = cc.getAnalysisContext();
     this.cc = cc;
     exprSwitch = new ExpressionSwitch(cc);
+  }
+
+  StatementSwitch(ConstructionContext cc, BreakStatement breakStatement) {
+    this(cc);
+    this.switchEndBreak = breakStatement;
   }
 
   @Override
@@ -113,23 +127,247 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     return this;
   }
 
+  private record SwitchFinalBranchesRes(
+      LinkedHashSet<NamedEntity> updatedEntities, List<MLIRType> returnTypes,
+      String returnTypesString,
+      // The values representing the updated entities after the switch is done
+      List<MLIRValue> resultValues) {}
+
+  // Resolves updated entities and emits the corresponding yield instructions
+  // into the given ConstructionContexts
+  // Returns the inputs to the final basic block as a string
+  private static SwitchFinalBranchesRes
+  emitSwitchFinalBranches(ConstructionContext cc,
+                          List<ConstructionContext> condCCs,
+                          String finalBBName) {
+    assert !condCCs.isEmpty();
+    var updatedEntities = new LinkedHashSet<NamedEntity>();
+    // Collect all updated entities
+    for (var xCC : condCCs) {
+      var currUpdated =
+          xCC.getUpdatedEntities()
+              .stream()
+              .filter(cc::hasValue)
+              .collect(Collectors.toCollection(LinkedHashSet::new));
+      updatedEntities.addAll(currUpdated);
+    }
+    var ac = cc.getAnalysisContext();
+    var returnTypes = updatedEntities.stream()
+                          .map(ac::getDeclaredType)
+                          .map(MLIRType::mapType)
+                          .toList();
+    var returnTypesStr =
+        returnTypes.stream().map(Object::toString).collect(joining(", "));
+    // Emit branches to final BB
+    for (var xCC : condCCs) {
+      var values = xCC.getValues();
+      var yieldValues = updatedEntities.stream().map(values::get).toList();
+      var yieldValuesStr =
+          yieldValues.stream().map(Object::toString).collect(joining(", "));
+      xCC.emitLn("cf.br %s(%s : %s)", finalBBName, yieldValuesStr,
+                 returnTypesStr);
+    }
+    // Input values to the final cc which will immediately be yielded
+    var resultValues = returnTypes.stream()
+                           .map(condCCs.getLast()::makeAnonymousValue)
+                           .toList();
+    return new SwitchFinalBranchesRes(updatedEntities, returnTypes,
+                                      returnTypesStr, resultValues);
+  }
+
+  @Override
+  public Object caseBreakStatement(BreakStatement breakStmt) {
+    assert switchEndBreak != null : "NYI: Break statement in loop";
+    assert breakStmt == switchEndBreak
+        : "NYI: Switch statements breaks in position other than the end";
+    return this;
+  }
+
+  @Override
+  public Object caseSwitchStatement(SwitchStatement switchStmt) {
+    /*
+    TODO: fallthrough and breaks that are not at the end of case regions
+    - Fallthrough will require the BBs to take the values that may be changed
+      in a previous case block as an argument
+    - Problem: breaks in arbitrary positions could still be difficult
+      - using cf.br from inside scf.if is not allowed
+        - 'if (cond) break;' would not work
+        - would need to reimplement if statements using cf in that case
+          - Either implement all ifs using cf, or only when inside of a switch
+      - Each break needs to know all possible modified values
+        -> can only emit the cf.br after emitting all BBs
+        -> need to record the current updatedValues for each break
+    Example code:
+    CoreDSL:
+    switch (a) {
+      case 1:
+      case 2:
+        x = 10;
+      case 3:
+        y = 5;
+        break;
+      case 4:
+        x = 5;
+        z = 10;
+        break;
+      default:
+        break;
+    }
+    MLIR:
+    cf.switch %a : ui32, [
+      default: ^default
+      1: ^case_1,
+      2: ^case_2,
+      3: ^case_3(%x, ui32),
+      4: ^case_4
+    ]
+    ^case_1():
+      cf.br ^case_2()
+    ^case_2():
+      %new_x = 10
+      cf.br ^case_3(%new_x : ui32)
+    ^case_3(%c3_x : i32):
+      %new_y = 5
+      cf.br ^end_bb(%c3_x, %new_y)
+    ^case_4():
+      %new_x = 5
+      %new_z = 10
+      cf.br ^end_bb(%new_x, %y, %new_z)
+    ^default():
+      cf.br ^end_bb(%x, %y, %z : ui32, ui32, ui32)
+    ^end_bb(%res_x : ui32, %res_y : ui32, %res_z : ui32):
+      scf.yield %res_x, %res_y, %res_z : ui32, ui32, ui32
+     */
+    final var condVal =
+        new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+    var sections = switchStmt.getSections();
+    if (sections.isEmpty()) {
+      // For an empty switch statement, there is nothing to do
+      return this;
+    }
+    // The case values need to fit into a signed n bit integer, so if we have
+    // an unsigned value, the max value of that type may be a case value,
+    // which is not representable as n bit signed integer
+    final int condWidth =
+        condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
+    // cf.switch wants signless values
+    final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
+    var sectionCCs = new ArrayList<ConstructionContext>();
+    var sectionBBNames = new ArrayList<String>();
+    var sectionValStrings = new ArrayList<String>();
+    // We don't need unique names for the basic blocks because each switch
+    // statement is within an scf.execute_region call and basic blocks are
+    // only visible in the same region
+    final var defaultBBName = "^default";
+    boolean gotDefaultCase = false;
+    for (var section : sections) {
+      String bbName;
+      String valueString;
+      if (section instanceof CaseSection caseSection) {
+        var val = ac.getExpressionValue(caseSection.getCondition());
+        assert val.isValid() : "Case value not constant expression";
+        valueString = val.toString();
+        bbName = "^case_" + valueString;
+      } else {
+        assert section instanceof DefaultSection;
+        valueString = null;
+        gotDefaultCase = true;
+        bbName = defaultBBName;
+      }
+      sectionBBNames.add(bbName);
+      sectionValStrings.add(valueString);
+    }
+    final var finalBBName = "^switch_end";
+    var lastCC = cc;
+    // Use the value map from cc (NOT lastCC) throughout the loop, but the
+    // counters from lastCC in order to not have conflicting SSA values
+    // while still using the value assignments from before the switch
+    // Otherwise, the value changes from one case would carry over to the next
+    final var values = cc.getValues();
+    for (var section : sections) {
+      var lastStatement = section.getBody().getLast();
+      assert lastStatement instanceof BreakStatement
+          : "NYI: Fallthrough in switch statement";
+      var endBreak = (BreakStatement)lastStatement;
+      var valueCounter = lastCC.getValueCounter();
+      var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
+                                              new AtomicInteger(valueCounter),
+                                              ac, new StringBuilder());
+      for (var stmt : section.getBody()) {
+        new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
+      }
+      sectionCCs.add(sectionCC);
+      lastCC = sectionCC;
+    }
+    var finalBranchesRes = emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
+    var returnTypes = finalBranchesRes.returnTypes;
+    var updatedEntities = finalBranchesRes.updatedEntities;
+    String returnTypeString = finalBranchesRes.returnTypesString;
+    var oldReturnValues = updatedEntities.stream().map(cc::getValue).toList();
+    var returnValues =
+        returnTypes.stream().map(cc::makeAnonymousValue).toList();
+    Streams.forEachPair(updatedEntities.stream(), returnValues.stream(),
+                        cc::setValue);
+    String returnValuesString =
+        returnValues.stream().map(Object::toString).collect(joining(", "));
+    // We need to use scf.execute_region, as the child regions of scf
+    // operations require the region to only consist of one block.
+    // This is not required for top-level switch statements, but it's easier to
+    // do this in a uniform way
+    cc.emitLn("%s = scf.execute_region -> (%s) {", returnValuesString,
+              returnTypeString);
+    cc.emitLn("  cf.switch %s : i%d, [", condValSignless, condWidth);
+    // The default case must be the first in the list
+    if (gotDefaultCase) {
+      cc.emit("    default: %s", defaultBBName);
+    } else {
+      String finalBBInputs =
+          oldReturnValues.stream().map(Object::toString).collect(joining(", "));
+      cc.emit("    default: %s(%s : %s)", finalBBName, finalBBInputs,
+              returnTypeString);
+    }
+    assert sectionBBNames.size() == sectionValStrings.size();
+    for (int i = 0; i < sectionValStrings.size(); ++i) {
+      String valueString = sectionValStrings.get(i);
+      // Skip default block because it always goes first
+      if (valueString == null)
+        continue;
+      String bbName = sectionBBNames.get(i);
+      cc.emit(",\n    %s: %s", valueString, bbName);
+    }
+    cc.emitLn("\n  ]");
+    assert sectionCCs.size() == sections.size();
+    assert (sectionCCs.size() == sectionBBNames.size());
+    for (int i = 0; i < sectionCCs.size(); ++i) {
+      var xCC = sectionCCs.get(i);
+      var sectionContent =
+          xCC.getStringBuilder().toString().indent(N_SPACES * 2);
+      String bbName = sectionBBNames.get(i);
+      cc.emitLn("  %s():\n%s", bbName, sectionContent.stripTrailing());
+    }
+    final var yieldValues = finalBranchesRes.resultValues;
+    String typedYieldedValueString =
+        yieldValues.stream()
+            .map((MLIRValue val) -> val.toString() + ": " + val.type.toString())
+            .collect(joining(", "));
+    cc.emitLn("  %s(%s):", finalBBName, typedYieldedValueString);
+    String yieldedValueString =
+        yieldValues.stream().map(Object::toString).collect(joining(", "));
+    cc.emitLn("    scf.yield %s : %s", yieldedValueString, returnTypeString);
+    cc.emitLn("}");
+    return this;
+  }
+
   @Override
   public Object caseIfStatement(IfStatement ifStmt) {
     var cond = exprSwitch.doSwitch(ifStmt.getCondition());
     var cast = cc.makeI1Cast(cond);
 
-    var values = cc.getValues();
-    var counter = cc.getCounter();
-
     var hasElse = ifStmt.getElseBody() != null;
 
-    var thenCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
+    var thenCC = cc.createDerivedCC();
 
-    var elseCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(values),
-        new AtomicInteger(counter), ac, new StringBuilder());
+    var elseCC = cc.createDerivedCC();
 
     new StatementSwitch(thenCC).doSwitch(ifStmt.getThenBody());
     if (hasElse)
@@ -198,9 +436,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   private List<NamedEntity> getLoopCarriedVariables(ForLoop loop) {
     // Simulate construction to find loop-carried values, in lieu of proper
     // analysis.
-    var simCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var simCC = cc.createDerivedCC();
     var simExprSwitch = new ExpressionSwitch(simCC);
     var simStmtSwitch = new StatementSwitch(simCC);
 
@@ -293,9 +529,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var step = cc.makeHWConst(actionAna.step, actualIterType.width);
 
     // This nested construction will be used for the loop body.
-    var forCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var forCC = cc.createDerivedCC();
 
     // Make the iterator available as an ui/si value in the body.
     var iterIndex = forCC.makeAnonymousValue(MLIRType.DUMMY);
@@ -390,13 +624,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // Real construction begins here. See
     // https://mlir.llvm.org/docs/Dialects/SCFDialect/#scfwhile-mlirscfwhileop
     // for the use of "before" and "after" terms.
-    var beforeCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
-
-    var afterCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var beforeCC = cc.createDerivedCC();
+    var afterCC = cc.createDerivedCC();
 
     var argTypes = new LinkedList<MLIRType>();
     var beforeArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
@@ -470,9 +699,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
   @Override
   public Object caseSpawnStatement(SpawnStatement spawn) {
-    var spawnCC = new ConstructionContext(
-        new LinkedHashMap<NamedEntity, MLIRValue>(cc.getValues()),
-        new AtomicInteger(cc.getCounter()), ac, new StringBuilder());
+    var spawnCC = cc.createDerivedCC();
     new StatementSwitch(spawnCC).doSwitch(spawn.getBody());
     spawnCC.emitLn("coredsl.end");
     cc.emitLn("coredsl.spawn {\n%s}",

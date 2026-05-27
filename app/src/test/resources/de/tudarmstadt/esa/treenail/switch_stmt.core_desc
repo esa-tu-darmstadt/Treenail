@@ -1,0 +1,130 @@
+InstructionSet SwitchStmt {
+  architectural_state {
+    register unsigned<32> X[32] [[is_main_reg]];
+    extern unsigned char MEM[0x100000000] [[is_main_mem]];
+    const unsigned<32> MY_CONST = 3;
+  }
+
+  instructions {
+    Simple {
+       encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+       behavior: {
+         unsigned<32> x = MEM[rd];
+         unsigned<16> y = MEM[1:0];
+         unsigned<8> z = MEM[2];
+         switch (rs2) {
+           case 0:
+             break;
+           case MY_CONST - 2:
+             x = 10;
+             break;
+           case 1 + 1:
+             y = 5;
+             break;
+           case MY_CONST:
+             z = 7;
+             break;
+           default:
+             x = 1;
+             y = 1;
+             z = 1;
+             break;
+         }
+         X[rs1] = x;
+         MEM[1:0] = y;
+         MEM[2] = z;
+       }
+    }
+    SimpleNoDefaultCase {
+       encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+       behavior: {
+         unsigned<32> x = MEM[rd];
+         unsigned<16> y = MEM[1:0];
+         unsigned<8> z = MEM[2];
+         switch (rs2) {
+           case 0:
+             break;
+           case 1:
+             x = 10;
+             break;
+           case 2:
+             y = 5;
+             break;
+           case 3:
+             z = 7;
+             break;
+         }
+         X[rs1] = x;
+         MEM[1:0] = y;
+         MEM[2] = z;
+       }
+    }
+    NestedSwitch {
+        encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+        behavior: {
+          unsigned<32> x = MEM[rd];
+          unsigned<16> y = MEM[1:0];
+          unsigned<8> z = MEM[2];
+          switch (rs2) {
+            case 0:
+              switch (rd) {
+                case 16:
+                   y -= 1;
+                   break;
+                case 2:
+                   y += 1;
+                   break;
+                default:
+                   y += 2;
+                   break;
+              }
+              break;
+            case 1:
+              x = 10;
+              break;
+            case 2:
+              y = 5;
+              break;
+            case 3:
+              z = 7;
+              break;
+          }
+          X[rs1] = x;
+          MEM[1:0] = y;
+          MEM[2] = z;
+        }
+    }
+    DefaultOnlySwitch {
+        encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+        behavior: {
+          unsigned<32> x = MEM[rd];
+          unsigned<16> y = MEM[1:0];
+          unsigned<8> z = MEM[2];
+          switch (rs2) {
+            default:
+              x = MEM[rs1];
+              y = 10;
+              z = 5;
+              break;
+          }
+          X[rs1] = x;
+          MEM[1:0] = y;
+          MEM[2] = z;
+        }
+    }
+    EmptySwitch {
+        encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b001 :: rd[4:0] :: 7'b0101011;
+        behavior: {
+          unsigned<32> x = MEM[rd];
+          unsigned<16> y = MEM[1:0];
+          unsigned<8> z = MEM[2];
+          switch (rs2) {
+          }
+          X[rs1] = x;
+          MEM[1:0] = y;
+          MEM[2] = z;
+        }
+    }
+  }
+}
+
