@@ -2,6 +2,7 @@ package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigInteger;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
+import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
@@ -21,6 +22,7 @@ import org.eclipse.emf.ecore.EObject;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.NavigableMap;
 import java.util.Set;
 
 class ForLoopAnalyzer {
@@ -210,15 +212,30 @@ class ForLoopAnalyzer {
 
   // TODO: needs to also find other aliases
   // Returns null if any alias initializer could not be resolved
+  // TODO: we can skip const variables, as any alias has to be const
+  // TODO: as soon as we reach a const alias, we can quit
   private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
     Declarator d = getEntityDeclarator(entity);
     var confirmedAliases = new HashSet<NamedEntity>();
+    // Only architectural state can have aliases
+    // TODO: parent may also be null or architectural state
+    if (d.eContainer() instanceof ISA) {
+      confirmedAliases.add(entity);
+      return confirmedAliases;
+    }
+    System.out.println("Variable " + entity.getName());
     while (d.isAlias()) {
       confirmedAliases.add(d);
-      if (d.getInitializer() instanceof EntityReference entityRef) {
+      var initializer = d.getInitializer();
+      if (initializer instanceof ExpressionInitializer exprInit && exprInit.getValue() instanceof EntityReference entityRef) {
         d = getEntityDeclarator(entityRef.getTarget());
       } else {
         // TODO: could check more complicated declarations here as well
+        System.out.println("Returning null :(");
+        if (initializer instanceof ExpressionInitializer exprInit) {
+          System.out.println(exprInit.getValue());
+        } else
+          System.out.println(d.getInitializer());
         return null;
       }
     }
@@ -240,7 +257,7 @@ class ForLoopAnalyzer {
       assert init != null : "Alias declarations must have an initializer";
       // TODO: is that cast allowed?
       if (containsOneOf((Expression)init, confirmedAliases)) {
-        // TODO: need to insert the NamedEntity into confirmedAliases
+        confirmedAliases.add(aliasDeclarator);
       }
     }
     return confirmedAliases;
@@ -261,6 +278,10 @@ class ForLoopAnalyzer {
     if (aliases == null) {
       return true;
     }
+    System.out.println("Aliases:");
+    for (var alias : aliases) {
+      System.out.println(alias.getName());
+    }
     var nonConstAliases = new HashSet<NamedEntity>();
     for (NamedEntity e : aliases) {
       Declaration d = (Declaration)e.eContainer();
@@ -276,6 +297,7 @@ class ForLoopAnalyzer {
     for (var expr : loop.getLoopExpressions()) {
       for (TreeIterator<EObject> it = expr.eAllContents(); it.hasNext(); ) {
         var item = it.next();
+        // TODO: ++ -- exprs
         if (item instanceof AssignmentExpression assignmentExpression) {
           Expression target = assignmentExpression.getTarget();
           if (containsOneOf(target, nonConstAliases)) {
