@@ -828,6 +828,24 @@ class AppTest {
     // clang-format on
   }
 
+  // TODO: this does not exactly check if the instruction has a for or while. It checks everything after the instruction
+  static boolean hasForLoop(String mlirCode, String instrName) {
+    int instrIdx = mlirCode.indexOf(instrName);
+    assert instrIdx != -1;
+    // Check whether scf.for or scf.while are the next instruction from the
+    // given instruction
+    int forIdx = mlirCode.indexOf("scf.for", instrIdx);
+    int whileIdx = mlirCode.indexOf("scf.while", instrIdx);
+    if (forIdx == -1) {
+      assert whileIdx != -1 : "Expected either an scf.for or scf.while";
+      return false;
+    } else if (whileIdx == -1) {
+      return true;
+    } else {
+      return forIdx < whileIdx;
+    }
+  }
+
   @Test
   void switchStmtWorks() {
     var appInst = App.getInstance();
@@ -1033,6 +1051,7 @@ class AppTest {
     System.out.println(mlirCode);
     // clang-format off
     // ConstBoundsLT
+    assertTrue(hasForLoop(mlirCode, "ConstBoundsLT"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant 0 : i6
         %11 = hw.constant 20 : i6
@@ -1049,6 +1068,7 @@ class AppTest {
         }
     """));
     // ConstBoundsLE
+    assertTrue(hasForLoop(mlirCode, "ConstBoundsLE"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant 0 : i6
         %11 = hw.constant 21 : i6
@@ -1065,6 +1085,7 @@ class AppTest {
         }
     """));
     // ConstBoundsStep2
+    assertTrue(hasForLoop(mlirCode, "ConstBoundsStep2"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant 0 : i6
         %11 = hw.constant 20 : i6
@@ -1081,6 +1102,7 @@ class AppTest {
         }
     """));
     // ConstBoundsGT
+    assertTrue(hasForLoop(mlirCode, "ConstBoundsGT"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant -1 : i7
         %11 = hw.constant 20 : i7
@@ -1099,6 +1121,7 @@ class AppTest {
         }
     """));
     // ConstBoundsGE
+    assertTrue(hasForLoop(mlirCode, "ConstBoundsGE"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant -1 : i7
         %11 = hw.constant 21 : i7
@@ -1116,6 +1139,12 @@ class AppTest {
           scf.yield %23 : ui32
         }
     """));
+    assertTrue(hasForLoop(mlirCode, "RuntimeInitBound"));
+    assertTrue(hasForLoop(mlirCode, "RuntimeInitBoundStep"));
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableBoundModified"));
+    assertTrue(hasForLoop(mlirCode, "RuntimeBoundedViableRef"));
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableRef"));
     // clang-format on
     assertFalse(true);
   }
