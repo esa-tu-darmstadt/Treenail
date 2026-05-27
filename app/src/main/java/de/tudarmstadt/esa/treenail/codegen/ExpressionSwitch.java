@@ -25,11 +25,9 @@ import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
 import java.math.BigInteger;
 import java.util.AbstractMap;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Stack;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 
