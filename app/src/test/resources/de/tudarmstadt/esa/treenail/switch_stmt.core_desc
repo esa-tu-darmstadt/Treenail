@@ -1,7 +1,6 @@
 InstructionSet SwitchStmt {
   architectural_state {
     register unsigned<32> X[32] [[is_main_reg]];
-    register unsigned<32> PC;
     extern unsigned char MEM[0x100000000] [[is_main_mem]];
     const unsigned<32> MY_CONST = 3;
   }
