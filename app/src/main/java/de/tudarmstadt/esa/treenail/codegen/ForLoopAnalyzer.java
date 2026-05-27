@@ -1,6 +1,8 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigInteger;
+
+import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.EntityReference;
@@ -22,7 +24,6 @@ import org.eclipse.emf.ecore.EObject;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.NavigableMap;
 import java.util.Set;
 
 class ForLoopAnalyzer {
@@ -156,7 +157,21 @@ class ForLoopAnalyzer {
   static final Set<String> INCR_DECR = Set.of("++", "--");
   static final Set<String> COMP_ASSIGN = Set.of("+=", "-=");
 
-  static Initialization analyzeInitialization(ForLoop loop, ConstructionContext cc) {
+  // Either get the existing MLIR value that represents entity or load the
+  // value using coredsl.get
+  // TODO: name
+  static MLIRValue getOrMakeEntityValue(NamedEntity entity, ConstructionContext cc, AnalysisContext ac) {
+    var mlirValue = cc.getValue(entity);
+    if (mlirValue == null) {
+      var type = MLIRType.mapType(ac.getDeclaredType(entity));
+      mlirValue = cc.makeAnonymousValue(type);
+      // TODO: check syntax
+      cc.emitLn("%s = coredsl.get @%s", mlirValue, entity.getName());
+    }
+    return mlirValue;
+  }
+
+  static Initialization analyzeInitialization(ForLoop loop, ConstructionContext cc, AnalysisContext ac) {
     var res = new Initialization();
     try {
       var decl = loop.getStartDeclaration();
@@ -174,7 +189,8 @@ class ForLoopAnalyzer {
       var exprInit = (ExpressionInitializer)init;
       res.variable = dtor;
       if (exprInit.getValue() instanceof EntityReference entityRef) {
-        res.value = new RuntimeValue(cc.getValue(entityRef.getTarget()), cc);
+        var mlirValue = getOrMakeEntityValue(entityRef.getTarget(), cc, ac);
+        res.value = new RuntimeValue(mlirValue, cc);
       } else if (exprInit.getValue() instanceof IntegerConstant konst) {
         var resVal = ensureBigInteger(konst.getValue(), null);
         res.value = new ConstValue(resVal, cc);
@@ -212,14 +228,15 @@ class ForLoopAnalyzer {
 
   // TODO: needs to also find other aliases
   // Returns null if any alias initializer could not be resolved
-  // TODO: we can skip const variables, as any alias has to be const
   // TODO: as soon as we reach a const alias, we can quit
   private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
     Declarator d = getEntityDeclarator(entity);
     var confirmedAliases = new HashSet<NamedEntity>();
-    // Only architectural state can have aliases
-    // TODO: parent may also be null or architectural state
-    if (d.eContainer() instanceof ISA) {
+    // Alias declarations are only allowed in architectural state, so aliases
+    // of local variables are impossible
+    // First container is declaration, second declaration statement, third is
+    // the statement this is contained in (e.g. CompoundStatement)
+    if (!(d.eContainer().eContainer().eContainer() instanceof ISA)) {
       confirmedAliases.add(entity);
       return confirmedAliases;
     }
@@ -309,7 +326,7 @@ class ForLoopAnalyzer {
     return false;
   }
 
-  static Condition analyzeCondition(ForLoop loop, ConstructionContext cc) {
+  static Condition analyzeCondition(ForLoop loop, ConstructionContext cc, AnalysisContext ac) {
     var expr = loop.getCondition();
     var res = new Condition();
     try {
@@ -324,11 +341,12 @@ class ForLoopAnalyzer {
       } else {
         if (infix.getRight() instanceof EntityReference entityReference) {
           NamedEntity entity = entityReference.getTarget();
+          // TODO: this is also a valid reason to stop for constant bounds
           if (entityMayBeModifiedInLoop(entity, loop)) {
             return null;
           }
-
-          res.bound = new RuntimeValue(cc.getValue(entityReference.getTarget()), cc);
+          var mlirValue = getOrMakeEntityValue(entity, cc, ac);
+          res.bound = new RuntimeValue(mlirValue, cc);
         } else {
           return null;
         }
@@ -375,7 +393,7 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  private static Action analyzeCompoundAssignmentAction(Expression expr, ConstructionContext cc) {
+  private static Action analyzeCompoundAssignmentAction(Expression expr, ConstructionContext cc, AnalysisContext ac) {
     var res = new Action();
     try {
       var assign = (AssignmentExpression)expr;
@@ -389,7 +407,8 @@ class ForLoopAnalyzer {
         res.step = new ConstValue(stepVal, cc);
       } else if (assign.getValue() instanceof EntityReference rhs) {
         res.step = null;
-        res.step = new RuntimeValue(cc.getValue(rhs.getTarget()), cc);
+        var mlirValue = getOrMakeEntityValue(rhs.getTarget(), cc, ac);
+        res.step = new RuntimeValue(mlirValue, cc);
         if ("-=".equals(opr)) {
           // TODO: this always makes it impossible to create an scf.for from
           // this, as if the value was unsigned before, it is now signed
@@ -407,7 +426,7 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  static Action analyzeAction(ForLoop loop, ConstructionContext cc) {
+  static Action analyzeAction(ForLoop loop, ConstructionContext cc, AnalysisContext ac) {
     var exprs = loop.getLoopExpressions();
     if (exprs.size() != 1)
       return null;
@@ -419,7 +438,7 @@ class ForLoopAnalyzer {
     res = analyzePostfixAction(expr, cc);
     if (res != null)
       return res;
-    res = analyzeCompoundAssignmentAction(expr, cc);
+    res = analyzeCompoundAssignmentAction(expr, cc, ac);
     if (res != null)
       return res;
     return null;

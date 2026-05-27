@@ -1,7 +1,6 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.getAddResultType;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
@@ -466,9 +465,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // need to be written into a ConstructionContext, but can only be written
     // after we have confirmed that this can be represented by scf.for
     ConstructionContext tmpCC = cc.createDerivedCC();
-    var initAna = ForLoopAnalyzer.analyzeInitialization(loop, tmpCC);
-    var condAna = ForLoopAnalyzer.analyzeCondition(loop, tmpCC);
-    var actionAna = ForLoopAnalyzer.analyzeAction(loop, tmpCC);
+    var initAna = ForLoopAnalyzer.analyzeInitialization(loop, tmpCC, ac);
+    var condAna = ForLoopAnalyzer.analyzeCondition(loop, tmpCC, ac);
+    var actionAna = ForLoopAnalyzer.analyzeAction(loop, tmpCC, ac);
     if (initAna == null || condAna == null || actionAna == null ||
         initAna.variable != condAna.variable ||
         condAna.variable != actionAna.variable)
