@@ -240,6 +240,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
      */
     final var condVal =
         new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+    var sections = switchStmt.getSections();
+    if (sections.isEmpty()) {
+      // For an empty switch statement, there is nothing to do
+      return this;
+    }
     // The case values need to fit into a signed n bit integer, so if we have
     // an unsigned value, the max value of that type may be a case value,
     // which is not representable as n bit signed integer
@@ -247,11 +252,6 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
     // cf.switch wants signless values
     final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
-    var sections = switchStmt.getSections();
-    if (switchStmt.getSections().isEmpty()) {
-      // For an empty switch statement, there is nothing to do
-      return this;
-    }
     var sectionCCs = new ArrayList<ConstructionContext>();
     var sectionBBNames = new ArrayList<String>();
     var sectionValStrings = new ArrayList<String>();

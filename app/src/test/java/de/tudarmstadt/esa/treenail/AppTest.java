@@ -1016,7 +1016,6 @@ class AppTest {
           %2 = coredsl.cast %0 : ui8 to ui32
           %3 = coredsl.get @MEM[1:0] : ui16
           %4 = coredsl.get @MEM[2] : ui8
-          %5 = hwarith.cast %rs2 : (ui5) -> i6
           coredsl.set @X[%rs1 : ui5] = %2 : ui32
           coredsl.set @MEM[1:0] = %3 : ui16
           coredsl.set @MEM[2] = %4 : ui8
