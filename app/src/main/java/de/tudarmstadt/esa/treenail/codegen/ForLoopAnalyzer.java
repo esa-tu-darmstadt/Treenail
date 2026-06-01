@@ -206,17 +206,6 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  private static Declarator getEntityDeclarator(NamedEntity entity) {
-    Declaration decl = (Declaration)entity.eContainer();
-    for (Declarator d : decl.getDeclarators()) {
-      if (d.getName().equals(entity.getName())) {
-        return d;
-      }
-    }
-    assert false : "This should be unreachable";
-    return null;
-  }
-
   // Returns null if object is not an alias declaration
   private static void getAliasDeclarators(EObject object, ArrayList<Declarator> aliasDeclarators) {
     if (!(object instanceof Declaration decl)) {
@@ -233,7 +222,7 @@ class ForLoopAnalyzer {
   // Returns null if any alias initializer could not be resolved
   // TODO: as soon as we reach a const alias, we can quit
   private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
-    Declarator d = getEntityDeclarator(entity);
+    var d = (Declarator)entity;
     var confirmedAliases = new HashSet<NamedEntity>();
     // Alias declarations are only allowed in architectural state, so aliases
     // of local variables are impossible
@@ -248,7 +237,7 @@ class ForLoopAnalyzer {
       confirmedAliases.add(d);
       var initializer = d.getInitializer();
       if (initializer instanceof ExpressionInitializer exprInit && exprInit.getValue() instanceof EntityReference entityRef) {
-        d = getEntityDeclarator(entityRef.getTarget());
+        d = (Declarator)entityRef.getTarget();
       } else {
         // TODO: could check more complicated declarations here as well
         System.out.println("Returning null :(");
