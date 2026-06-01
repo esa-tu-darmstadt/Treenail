@@ -319,7 +319,6 @@ class ForLoopAnalyzer {
     for (var expr : statements) {
       for (TreeIterator<EObject> it = expr.eAllContents(); it.hasNext(); ) {
         var item = it.next();
-        // TODO: ++ -- exprs
         if (item instanceof AssignmentExpression assignmentExpression) {
           Expression target = assignmentExpression.getTarget();
           if (containsOneOf(target, nonConstAliases)) {
