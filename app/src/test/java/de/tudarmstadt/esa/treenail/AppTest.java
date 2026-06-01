@@ -1144,7 +1144,9 @@ class AppTest {
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableBoundModified"));
     assertTrue(hasForLoop(mlirCode, "RuntimeBoundedViableRef"));
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableRef"));
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointee"));
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointer"));
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleRef"));
     // clang-format on
     assertFalse(true);
   }
