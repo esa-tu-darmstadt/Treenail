@@ -325,6 +325,16 @@ class ForLoopAnalyzer {
           if (containsOneOf(target, nonConstAliases)) {
             return true;
           }
+        } else if (item instanceof PrefixExpression prefix) {
+          // TODO: are there prefix expressions that don't mutate?
+          if (containsOneOf(prefix.getOperand(), nonConstAliases)) {
+            return true;
+          }
+        } else if (item instanceof PostfixExpression postfix) {
+          // TODO: are there postfix expressions that don't mutate?
+          if (containsOneOf(postfix.getOperand(), nonConstAliases)) {
+            return true;
+          }
         }
       }
     }
