@@ -359,7 +359,6 @@ class ForLoopAnalyzer {
     } else {
       if (infix.getRight() instanceof EntityReference entityReference) {
         NamedEntity entity = entityReference.getTarget();
-        // TODO: this is also a valid reason to stop for constant bounds
         if (entityMayBeModifiedInLoop(entity, loop)) {
           return null;
         }
