@@ -4,6 +4,8 @@ import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigI
 
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
+import com.minres.coredsl.coreDsl.Statement;
+import com.minres.coredsl.coreDsl.CompoundStatement;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.Expression;
@@ -22,6 +24,7 @@ import org.eclipse.emf.common.util.TreeIterator;
 import org.eclipse.emf.ecore.EObject;
 
 import java.math.BigInteger;
+import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
@@ -311,7 +314,14 @@ class ForLoopAnalyzer {
     }
     // TODO: check if any of the given entities is modified in the for loop
     // - modified if any of the nonConstAliases is in an assignment expression
-    for (var expr : loop.getLoopExpressions()) {
+    var loopStmt = loop.getBody();
+    List<Statement> statements;
+    if (loopStmt instanceof CompoundStatement compound) {
+      statements = compound.getStatements();
+    } else {
+      statements = List.of(loopStmt);
+    }
+    for (var expr : statements) {
       for (TreeIterator<EObject> it = expr.eAllContents(); it.hasNext(); ) {
         var item = it.next();
         // TODO: ++ -- exprs
@@ -350,6 +360,11 @@ class ForLoopAnalyzer {
         } else {
           return null;
         }
+      }
+      // If the iterator is modified in the loop, this cannot be converted to
+      // scf.for
+      if (entityMayBeModifiedInLoop(ref.getTarget(), loop)) {
+        return null;
       }
       res.variable = ref.getTarget();
       res.relation = opr;
