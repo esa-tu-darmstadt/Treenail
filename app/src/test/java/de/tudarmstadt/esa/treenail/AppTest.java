@@ -1139,6 +1139,8 @@ class AppTest {
           scf.yield %23 : ui32
         }
     """));
+    assertFalse(hasForLoop(mlirCode, "ConstBoundNotViableModifiedIteratorPostfix"));
+    assertFalse(hasForLoop(mlirCode, "ConstBoundNotViableModifiedIteratorPrefix"));
     assertTrue(hasForLoop(mlirCode, "RuntimeInitBound"));
     assertTrue(hasForLoop(mlirCode, "RuntimeInitBoundStep"));
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableIteratorModified"));

@@ -70,6 +70,36 @@ InstructionSet TestScfForLoop {
         MEM[Imm6:Imm6 + 3] = sum;
       }
     }
+    ConstBoundNotViableModifiedIteratorPostfix {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (signed<32> i = 1; i >= -20; i -= 2) {
+          if (i % 5 == 0) {
+            i--;
+          }
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    ConstBoundNotViableModifiedIteratorPrefix {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (signed<32> i = 1; i >= -20; i -= 2) {
+          if (i % 5 == 0) {
+            ++i;
+          }
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
     RuntimeInitBound {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
