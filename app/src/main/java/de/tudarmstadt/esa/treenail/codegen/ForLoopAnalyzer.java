@@ -222,7 +222,10 @@ class ForLoopAnalyzer {
   // Returns null if any alias initializer could not be resolved
   // TODO: as soon as we reach a const alias, we can quit
   private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
-    var d = (Declarator)entity;
+    // TODO: bitfield needs to be implemented
+    if (!(entity instanceof Declarator d)) {
+      return null;
+    }
     var confirmedAliases = new HashSet<NamedEntity>();
     // Alias declarations are only allowed in architectural state, so aliases
     // of local variables are impossible
@@ -328,38 +331,38 @@ class ForLoopAnalyzer {
   static Condition analyzeCondition(ForLoop loop, ConstructionContext cc, AnalysisContext ac) {
     var expr = loop.getCondition();
     var res = new Condition();
-    try {
-      var infix = (InfixExpression)expr;
-      var opr = infix.getOperator();
-      if (!CMP.contains(opr))
-        return null;
-      var ref = (EntityReference)infix.getLeft();
-      if (cc.isConstant(infix.getRight())) {
-        var constVal = cc.getConstantValue(infix.getRight(), null);
-        res.bound = new ConstValue(constVal, cc);
-      } else {
-        if (infix.getRight() instanceof EntityReference entityReference) {
-          NamedEntity entity = entityReference.getTarget();
-          // TODO: this is also a valid reason to stop for constant bounds
-          if (entityMayBeModifiedInLoop(entity, loop)) {
-            return null;
-          }
-          var mlirValue = getOrMakeEntityValue(entity, cc, ac);
-          res.bound = new RuntimeValue(mlirValue, cc);
-        } else {
-          return null;
-        }
-      }
-      // If the iterator is modified in the loop, this cannot be converted to
-      // scf.for
-      if (entityMayBeModifiedInLoop(ref.getTarget(), loop)) {
-        return null;
-      }
-      res.variable = ref.getTarget();
-      res.relation = opr;
-    } catch (ClassCastException cce) {
+    if (!(expr instanceof InfixExpression infix)) {
       return null;
     }
+    var opr = infix.getOperator();
+    if (!CMP.contains(opr))
+      return null;
+    if (!(infix.getLeft() instanceof EntityReference ref)) {
+      return null;
+    }
+    if (cc.isConstant(infix.getRight())) {
+      var constVal = cc.getConstantValue(infix.getRight(), null);
+      res.bound = new ConstValue(constVal, cc);
+    } else {
+      if (infix.getRight() instanceof EntityReference entityReference) {
+        NamedEntity entity = entityReference.getTarget();
+        // TODO: this is also a valid reason to stop for constant bounds
+        if (entityMayBeModifiedInLoop(entity, loop)) {
+          return null;
+        }
+        var mlirValue = getOrMakeEntityValue(entity, cc, ac);
+        res.bound = new RuntimeValue(mlirValue, cc);
+      } else {
+        return null;
+      }
+    }
+    // If the iterator is modified in the loop, this cannot be converted to
+    // scf.for
+    if (entityMayBeModifiedInLoop(ref.getTarget(), loop)) {
+      return null;
+    }
+    res.variable = ref.getTarget();
+    res.relation = opr;
     return res;
   }
 
