@@ -16,6 +16,7 @@ import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.PostfixExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
+import com.minres.coredsl.coreDsl.BitField;
 import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
@@ -222,25 +223,22 @@ class ForLoopAnalyzer {
   // Returns null if any alias initializer could not be resolved
   // TODO: as soon as we reach a const alias, we can quit
   private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
-    // TODO: bitfield needs to be implemented
-    if (!(entity instanceof Declarator d)) {
-      return null;
-    }
+    var currEntity = entity;
     var confirmedAliases = new HashSet<NamedEntity>();
     // Alias declarations are only allowed in architectural state, so aliases
     // of local variables are impossible
     // First container is declaration, second declaration statement, third is
     // the statement this is contained in (e.g. CompoundStatement)
-    if (!(d.eContainer().eContainer().eContainer() instanceof ISA)) {
+    if (!(currEntity.eContainer().eContainer().eContainer() instanceof ISA)) {
       confirmedAliases.add(entity);
       return confirmedAliases;
     }
     System.out.println("Variable " + entity.getName());
-    while (d.isAlias()) {
-      confirmedAliases.add(d);
+    while (currEntity instanceof Declarator d && d.isAlias()) {
+      confirmedAliases.add(currEntity);
       var initializer = d.getInitializer();
       if (initializer instanceof ExpressionInitializer exprInit && exprInit.getValue() instanceof EntityReference entityRef) {
-        d = (Declarator)entityRef.getTarget();
+        currEntity = entityRef.getTarget();
       } else {
         // TODO: could check more complicated declarations here as well
         System.out.println("Returning null :(");
@@ -251,7 +249,7 @@ class ForLoopAnalyzer {
         return null;
       }
     }
-    confirmedAliases.add(d);
+    confirmedAliases.add(currEntity);
     var aliasDeclarators = new ArrayList<Declarator>();
     for (NamedEntity namedEntity : confirmedAliases) {
       if (namedEntity.eContainer() instanceof Declarator decl) {
@@ -296,8 +294,13 @@ class ForLoopAnalyzer {
     }
     var nonConstAliases = new HashSet<NamedEntity>();
     for (NamedEntity e : aliases) {
-      Declaration d = (Declaration)e.eContainer();
-      if (!d.getQualifiers().contains(TypeQualifier.CONST)) {
+      if (e instanceof Declarator) {
+        Declaration d = (Declaration)e.eContainer();
+        if (!d.getQualifiers().contains(TypeQualifier.CONST)) {
+          nonConstAliases.add(e);
+        }
+      } else {
+        assert e instanceof BitField : "NamedEntity other than Declarator or BitField not considered in this code";
         nonConstAliases.add(e);
       }
     }
