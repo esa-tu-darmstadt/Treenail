@@ -7,6 +7,7 @@ InstructionSet TestScfForLoop {
       register unsigned<XLEN> TEST_REG = 10;
       unsigned<XLEN> &REG_REF = TEST_REG;
       unsigned<XLEN> &REG_REF_REF = REG_REF;
+      unsigned<4> &REG_BIT_REF = REG_REF[0:3];
     }
 
   instructions {
@@ -167,6 +168,21 @@ InstructionSet TestScfForLoop {
         MEM[Imm6:Imm6 + 3] = sum;
       }
     }
+    RuntimeBoundedViableRefModification {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = x; i < REG_REF; ++i) {
+          if (MEM[rs1 + i] == 123) {
+            X[0] += 2;
+          }
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
     RuntimeBoundedNotViableModifiedBoundPointee {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
@@ -204,6 +220,36 @@ InstructionSet TestScfForLoop {
         unsigned<32> y = MEM[Imm6 + 1];
         unsigned<32> sum = 0;
         for (unsigned<32> i = x; i < REG_REF; ++i) {
+          if (MEM[rs1 + i] == 123) {
+            REG_REF_REF += 2;
+          }
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeBoundedViableBitRef {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = x; i < REG_BIT_REF; ++i) {
+          if (MEM[rs1 + i] == 123) {
+            X[2] += 2;
+          }
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeBoundedNotViableModifiedBoundMultipleBitRef {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = x; i < REG_BIT_REF; ++i) {
           if (MEM[rs1 + i] == 123) {
             REG_REF_REF += 2;
           }

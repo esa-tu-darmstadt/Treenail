@@ -828,14 +828,16 @@ class AppTest {
     // clang-format on
   }
 
-  // TODO: this does not exactly check if the instruction has a for or while. It checks everything after the instruction
   static boolean hasForLoop(String mlirCode, String instrName) {
     int instrIdx = mlirCode.indexOf(instrName);
-    assert instrIdx != -1;
+    assert instrIdx != -1 : "Expected name of instruction to match output";
+    int endIdx = mlirCode.indexOf("coredsl.end", instrIdx);
+    assert endIdx != -1 : "Expected a coredsl.end instruction inside coredsl.instruction";
+    String instrBody = mlirCode.substring(instrIdx, endIdx);
     // Check whether scf.for or scf.while are the next instruction from the
     // given instruction
-    int forIdx = mlirCode.indexOf("scf.for", instrIdx);
-    int whileIdx = mlirCode.indexOf("scf.while", instrIdx);
+    int forIdx = instrBody.indexOf("scf.for");
+    int whileIdx = instrBody.indexOf("scf.while");
     if (forIdx == -1) {
       assert whileIdx != -1 : "Expected either an scf.for or scf.while";
       return false;
@@ -1146,9 +1148,13 @@ class AppTest {
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableBoundModified"));
     assertTrue(hasForLoop(mlirCode, "RuntimeBoundedViableRef"));
+    assertTrue(hasForLoop(mlirCode, "RuntimeBoundedViableRefModification"));
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointee"));
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointer"));
     assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleRef"));
+    // NOTE: this would technically be viable, but we don't check far enough for now
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedViableBitRef"));
+    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleBitRef"));
     // clang-format on
     assertFalse(true);
   }
