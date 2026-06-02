@@ -314,8 +314,8 @@ class ForLoopAnalyzer {
         }
       } else {
         assert e instanceof BitField
-            : ("NamedEntity other than Declarator or BitField not considered " +
-               "in this code");
+            : ("NamedEntity other than Declarator or BitField not considered "
+               + "in this code");
         nonConstAliases.add(e);
       }
     }
