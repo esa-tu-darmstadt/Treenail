@@ -271,8 +271,6 @@ class ForLoopAnalyzer {
     }
     // iterate alias declarators to see if any reference any of the other
     // aliases
-    // TODO: this only works if out-of-order declarations are not allowed in
-    // CoreDSL
     for (Declarator aliasDeclarator : aliasDeclarators) {
       if (aliasDeclarator.getInitializer() instanceof
           ExpressionInitializer exprInit) {
