@@ -4,31 +4,31 @@ import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigI
 
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
-import com.minres.coredsl.coreDsl.Statement;
+import com.minres.coredsl.coreDsl.BitField;
 import com.minres.coredsl.coreDsl.CompoundStatement;
-import com.minres.coredsl.coreDsl.ISA;
+import com.minres.coredsl.coreDsl.Declaration;
+import com.minres.coredsl.coreDsl.DeclarationStatement;
+import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ForLoop;
+import com.minres.coredsl.coreDsl.ISA;
+import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.PostfixExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
-import com.minres.coredsl.coreDsl.BitField;
-import com.minres.coredsl.coreDsl.Declarator;
-import com.minres.coredsl.coreDsl.Declaration;
-import com.minres.coredsl.coreDsl.IndexAccessExpression;
+import com.minres.coredsl.coreDsl.Statement;
 import com.minres.coredsl.coreDsl.TypeQualifier;
-import org.eclipse.emf.common.util.TreeIterator;
-import org.eclipse.emf.ecore.EObject;
-
 import java.math.BigInteger;
-import java.util.List;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import org.eclipse.emf.common.util.TreeIterator;
+import org.eclipse.emf.ecore.EObject;
 
 class ForLoopAnalyzer {
   // Wrapper to make us be able to write the same logic once for things that
@@ -36,7 +36,8 @@ class ForLoopAnalyzer {
   // Note that runtime computed values will emit code into their given
   // ConstructionContext, so the values should be put into a temporary one if
   // we don't know whether the code for them should be emitted
-  public static abstract sealed class ConstOrRuntimeValue permits ConstValue, RuntimeValue {
+  public static abstract sealed class ConstOrRuntimeValue permits ConstValue,
+      RuntimeValue {
     abstract void addOne();
     abstract void subOne();
     abstract void negate();
@@ -99,7 +100,8 @@ class ForLoopAnalyzer {
       var one = cc.makeConst(BigInteger.ONE, MLIRType.getType(1, false));
       var resultType = MLIRType.getAddResultType(currValue.type, one.type);
       var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.add %s, %s : %s", newCurr, currValue, one, newCurr.type);
+      cc.emitLn("%s = hwarith.add %s, %s : %s", newCurr, currValue, one,
+                newCurr.type);
       currValue = newCurr;
     }
 
@@ -108,17 +110,20 @@ class ForLoopAnalyzer {
       var one = cc.makeConst(BigInteger.ONE, MLIRType.getType(1, false));
       var resultType = MLIRType.getSubResultType(currValue.type, one.type);
       var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.sub %s, %s : %s", newCurr, currValue, one, newCurr.type);
+      cc.emitLn("%s = hwarith.sub %s, %s : %s", newCurr, currValue, one,
+                newCurr.type);
       currValue = newCurr;
     }
 
     @Override
     void negate() {
       var zero = cc.makeConst(BigInteger.ZERO, MLIRType.getType(1, false));
-      int resWidth = currValue.type.isSigned ? currValue.type.width : currValue.type.width + 1;
+      int resWidth = currValue.type.isSigned ? currValue.type.width
+                                             : currValue.type.width + 1;
       var resultType = MLIRType.getType(resWidth, true);
       var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.sub %s, %s : %s", newCurr, zero, currValue, newCurr.type);
+      cc.emitLn("%s = hwarith.sub %s, %s : %s", newCurr, zero, currValue,
+                newCurr.type);
       currValue = newCurr;
     }
 
@@ -135,7 +140,8 @@ class ForLoopAnalyzer {
     @Override
     MLIRValue getAsMLIRValue(MLIRType type) {
       var res = cc.makeAnonymousValue(MLIRType.DUMMY);
-      cc.emitLn("%s = hwarith.cast %s : (%s) -> i%d", res, currValue, currValue.type, type.width);
+      cc.emitLn("%s = hwarith.cast %s : (%s) -> i%d", res, currValue,
+                currValue.type, type.width);
       return res;
     }
   }
@@ -164,7 +170,9 @@ class ForLoopAnalyzer {
   // Either get the existing MLIR value that represents entity or load the
   // value using coredsl.get
   // TODO: name
-  static MLIRValue getOrMakeEntityValue(NamedEntity entity, ConstructionContext cc, AnalysisContext ac) {
+  static MLIRValue getOrMakeEntityValue(NamedEntity entity,
+                                        ConstructionContext cc,
+                                        AnalysisContext ac) {
     var mlirValue = cc.getValue(entity);
     if (mlirValue == null) {
       var type = MLIRType.mapType(ac.getDeclaredType(entity));
@@ -175,7 +183,9 @@ class ForLoopAnalyzer {
     return mlirValue;
   }
 
-  static Initialization analyzeInitialization(ForLoop loop, ConstructionContext cc, AnalysisContext ac) {
+  static Initialization analyzeInitialization(ForLoop loop,
+                                              ConstructionContext cc,
+                                              AnalysisContext ac) {
     var res = new Initialization();
     try {
       var decl = loop.getStartDeclaration();
@@ -208,7 +218,8 @@ class ForLoopAnalyzer {
   }
 
   // Returns null if object is not an alias declaration
-  private static void getAliasDeclarators(EObject object, ArrayList<Declarator> aliasDeclarators) {
+  private static void
+  getAliasDeclarators(EObject object, ArrayList<Declarator> aliasDeclarators) {
     if (!(object instanceof Declaration decl)) {
       return;
     }
@@ -219,61 +230,64 @@ class ForLoopAnalyzer {
     }
   }
 
-  // TODO: needs to also find other aliases
   // Returns null if any alias initializer could not be resolved
-  // TODO: as soon as we reach a const alias, we can quit
   private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
     var currEntity = entity;
     var confirmedAliases = new HashSet<NamedEntity>();
-    // Alias declarations are only allowed in architectural state, so aliases
-    // of local variables are impossible
     // First container is declaration, second declaration statement, third is
     // the statement this is contained in (e.g. CompoundStatement)
-    if (!(currEntity.eContainer().eContainer().eContainer() instanceof ISA)) {
+    var enclosingScope = currEntity.eContainer().eContainer().eContainer();
+    // Alias declarations are only allowed in architectural state, so aliases
+    // of local variables are impossible
+    if (!(enclosingScope instanceof ISA isa)) {
       confirmedAliases.add(entity);
       return confirmedAliases;
     }
-    System.out.println("Variable " + entity.getName());
+    // If this declarator is an alias, resolve the initializer until a concrete
+    // variable is reached
     while (currEntity instanceof Declarator d && d.isAlias()) {
       confirmedAliases.add(currEntity);
       var initializer = d.getInitializer();
-      if (initializer instanceof ExpressionInitializer exprInit && exprInit.getValue() instanceof EntityReference entityRef) {
+      if (initializer instanceof ExpressionInitializer exprInit &&
+          exprInit.getValue() instanceof EntityReference entityRef) {
         currEntity = entityRef.getTarget();
       } else {
         // TODO: could check more complicated declarations here as well
-        System.out.println("Returning null :(");
-        if (initializer instanceof ExpressionInitializer exprInit) {
-          System.out.println(exprInit.getValue());
-        } else
-          System.out.println(d.getInitializer());
         return null;
       }
     }
-    confirmedAliases.add(currEntity);
+    // TODO: if the last entity is const, we can quit here
     var aliasDeclarators = new ArrayList<Declarator>();
-    for (NamedEntity namedEntity : confirmedAliases) {
-      if (namedEntity.eContainer() instanceof Declarator decl) {
-        // TODO: also search the scope of this entity for aliases of it
-        var declParent = decl.eContainer();
-        for (var it = declParent.eAllContents(); it.hasNext(); ) {
-          EObject item = it.next();
-          getAliasDeclarators(item, aliasDeclarators);
+    confirmedAliases.add(currEntity);
+    for (Statement s : isa.getArchStateBody()) {
+      if (s instanceof DeclarationStatement declStmt) {
+        var declaration = declStmt.getDeclaration();
+        for (var dtor : declaration.getDeclarators()) {
+          if (dtor.isAlias()) {
+            aliasDeclarators.add(dtor);
+          }
         }
       }
     }
-    // iterate alias declarators to see if any reference res
+    // iterate alias declarators to see if any reference any of the other
+    // aliases
+    // TODO: this only works if out-of-order declarations are not allowed in
+    // CoreDSL
     for (Declarator aliasDeclarator : aliasDeclarators) {
-      var init = aliasDeclarator.getInitializer();
-      assert init != null : "Alias declarations must have an initializer";
-      // TODO: is that cast allowed?
-      if (containsOneOf((Expression)init, confirmedAliases)) {
-        confirmedAliases.add(aliasDeclarator);
+      if (aliasDeclarator.getInitializer() instanceof
+          ExpressionInitializer exprInit) {
+        if (containsOneOf(exprInit.getValue(), confirmedAliases)) {
+          confirmedAliases.add(aliasDeclarator);
+        }
+      } else {
+        assert false : "NYI: ListInitializer";
       }
     }
     return confirmedAliases;
   }
 
-  private static boolean containsOneOf(Expression expr, HashSet<NamedEntity> entities) {
+  private static boolean containsOneOf(Expression expr,
+                                       HashSet<NamedEntity> entities) {
     while (expr instanceof IndexAccessExpression indexAccess) {
       expr = indexAccess.getTarget();
     }
@@ -283,7 +297,8 @@ class ForLoopAnalyzer {
   }
 
   // Returns true if we cannot prove that the entity is not modified in the loop
-  private static boolean entityMayBeModifiedInLoop(NamedEntity entity, ForLoop loop) {
+  private static boolean entityMayBeModifiedInLoop(NamedEntity entity,
+                                                   ForLoop loop) {
     var aliases = getAllEntityAliases(entity);
     if (aliases == null) {
       return true;
@@ -300,7 +315,9 @@ class ForLoopAnalyzer {
           nonConstAliases.add(e);
         }
       } else {
-        assert e instanceof BitField : "NamedEntity other than Declarator or BitField not considered in this code";
+        assert e instanceof BitField
+            : ("NamedEntity other than Declarator or BitField not considered " +
+               "in this code");
         nonConstAliases.add(e);
       }
     }
@@ -317,7 +334,7 @@ class ForLoopAnalyzer {
       statements = List.of(loopStmt);
     }
     for (var expr : statements) {
-      for (TreeIterator<EObject> it = expr.eAllContents(); it.hasNext(); ) {
+      for (TreeIterator<EObject> it = expr.eAllContents(); it.hasNext();) {
         var item = it.next();
         if (item instanceof AssignmentExpression assignmentExpression) {
           Expression target = assignmentExpression.getTarget();
@@ -340,7 +357,8 @@ class ForLoopAnalyzer {
     return false;
   }
 
-  static Condition analyzeCondition(ForLoop loop, ConstructionContext cc, AnalysisContext ac) {
+  static Condition analyzeCondition(ForLoop loop, ConstructionContext cc,
+                                    AnalysisContext ac) {
     var expr = loop.getCondition();
     var res = new Condition();
     if (!(expr instanceof InfixExpression infix)) {
@@ -377,7 +395,8 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  private static Action analyzePrefixAction(Expression expr, ConstructionContext cc) {
+  private static Action analyzePrefixAction(Expression expr,
+                                            ConstructionContext cc) {
     var res = new Action();
     try {
       var prefix = (PrefixExpression)expr;
@@ -394,7 +413,8 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  private static Action analyzePostfixAction(Expression expr, ConstructionContext cc) {
+  private static Action analyzePostfixAction(Expression expr,
+                                             ConstructionContext cc) {
     var res = new Action();
     try {
       var postfix = (PostfixExpression)expr;
@@ -403,7 +423,8 @@ class ForLoopAnalyzer {
         return null;
       var ref = (EntityReference)postfix.getOperand();
       res.variable = ref.getTarget();
-      var stepValue = "++".equals(opr) ? BigInteger.ONE : BigInteger.ONE.negate();
+      var stepValue =
+          "++".equals(opr) ? BigInteger.ONE : BigInteger.ONE.negate();
       res.step = new ConstValue(stepValue, cc);
     } catch (ClassCastException cce) {
       return null;
@@ -411,7 +432,9 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  private static Action analyzeCompoundAssignmentAction(Expression expr, ConstructionContext cc, AnalysisContext ac) {
+  private static Action analyzeCompoundAssignmentAction(Expression expr,
+                                                        ConstructionContext cc,
+                                                        AnalysisContext ac) {
     var res = new Action();
     try {
       var assign = (AssignmentExpression)expr;
@@ -420,8 +443,9 @@ class ForLoopAnalyzer {
         return null;
       var lhs = (EntityReference)assign.getTarget();
       if (assign.getValue() instanceof IntegerConstant rhs) {
-        BigInteger stepVal = "+=".equals(opr) ? ensureBigInteger(rhs.getValue(), null)
-                : rhs.getValue().negate();
+        BigInteger stepVal = "+=".equals(opr)
+                                 ? ensureBigInteger(rhs.getValue(), null)
+                                 : rhs.getValue().negate();
         res.step = new ConstValue(stepVal, cc);
       } else if (assign.getValue() instanceof EntityReference rhs) {
         res.step = null;
@@ -444,7 +468,8 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  static Action analyzeAction(ForLoop loop, ConstructionContext cc, AnalysisContext ac) {
+  static Action analyzeAction(ForLoop loop, ConstructionContext cc,
+                              AnalysisContext ac) {
     var exprs = loop.getLoopExpressions();
     if (exprs.size() != 1)
       return null;
