@@ -177,8 +177,7 @@ class ForLoopAnalyzer {
     if (mlirValue == null) {
       var type = MLIRType.mapType(ac.getDeclaredType(entity));
       mlirValue = cc.makeAnonymousValue(type);
-      // TODO: check syntax
-      cc.emitLn("%s = coredsl.get @%s", mlirValue, entity.getName());
+      cc.emitLn("%s = coredsl.get @%s : %s", mlirValue, entity.getName(), type);
     }
     return mlirValue;
   }
@@ -252,11 +251,12 @@ class ForLoopAnalyzer {
           exprInit.getValue() instanceof EntityReference entityRef) {
         currEntity = entityRef.getTarget();
       } else {
+        // If we can't fully check all aliases, we have to assume that the
+        // variable is modified somewhere in the loop
         // TODO: could check more complicated declarations here as well
         return null;
       }
     }
-    // TODO: if the last entity is const, we can quit here
     var aliasDeclarators = new ArrayList<Declarator>();
     confirmedAliases.add(currEntity);
     for (Statement s : isa.getArchStateBody()) {
