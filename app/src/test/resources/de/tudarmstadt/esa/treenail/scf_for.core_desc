@@ -146,19 +146,7 @@ InstructionSet TestScfForLoop {
         MEM[Imm6:Imm6 + 3] = sum;
       }
     }
-    RuntimeInitBound {
-      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
-      behavior: {
-        unsigned<32> x = MEM[Imm6];
-        unsigned<32> y = MEM[Imm6 + 1];
-        unsigned<32> sum = 0;
-        for (unsigned<32> i = x; i < y; ++i) {
-          sum += MEM[rs1 + i];
-        }
-        MEM[Imm6:Imm6 + 3] = sum;
-      }
-    }
-    RuntimeInitBoundStep {
+    RuntimeBoundsLT {
       encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
       behavior: {
         unsigned<32> x = MEM[Imm6];
@@ -166,6 +154,42 @@ InstructionSet TestScfForLoop {
         unsigned<32> step = X[rs1];
         unsigned<32> sum = 0;
         for (unsigned<32> i = x; i < y; i += step) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeBoundsLE {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = x; i <= y; i++) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeBoundsGT {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        signed<32> x = MEM[Imm6];
+        signed<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (signed<32> i = x; i > y; i -= 2) {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
+    RuntimeBoundsGE {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        signed<32> x = MEM[Imm6];
+        signed<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        for (signed<32> i = x; i >= y; i -= 2) {
           sum += MEM[rs1 + i];
         }
         MEM[Imm6:Imm6 + 3] = sum;

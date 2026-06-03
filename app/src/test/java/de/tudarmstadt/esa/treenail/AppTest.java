@@ -1023,6 +1023,9 @@ class AppTest {
     // clang-format on
   }
 
+  // Checks whether the given instruction contains an scf.for or an scf.while.
+  // Assumes the instruction contains either an scf.for or an scf.while. The
+  // instruction should not contain both
   static boolean instrHasSCFFor(String mlirCode, String instrName) {
     int instrIdx = mlirCode.indexOf(instrName);
     assert instrIdx != -1 : "Expected name of instruction to match output";
@@ -1037,10 +1040,9 @@ class AppTest {
     if (forIdx == -1) {
       assert whileIdx != -1 : "Expected either an scf.for or scf.while";
       return false;
-    } else if (whileIdx == -1) {
-      return true;
     } else {
-      return forIdx < whileIdx;
+      assert whileIdx == -1 : "Expected either an scf.for or scf.while";
+      return true;
     }
   }
 
@@ -1156,32 +1158,7 @@ class AppTest {
     assertFalse(instrHasSCFFor(mlirCode, "NotViableExprInit"));
     assertFalse(instrHasSCFFor(mlirCode, "NotViableExprBound"));
     assertFalse(instrHasSCFFor(mlirCode, "NotViableExprStep"));
-    assertTrue(instrHasSCFFor(mlirCode, "RuntimeInitBound"));
-    assertTrue(mlirCode.contains("""
-        %1 = coredsl.cast %Imm6 : ui6 to ui32
-        %0 = coredsl.get @MEM[%1 : ui32] : ui8
-        %2 = coredsl.cast %0 : ui8 to ui32
-        %4 = hwarith.constant 1 : ui1
-        %5 = hwarith.add %Imm6, %4 : (ui6, ui1) -> ui7
-        %6 = coredsl.cast %5 : ui7 to ui32
-        %3 = coredsl.get @MEM[%6 : ui32] : ui8
-        %7 = coredsl.cast %3 : ui8 to ui32
-        %8 = hwarith.constant 0 : ui1
-        %9 = coredsl.cast %8 : ui1 to ui32
-        %10 = hwarith.cast %2 : (ui32) -> i32
-        %11 = hwarith.cast %7 : (ui32) -> i32
-        %12 = hw.constant 1 : i32
-        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%15 = %9) -> (ui32) : i32 {
-          %14 = hwarith.cast %13 : (i32) -> ui32
-          %17 = hwarith.add %rs1, %14 : (ui5, ui32) -> ui33
-          %18 = coredsl.cast %17 : ui33 to ui32
-          %16 = coredsl.get @MEM[%18 : ui32] : ui8
-          %19 = hwarith.add %15, %16 : (ui32, ui8) -> ui33
-          %20 = coredsl.cast %19 : ui33 to ui32
-          scf.yield %20 : ui32
-        }
-    """));
-    assertTrue(instrHasSCFFor(mlirCode, "RuntimeInitBoundStep"));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundsLT"));
     assertTrue(mlirCode.contains("""
         %1 = coredsl.cast %Imm6 : ui6 to ui32
         %0 = coredsl.get @MEM[%1 : ui32] : ui8
@@ -1207,6 +1184,100 @@ class AppTest {
           scf.yield %21 : ui32
         }
     """));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundsLE"));
+    assertTrue(mlirCode.contains("""
+        %1 = coredsl.cast %Imm6 : ui6 to ui32
+        %0 = coredsl.get @MEM[%1 : ui32] : ui8
+        %2 = coredsl.cast %0 : ui8 to ui32
+        %4 = hwarith.constant 1 : ui1
+        %5 = hwarith.add %Imm6, %4 : (ui6, ui1) -> ui7
+        %6 = coredsl.cast %5 : ui7 to ui32
+        %3 = coredsl.get @MEM[%6 : ui32] : ui8
+        %7 = coredsl.cast %3 : ui8 to ui32
+        %8 = hwarith.constant 0 : ui1
+        %9 = coredsl.cast %8 : ui1 to ui32
+        %10 = hwarith.constant 1 : ui1
+        %11 = hwarith.add %7, %10 : ui33
+        %12 = hwarith.cast %2 : (ui32) -> i33
+        %13 = hwarith.cast %11 : (ui33) -> i33
+        %14 = hw.constant 1 : i33
+        %15 = scf.for unsigned %15 = %12 to %13 step %14 iter_args(%18 = %9) -> (ui32) : i33 {
+          %16 = hwarith.cast %15 : (i33) -> ui33
+          %17 = coredsl.cast %16 : ui33 to ui32
+          %20 = hwarith.add %rs1, %17 : (ui5, ui32) -> ui33
+          %21 = coredsl.cast %20 : ui33 to ui32
+          %19 = coredsl.get @MEM[%21 : ui32] : ui8
+          %22 = hwarith.add %18, %19 : (ui32, ui8) -> ui33
+          %23 = coredsl.cast %22 : ui33 to ui32
+          scf.yield %23 : ui32
+        }
+    """));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundsGT"));
+    assertTrue(mlirCode.contains("""
+        %1 = coredsl.cast %Imm6 : ui6 to ui32
+        %0 = coredsl.get @MEM[%1 : ui32] : ui8
+        %2 = coredsl.cast %0 : ui8 to si32
+        %4 = hwarith.constant 1 : ui1
+        %5 = hwarith.add %Imm6, %4 : (ui6, ui1) -> ui7
+        %6 = coredsl.cast %5 : ui7 to ui32
+        %3 = coredsl.get @MEM[%6 : ui32] : ui8
+        %7 = coredsl.cast %3 : ui8 to si32
+        %8 = hwarith.constant 0 : ui1
+        %9 = coredsl.cast %8 : ui1 to ui32
+        %10 = hwarith.constant 0 : ui1
+        %11 = hwarith.sub %10, %2 : si32
+        %12 = hwarith.constant 0 : ui1
+        %13 = hwarith.sub %12, %7 : si32
+        %14 = hwarith.cast %11 : (si32) -> i32
+        %15 = hwarith.cast %13 : (si32) -> i32
+        %16 = hw.constant 2 : i32
+        %17 = scf.for %17 = %14 to %15 step %16 iter_args(%21 = %9) -> (ui32) : i32 {
+          %18 = hw.constant 0 : i32
+          %19 = comb.sub %18, %17 : i32
+          %20 = hwarith.cast %19 : (i32) -> si32
+          %23 = hwarith.add %rs1, %20 : (ui5, si32) -> si33
+          %24 = coredsl.cast %23 : si33 to ui32
+          %22 = coredsl.get @MEM[%24 : ui32] : ui8
+          %25 = hwarith.add %21, %22 : (ui32, ui8) -> ui33
+          %26 = coredsl.cast %25 : ui33 to ui32
+          scf.yield %26 : ui32
+        }
+    """));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundsGE"));
+    assertTrue(mlirCode.contains("""
+        %1 = coredsl.cast %Imm6 : ui6 to ui32
+        %0 = coredsl.get @MEM[%1 : ui32] : ui8
+        %2 = coredsl.cast %0 : ui8 to si32
+        %4 = hwarith.constant 1 : ui1
+        %5 = hwarith.add %Imm6, %4 : (ui6, ui1) -> ui7
+        %6 = coredsl.cast %5 : ui7 to ui32
+        %3 = coredsl.get @MEM[%6 : ui32] : ui8
+        %7 = coredsl.cast %3 : ui8 to si32
+        %8 = hwarith.constant 0 : ui1
+        %9 = coredsl.cast %8 : ui1 to ui32
+        %10 = hwarith.constant 1 : ui1
+        %11 = hwarith.sub %7, %10 : si33
+        %12 = hwarith.constant 0 : ui1
+        %13 = hwarith.sub %12, %2 : si32
+        %14 = hwarith.constant 0 : ui1
+        %15 = hwarith.sub %14, %11 : si33
+        %16 = hwarith.cast %13 : (si32) -> i33
+        %17 = hwarith.cast %15 : (si33) -> i33
+        %18 = hw.constant 2 : i33
+        %19 = scf.for %19 = %16 to %17 step %18 iter_args(%24 = %9) -> (ui32) : i33 {
+          %20 = hw.constant 0 : i33
+          %21 = comb.sub %20, %19 : i33
+          %22 = hwarith.cast %21 : (i33) -> si33
+          %23 = coredsl.cast %22 : si33 to si32
+          %26 = hwarith.add %rs1, %23 : (ui5, si32) -> si33
+          %27 = coredsl.cast %26 : si33 to ui32
+          %25 = coredsl.get @MEM[%27 : ui32] : ui8
+          %28 = hwarith.add %24, %25 : (ui32, ui8) -> ui33
+          %29 = coredsl.cast %28 : ui33 to ui32
+          scf.yield %29 : ui32
+        }
+    """));
+
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableBoundModified"));
     assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundedViableRef"));
