@@ -250,6 +250,11 @@ class ForLoopAnalyzer {
     while (currEntity instanceof Declarator dtor && dtor.isAlias()) {
       assert dtor.eContainer() instanceof Declaration;
       var decl = (Declaration)dtor.eContainer();
+      // A volatile variable may be changed arbitrarily by external entities,
+      // even if it is const, so we always have to assume its modified
+      if (decl.getQualifiers().contains(TypeQualifier.VOLATILE)) {
+        return null;
+      }
       if (!decl.getQualifiers().contains(TypeQualifier.CONST)) {
         confirmedAliases.add(currEntity);
       }
@@ -265,8 +270,6 @@ class ForLoopAnalyzer {
       }
     }
     if (currEntity.eContainer() instanceof Declaration decl) {
-      // A volatile variable may be changed arbitrarily by external entities,
-      // even if it is const, so we always have to assume its modified
       if (decl.getQualifiers().contains(TypeQualifier.VOLATILE)) {
         return null;
       }
