@@ -216,19 +216,6 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  // Returns null if object is not an alias declaration
-  private static void
-  getAliasDeclarators(EObject object, ArrayList<Declarator> aliasDeclarators) {
-    if (!(object instanceof Declaration decl)) {
-      return;
-    }
-    for (Declarator declarator : decl.getDeclarators()) {
-      if (declarator.isAlias()) {
-        aliasDeclarators.add(declarator);
-      }
-    }
-  }
-
   // Returns null if any alias initializer could not be resolved
   private static HashSet<NamedEntity> getMutableAliases(NamedEntity entity) {
     var currEntity = entity;
