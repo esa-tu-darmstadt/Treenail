@@ -828,27 +828,6 @@ class AppTest {
     // clang-format on
   }
 
-  static boolean hasForLoop(String mlirCode, String instrName) {
-    int instrIdx = mlirCode.indexOf(instrName);
-    assert instrIdx != -1 : "Expected name of instruction to match output";
-    int endIdx = mlirCode.indexOf("coredsl.end", instrIdx);
-    assert endIdx != -1
-        : "Expected a coredsl.end instruction inside coredsl.instruction";
-    String instrBody = mlirCode.substring(instrIdx, endIdx);
-    // Check whether scf.for or scf.while are the next instruction from the
-    // given instruction
-    int forIdx = instrBody.indexOf("scf.for");
-    int whileIdx = instrBody.indexOf("scf.while");
-    if (forIdx == -1) {
-      assert whileIdx != -1 : "Expected either an scf.for or scf.while";
-      return false;
-    } else if (whileIdx == -1) {
-      return true;
-    } else {
-      return forIdx < whileIdx;
-    }
-  }
-
   @Test
   void switchStmtWorks() {
     var appInst = App.getInstance();
@@ -1044,8 +1023,33 @@ class AppTest {
     // clang-format on
   }
 
+  static boolean instrHasSCFFor(String mlirCode, String instrName) {
+    int instrIdx = mlirCode.indexOf(instrName);
+    assert instrIdx != -1 : "Expected name of instruction to match output";
+    int endIdx = mlirCode.indexOf("coredsl.end", instrIdx);
+    assert endIdx != -1
+            : "Expected a coredsl.end instruction inside coredsl.instruction";
+    String instrBody = mlirCode.substring(instrIdx, endIdx);
+    // Check whether scf.for or scf.while are the next instruction from the
+    // given instruction
+    int forIdx = instrBody.indexOf("scf.for");
+    int whileIdx = instrBody.indexOf("scf.while");
+    if (forIdx == -1) {
+      assert whileIdx != -1 : "Expected either an scf.for or scf.while";
+      return false;
+    } else if (whileIdx == -1) {
+      return true;
+    } else {
+      return forIdx < whileIdx;
+    }
+  }
+
   @Test
-  void dynamicBoundedForLoopWorks() {
+  void forLoopWorks() {
+    // NOTE: Even though there are many instructions in the .core_desc file,
+    // not all of them have their output checked rigorously, as many just check
+    // whether it is correctly determined that the loop is not representable
+    // with scf.for
     var appInst = App.getInstance();
     var fileName = getClass().getResource("scf_for.core_desc").getPath();
     var content = appInst.parse(fileName);
@@ -1054,7 +1058,7 @@ class AppTest {
     System.out.println(mlirCode);
     // clang-format off
     // ConstBoundsLT
-    assertTrue(hasForLoop(mlirCode, "ConstBoundsLT"));
+    assertTrue(instrHasSCFFor(mlirCode, "ConstBoundsLT"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant 0 : i5
         %11 = hw.constant 20 : i5
@@ -1071,7 +1075,7 @@ class AppTest {
         }
     """));
     // ConstBoundsLE
-    assertTrue(hasForLoop(mlirCode, "ConstBoundsLE"));
+    assertTrue(instrHasSCFFor(mlirCode, "ConstBoundsLE"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant 0 : i5
         %11 = hw.constant 21 : i5
@@ -1088,7 +1092,7 @@ class AppTest {
         }
     """));
     // ConstBoundsStep2
-    assertTrue(hasForLoop(mlirCode, "ConstBoundsStep2"));
+    assertTrue(instrHasSCFFor(mlirCode, "ConstBoundsStep2"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant 0 : i5
         %11 = hw.constant 20 : i5
@@ -1105,7 +1109,7 @@ class AppTest {
         }
     """));
     // ConstBoundsGT
-    assertTrue(hasForLoop(mlirCode, "ConstBoundsGT"));
+    assertTrue(instrHasSCFFor(mlirCode, "ConstBoundsGT"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant -1 : i6
         %11 = hw.constant 20 : i6
@@ -1124,7 +1128,7 @@ class AppTest {
         }
     """));
     // ConstBoundsGE
-    assertTrue(hasForLoop(mlirCode, "ConstBoundsGE"));
+    assertTrue(instrHasSCFFor(mlirCode, "ConstBoundsGE"));
     assertTrue(mlirCode.contains("""
         %10 = hw.constant -1 : i6
         %11 = hw.constant 21 : i6
@@ -1142,20 +1146,77 @@ class AppTest {
           scf.yield %23 : ui32
         }
     """));
-    assertFalse(hasForLoop(mlirCode, "ConstBoundNotViableModifiedIteratorPostfix"));
-    assertFalse(hasForLoop(mlirCode, "ConstBoundNotViableModifiedIteratorPrefix"));
-    assertTrue(hasForLoop(mlirCode, "RuntimeInitBound"));
-    assertTrue(hasForLoop(mlirCode, "RuntimeInitBoundStep"));
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableBoundModified"));
-    assertTrue(hasForLoop(mlirCode, "RuntimeBoundedViableRef"));
-    assertTrue(hasForLoop(mlirCode, "RuntimeBoundedViableRefModification"));
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointee"));
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointer"));
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleRef"));
+    // Check if modifying the iterator inside the loop leads to it being
+    // converted to while
+    assertFalse(instrHasSCFFor(mlirCode, "ConstBoundNotViableModifiedIteratorAssignExpr"));
+    assertFalse(instrHasSCFFor(mlirCode, "ConstBoundNotViableModifiedIteratorPostfix"));
+    assertFalse(instrHasSCFFor(mlirCode, "ConstBoundNotViableModifiedIteratorPrefix"));
+    // Check that nontrivial expressions in the loop lead to it not being
+    // converted to scf.for
+    assertFalse(instrHasSCFFor(mlirCode, "NotViableExprInit"));
+    assertFalse(instrHasSCFFor(mlirCode, "NotViableExprBound"));
+    assertFalse(instrHasSCFFor(mlirCode, "NotViableExprStep"));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeInitBound"));
+    assertTrue(mlirCode.contains("""
+        %1 = coredsl.cast %Imm6 : ui6 to ui32
+        %0 = coredsl.get @MEM[%1 : ui32] : ui8
+        %2 = coredsl.cast %0 : ui8 to ui32
+        %4 = hwarith.constant 1 : ui1
+        %5 = hwarith.add %Imm6, %4 : (ui6, ui1) -> ui7
+        %6 = coredsl.cast %5 : ui7 to ui32
+        %3 = coredsl.get @MEM[%6 : ui32] : ui8
+        %7 = coredsl.cast %3 : ui8 to ui32
+        %8 = hwarith.constant 0 : ui1
+        %9 = coredsl.cast %8 : ui1 to ui32
+        %10 = hwarith.cast %2 : (ui32) -> i32
+        %11 = hwarith.cast %7 : (ui32) -> i32
+        %12 = hw.constant 1 : i32
+        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%15 = %9) -> (ui32) : i32 {
+          %14 = hwarith.cast %13 : (i32) -> ui32
+          %17 = hwarith.add %rs1, %14 : (ui5, ui32) -> ui33
+          %18 = coredsl.cast %17 : ui33 to ui32
+          %16 = coredsl.get @MEM[%18 : ui32] : ui8
+          %19 = hwarith.add %15, %16 : (ui32, ui8) -> ui33
+          %20 = coredsl.cast %19 : ui33 to ui32
+          scf.yield %20 : ui32
+        }
+    """));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeInitBoundStep"));
+    assertTrue(mlirCode.contains("""
+        %1 = coredsl.cast %Imm6 : ui6 to ui32
+        %0 = coredsl.get @MEM[%1 : ui32] : ui8
+        %2 = coredsl.cast %0 : ui8 to ui32
+        %4 = hwarith.constant 1 : ui1
+        %5 = hwarith.add %Imm6, %4 : (ui6, ui1) -> ui7
+        %6 = coredsl.cast %5 : ui7 to ui32
+        %3 = coredsl.get @MEM[%6 : ui32] : ui8
+        %7 = coredsl.cast %3 : ui8 to ui32
+        %8 = coredsl.get @X[%rs1 : ui5] : ui32
+        %9 = hwarith.constant 0 : ui1
+        %10 = coredsl.cast %9 : ui1 to ui32
+        %11 = hwarith.cast %2 : (ui32) -> i32
+        %12 = hwarith.cast %7 : (ui32) -> i32
+        %13 = hwarith.cast %8 : (ui32) -> i32
+        %14 = scf.for unsigned %14 = %11 to %12 step %13 iter_args(%16 = %10) -> (ui32) : i32 {
+          %15 = hwarith.cast %14 : (i32) -> ui32
+          %18 = hwarith.add %rs1, %15 : (ui5, ui32) -> ui33
+          %19 = coredsl.cast %18 : ui33 to ui32
+          %17 = coredsl.get @MEM[%19 : ui32] : ui8
+          %20 = hwarith.add %16, %17 : (ui32, ui8) -> ui33
+          %21 = coredsl.cast %20 : ui33 to ui32
+          scf.yield %21 : ui32
+        }
+    """));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableBoundModified"));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundedViableRef"));
+    assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundedViableRefModification"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointee"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointer"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleRef"));
     // NOTE: this would technically be viable, but we don't check far enough for now
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedViableBitRef"));
-    assertFalse(hasForLoop(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleBitRef"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedViableBitRef"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleBitRef"));
     // clang-format on
     assertFalse(true);
   }
