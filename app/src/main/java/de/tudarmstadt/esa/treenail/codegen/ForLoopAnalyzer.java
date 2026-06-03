@@ -264,11 +264,17 @@ class ForLoopAnalyzer {
         return null;
       }
     }
-    if (currEntity.eContainer() instanceof Declaration decl &&
-        decl.getQualifiers().contains(TypeQualifier.CONST)) {
-      assert confirmedAliases.isEmpty()
-          : "There can be no non-const aliases for a const variable";
-      return confirmedAliases;
+    if (currEntity.eContainer() instanceof Declaration decl) {
+      // A volatile variable may be changed arbitrarily by external entities,
+      // even if it is const, so we always have to assume its modified
+      if (decl.getQualifiers().contains(TypeQualifier.VOLATILE)) {
+        return null;
+      }
+      if (decl.getQualifiers().contains(TypeQualifier.CONST)) {
+        assert confirmedAliases.isEmpty()
+            : "There can be no non-const aliases for a const variable";
+        return confirmedAliases;
+      }
     }
     confirmedAliases.add(currEntity);
     var aliasDeclarators = new ArrayList<Declarator>();
