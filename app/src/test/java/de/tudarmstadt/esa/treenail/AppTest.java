@@ -1028,7 +1028,7 @@ class AppTest {
     assert instrIdx != -1 : "Expected name of instruction to match output";
     int endIdx = mlirCode.indexOf("coredsl.end", instrIdx);
     assert endIdx != -1
-            : "Expected a coredsl.end instruction inside coredsl.instruction";
+        : "Expected a coredsl.end instruction inside coredsl.instruction";
     String instrBody = mlirCode.substring(instrIdx, endIdx);
     // Check whether scf.for or scf.while are the next instruction from the
     // given instruction
