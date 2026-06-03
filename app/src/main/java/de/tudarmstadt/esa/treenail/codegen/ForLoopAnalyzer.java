@@ -230,7 +230,7 @@ class ForLoopAnalyzer {
   }
 
   // Returns null if any alias initializer could not be resolved
-  private static HashSet<NamedEntity> getAllEntityAliases(NamedEntity entity) {
+  private static HashSet<NamedEntity> getMutableAliases(NamedEntity entity) {
     var currEntity = entity;
     var confirmedAliases = new HashSet<NamedEntity>();
     // First container is declaration, second declaration statement, third is
@@ -239,14 +239,21 @@ class ForLoopAnalyzer {
     // Alias declarations are only allowed in architectural state, so aliases
     // of local variables are impossible
     if (!(enclosingScope instanceof ISA isa)) {
-      confirmedAliases.add(entity);
+      if (!(entity.eContainer() instanceof Declaration decl) ||
+          !decl.getQualifiers().contains(TypeQualifier.CONST)) {
+        confirmedAliases.add(entity);
+      }
       return confirmedAliases;
     }
     // If this declarator is an alias, resolve the initializer until a concrete
     // variable is reached
-    while (currEntity instanceof Declarator d && d.isAlias()) {
-      confirmedAliases.add(currEntity);
-      var initializer = d.getInitializer();
+    while (currEntity instanceof Declarator dtor && dtor.isAlias()) {
+      assert dtor.eContainer() instanceof Declaration;
+      var decl = (Declaration)dtor.eContainer();
+      if (!decl.getQualifiers().contains(TypeQualifier.CONST)) {
+        confirmedAliases.add(currEntity);
+      }
+      var initializer = dtor.getInitializer();
       if (initializer instanceof ExpressionInitializer exprInit &&
           exprInit.getValue() instanceof EntityReference entityRef) {
         currEntity = entityRef.getTarget();
@@ -257,11 +264,20 @@ class ForLoopAnalyzer {
         return null;
       }
     }
-    var aliasDeclarators = new ArrayList<Declarator>();
+    if (currEntity.eContainer() instanceof Declaration decl &&
+        decl.getQualifiers().contains(TypeQualifier.CONST)) {
+      assert confirmedAliases.isEmpty()
+          : "There can be no non-const aliases for a const variable";
+      return confirmedAliases;
+    }
     confirmedAliases.add(currEntity);
+    var aliasDeclarators = new ArrayList<Declarator>();
     for (Statement s : isa.getArchStateBody()) {
       if (s instanceof DeclarationStatement declStmt) {
         var declaration = declStmt.getDeclaration();
+        if (declaration.getQualifiers().contains(TypeQualifier.CONST)) {
+          continue;
+        }
         for (var dtor : declaration.getDeclarators()) {
           if (dtor.isAlias()) {
             aliasDeclarators.add(dtor);
@@ -297,7 +313,7 @@ class ForLoopAnalyzer {
   // Returns true if we cannot prove that the entity is not modified in the loop
   private static boolean entityMayBeModifiedInLoop(NamedEntity entity,
                                                    ForLoop loop) {
-    var aliases = getAllEntityAliases(entity);
+    var aliases = getMutableAliases(entity);
     if (aliases == null) {
       return true;
     }
