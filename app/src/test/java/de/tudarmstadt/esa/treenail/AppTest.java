@@ -832,7 +832,8 @@ class AppTest {
     int instrIdx = mlirCode.indexOf(instrName);
     assert instrIdx != -1 : "Expected name of instruction to match output";
     int endIdx = mlirCode.indexOf("coredsl.end", instrIdx);
-    assert endIdx != -1 : "Expected a coredsl.end instruction inside coredsl.instruction";
+    assert endIdx != -1
+        : "Expected a coredsl.end instruction inside coredsl.instruction";
     String instrBody = mlirCode.substring(instrIdx, endIdx);
     // Check whether scf.for or scf.while are the next instruction from the
     // given instruction
@@ -1055,12 +1056,12 @@ class AppTest {
     // ConstBoundsLT
     assertTrue(hasForLoop(mlirCode, "ConstBoundsLT"));
     assertTrue(mlirCode.contains("""
-        %10 = hw.constant 0 : i6
-        %11 = hw.constant 20 : i6
-        %12 = hw.constant 1 : i6
-        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i6 {
-          %14 = hwarith.cast %13 : (i6) -> ui6
-          %15 = coredsl.cast %14 : ui6 to ui32
+        %10 = hw.constant 0 : i5
+        %11 = hw.constant 20 : i5
+        %12 = hw.constant 1 : i5
+        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i5 {
+          %14 = hwarith.cast %13 : (i5) -> ui5
+          %15 = coredsl.cast %14 : ui5 to ui32
           %18 = hwarith.add %rs1, %15 : (ui5, ui32) -> ui33
           %19 = coredsl.cast %18 : ui33 to ui32
           %17 = coredsl.get @MEM[%19 : ui32] : ui8
@@ -1072,12 +1073,12 @@ class AppTest {
     // ConstBoundsLE
     assertTrue(hasForLoop(mlirCode, "ConstBoundsLE"));
     assertTrue(mlirCode.contains("""
-        %10 = hw.constant 0 : i6
-        %11 = hw.constant 21 : i6
-        %12 = hw.constant 1 : i6
-        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i6 {
-          %14 = hwarith.cast %13 : (i6) -> ui6
-          %15 = coredsl.cast %14 : ui6 to ui32
+        %10 = hw.constant 0 : i5
+        %11 = hw.constant 21 : i5
+        %12 = hw.constant 1 : i5
+        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i5 {
+          %14 = hwarith.cast %13 : (i5) -> ui5
+          %15 = coredsl.cast %14 : ui5 to ui32
           %18 = hwarith.add %rs1, %15 : (ui5, ui32) -> ui33
           %19 = coredsl.cast %18 : ui33 to ui32
           %17 = coredsl.get @MEM[%19 : ui32] : ui8
@@ -1089,12 +1090,12 @@ class AppTest {
     // ConstBoundsStep2
     assertTrue(hasForLoop(mlirCode, "ConstBoundsStep2"));
     assertTrue(mlirCode.contains("""
-        %10 = hw.constant 0 : i6
-        %11 = hw.constant 20 : i6
-        %12 = hw.constant 2 : i6
-        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i6 {
-          %14 = hwarith.cast %13 : (i6) -> ui6
-          %15 = coredsl.cast %14 : ui6 to ui32
+        %10 = hw.constant 0 : i5
+        %11 = hw.constant 20 : i5
+        %12 = hw.constant 2 : i5
+        %13 = scf.for unsigned %13 = %10 to %11 step %12 iter_args(%16 = %9) -> (ui32) : i5 {
+          %14 = hwarith.cast %13 : (i5) -> ui5
+          %15 = coredsl.cast %14 : ui5 to ui32
           %18 = hwarith.add %rs1, %15 : (ui5, ui32) -> ui33
           %19 = coredsl.cast %18 : ui33 to ui32
           %17 = coredsl.get @MEM[%19 : ui32] : ui8
@@ -1106,14 +1107,14 @@ class AppTest {
     // ConstBoundsGT
     assertTrue(hasForLoop(mlirCode, "ConstBoundsGT"));
     assertTrue(mlirCode.contains("""
-        %10 = hw.constant -1 : i7
-        %11 = hw.constant 20 : i7
-        %12 = hw.constant 2 : i7
-        %13 = scf.for %13 = %10 to %11 step %12 iter_args(%18 = %9) -> (ui32) : i7 {
-          %14 = hw.constant 0 : i7
-          %15 = comb.sub %14, %13 : i7
-          %16 = hwarith.cast %15 : (i7) -> si7
-          %17 = coredsl.cast %16 : si7 to si32
+        %10 = hw.constant -1 : i6
+        %11 = hw.constant 20 : i6
+        %12 = hw.constant 2 : i6
+        %13 = scf.for %13 = %10 to %11 step %12 iter_args(%18 = %9) -> (ui32) : i6 {
+          %14 = hw.constant 0 : i6
+          %15 = comb.sub %14, %13 : i6
+          %16 = hwarith.cast %15 : (i6) -> si6
+          %17 = coredsl.cast %16 : si6 to si32
           %20 = hwarith.add %rs1, %17 : (ui5, si32) -> si33
           %21 = coredsl.cast %20 : si33 to ui32
           %19 = coredsl.get @MEM[%21 : ui32] : ui8
@@ -1125,14 +1126,14 @@ class AppTest {
     // ConstBoundsGE
     assertTrue(hasForLoop(mlirCode, "ConstBoundsGE"));
     assertTrue(mlirCode.contains("""
-        %10 = hw.constant -1 : i7
-        %11 = hw.constant 21 : i7
-        %12 = hw.constant 2 : i7
-        %13 = scf.for %13 = %10 to %11 step %12 iter_args(%18 = %9) -> (ui32) : i7 {
-          %14 = hw.constant 0 : i7
-          %15 = comb.sub %14, %13 : i7
-          %16 = hwarith.cast %15 : (i7) -> si7
-          %17 = coredsl.cast %16 : si7 to si32
+        %10 = hw.constant -1 : i6
+        %11 = hw.constant 21 : i6
+        %12 = hw.constant 2 : i6
+        %13 = scf.for %13 = %10 to %11 step %12 iter_args(%18 = %9) -> (ui32) : i6 {
+          %14 = hw.constant 0 : i6
+          %15 = comb.sub %14, %13 : i6
+          %16 = hwarith.cast %15 : (i6) -> si6
+          %17 = coredsl.cast %16 : si6 to si32
           %20 = hwarith.add %rs1, %17 : (ui5, si32) -> si33
           %21 = coredsl.cast %20 : si33 to ui32
           %19 = coredsl.get @MEM[%21 : ui32] : ui8
