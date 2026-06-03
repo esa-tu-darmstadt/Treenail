@@ -4,7 +4,6 @@ import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigI
 
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.*;
-
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Set;
