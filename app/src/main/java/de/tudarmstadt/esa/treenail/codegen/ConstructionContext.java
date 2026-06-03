@@ -173,8 +173,8 @@ class ConstructionContext {
   // using this function when we know that the operations are needed in the
   // main context
   void appendDerivedCC(ConstructionContext derived) {
-    assert counter.get() <= derived.counter.get();
-    counter.set(derived.counter.get());
+    assert getValueCounter() <= derived.getValueCounter();
+    valueCounter.set(derived.getValueCounter());
     // TODO: make this check if all values of values are in derived.values (not
     //  necessarily the same value but same key)
     values.putAll(derived.values);
