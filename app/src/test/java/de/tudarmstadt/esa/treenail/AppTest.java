@@ -1057,7 +1057,6 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
-    System.out.println(mlirCode);
     // clang-format off
     // ConstBoundsLT
     assertTrue(instrHasSCFFor(mlirCode, "ConstBoundsLT"));
@@ -1289,6 +1288,5 @@ class AppTest {
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedViableBitRef"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleBitRef"));
     // clang-format on
-    assertFalse(true);
   }
 }
