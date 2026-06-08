@@ -21,7 +21,8 @@ import org.eclipse.emf.common.util.TreeIterator;
 import org.eclipse.emf.ecore.EObject;
 
 class AliasAnalysis {
-  // Returns null if any alias initializer could not be resolved
+  // Returns null if any alias initializer could not be resolved, meaning there
+  // may be mutable aliases we do not know of
   private static HashSet<NamedEntity> getMutableAliases(NamedEntity entity) {
     var currEntity = entity;
     var confirmedAliases = new HashSet<NamedEntity>();
@@ -71,9 +72,6 @@ class AliasAnalysis {
         return confirmedAliases;
       }
     }
-    // TODO: this assumes that all entities that do not have a declaration
-    //  as parent are mutable. This is the case for BitField, but are there
-    //  others?
     confirmedAliases.add(currEntity);
     var aliasDeclarators = new ArrayList<Declarator>();
     for (Statement s : isa.getArchStateBody()) {
@@ -130,13 +128,15 @@ class AliasAnalysis {
             return true;
           }
         } else if (item instanceof PrefixExpression prefix) {
-          // TODO: are there prefix expressions that don't mutate?
-          if (containsOneOf(prefix.getOperand(), aliases)) {
+          String operator = prefix.getOperator();
+          if ((operator.equals("++") || operator.equals("--")) &&
+              containsOneOf(prefix.getOperand(), aliases)) {
             return true;
           }
         } else if (item instanceof PostfixExpression postfix) {
-          // TODO: are there postfix expressions that don't mutate?
-          if (containsOneOf(postfix.getOperand(), aliases)) {
+          String operator = postfix.getOperator();
+          if ((operator.equals("++") || operator.equals("--")) &&
+              containsOneOf(postfix.getOperand(), aliases)) {
             return true;
           }
         }
