@@ -146,9 +146,8 @@ class ForLoopAnalyzer {
   static final Set<String> COMP_ASSIGN = Set.of("+=", "-=");
 
   // Either get the existing MLIR value that represents entity or load the
-  // value using coredsl.get
-  // TODO: name
-  static MLIRValue getOrMakeEntityValue(NamedEntity entity,
+  // value using coredsl.get if it is architectural state
+  static MLIRValue getOrLoadEntityValue(NamedEntity entity,
                                         ConstructionContext cc,
                                         AnalysisContext ac) {
     var mlirValue = cc.getValue(entity);
@@ -180,7 +179,7 @@ class ForLoopAnalyzer {
       var exprInit = (ExpressionInitializer)init;
       res.variable = dtor;
       if (exprInit.getValue() instanceof EntityReference entityRef) {
-        var mlirValue = getOrMakeEntityValue(entityRef.getTarget(), cc, ac);
+        var mlirValue = getOrLoadEntityValue(entityRef.getTarget(), cc, ac);
         res.value = new RuntimeValue(mlirValue, cc);
       } else if (exprInit.getValue() instanceof IntegerConstant konst) {
         var resVal = ensureBigInteger(konst.getValue(), null);
@@ -223,7 +222,7 @@ class ForLoopAnalyzer {
         if (AliasAnalysis.entityMayBeModifiedIn(entity, loopBody)) {
           return null;
         }
-        var mlirValue = getOrMakeEntityValue(entity, cc, ac);
+        var mlirValue = getOrLoadEntityValue(entity, cc, ac);
         res.bound = new RuntimeValue(mlirValue, cc);
       } else {
         return null;
@@ -293,7 +292,7 @@ class ForLoopAnalyzer {
         res.step = new ConstValue(stepVal, cc);
       } else if (assign.getValue() instanceof EntityReference rhs) {
         res.step = null;
-        var mlirValue = getOrMakeEntityValue(rhs.getTarget(), cc, ac);
+        var mlirValue = getOrLoadEntityValue(rhs.getTarget(), cc, ac);
         res.step = new RuntimeValue(mlirValue, cc);
         if ("-=".equals(opr)) {
           // TODO: this always makes it impossible to create an scf.for from
