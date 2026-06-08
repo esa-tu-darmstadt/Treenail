@@ -56,7 +56,8 @@ class MLIRType {
   }
 
   public static MLIRType getAddResultType(MLIRType lhsTy, MLIRType rhsTy) {
-    return getType(getAddSubResultWidth(lhsTy, rhsTy), lhsTy.isSigned | rhsTy.isSigned);
+    return getType(getAddSubResultWidth(lhsTy, rhsTy),
+                   lhsTy.isSigned | rhsTy.isSigned);
   }
 
   public static MLIRType getSubResultType(MLIRType lhsTy, MLIRType rhsTy) {
