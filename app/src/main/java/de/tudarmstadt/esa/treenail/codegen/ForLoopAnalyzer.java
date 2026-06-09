@@ -75,22 +75,12 @@ class ForLoopAnalyzer {
 
     @Override
     void addOne() {
-      var one = cc.makeConst(BigInteger.ONE, MLIRType.getType(1, false));
-      var resultType = MLIRType.getAddResultType(currValue.type, one.type);
-      var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.add %s, %s : (%s, %s) -> %s", newCurr, currValue,
-                one, currValue.type, one.type, newCurr.type);
-      currValue = newCurr;
+      currValue = ExpressionSwitch.emitIncrementOrDecrement(cc, currValue, false);
     }
 
     @Override
     void subOne() {
-      var one = cc.makeConst(BigInteger.ONE, MLIRType.getType(1, false));
-      var resultType = MLIRType.getSubResultType(currValue.type, one.type);
-      var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.sub %s, %s : (%s, %s) -> %s", newCurr, currValue,
-                one, currValue.type, one.type, newCurr.type);
-      currValue = newCurr;
+      currValue = ExpressionSwitch.emitIncrementOrDecrement(cc, currValue, true);
     }
 
     @Override
