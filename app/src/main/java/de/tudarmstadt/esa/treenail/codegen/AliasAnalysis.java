@@ -134,9 +134,10 @@ class AliasAnalysis {
             return true;
           }
         } else if (item instanceof PostfixExpression postfix) {
-          String operator = postfix.getOperator();
-          if ((operator.equals("++") || operator.equals("--")) &&
-              containsOneOf(postfix.getOperand(), aliases)) {
+          assert postfix.getOperator().equals("++") ||
+              postfix.getOperator().equals("--")
+              : "Unexpected postfix operator";
+          if (containsOneOf(postfix.getOperand(), aliases)) {
             return true;
           }
         }
