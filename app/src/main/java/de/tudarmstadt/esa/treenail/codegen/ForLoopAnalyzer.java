@@ -75,12 +75,14 @@ class ForLoopAnalyzer {
 
     @Override
     void addOne() {
-      currValue = ExpressionSwitch.emitIncrementOrDecrement(cc, currValue, false);
+      currValue =
+          ExpressionSwitch.emitIncrementOrDecrement(cc, currValue, false);
     }
 
     @Override
     void subOne() {
-      currValue = ExpressionSwitch.emitIncrementOrDecrement(cc, currValue, true);
+      currValue =
+          ExpressionSwitch.emitIncrementOrDecrement(cc, currValue, true);
     }
 
     @Override
