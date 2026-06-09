@@ -7,7 +7,7 @@ InstructionSet TestScfForLoop {
       register unsigned<XLEN> TEST_REG = 10;
       unsigned<XLEN> &REG_REF = TEST_REG;
       unsigned<XLEN> &REG_REF_REF = REG_REF;
-      unsigned<4> &REG_BIT_REF = REG_REF[0:3];
+      unsigned<4> &REG_BIT_REF = REG_REF[3:0];
     }
 
   instructions {
