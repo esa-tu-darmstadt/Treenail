@@ -78,8 +78,8 @@ class ForLoopAnalyzer {
       var one = cc.makeConst(BigInteger.ONE, MLIRType.getType(1, false));
       var resultType = MLIRType.getAddResultType(currValue.type, one.type);
       var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.add %s, %s : %s", newCurr, currValue, one,
-                newCurr.type);
+      cc.emitLn("%s = hwarith.add %s, %s : (%s, %s) -> %s", newCurr, currValue,
+                one, currValue.type, one.type, newCurr.type);
       currValue = newCurr;
     }
 
@@ -88,8 +88,8 @@ class ForLoopAnalyzer {
       var one = cc.makeConst(BigInteger.ONE, MLIRType.getType(1, false));
       var resultType = MLIRType.getSubResultType(currValue.type, one.type);
       var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.sub %s, %s : %s", newCurr, currValue, one,
-                newCurr.type);
+      cc.emitLn("%s = hwarith.sub %s, %s : (%s, %s) -> %s", newCurr, currValue,
+                one, currValue.type, one.type, newCurr.type);
       currValue = newCurr;
     }
 
@@ -99,9 +99,15 @@ class ForLoopAnalyzer {
       int resWidth = currValue.type.isSigned ? currValue.type.width
                                              : currValue.type.width + 1;
       var resultType = MLIRType.getType(resWidth, true);
+      var intermediateResultType =
+          MLIRType.getSubResultType(zero.type, currValue.type);
+      var intermediateRes = cc.makeAnonymousValue(intermediateResultType);
+      cc.emitLn("%s = hwarith.sub %s, %s : (%s, %s) -> %s", intermediateRes,
+                zero, currValue, zero.type, currValue.type,
+                intermediateResultType);
       var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.sub %s, %s : %s", newCurr, zero, currValue,
-                newCurr.type);
+      cc.emitLn("%s = hwarith.cast %s : (%s) -> %s", newCurr, intermediateRes,
+                intermediateRes.type, resultType);
       currValue = newCurr;
     }
 

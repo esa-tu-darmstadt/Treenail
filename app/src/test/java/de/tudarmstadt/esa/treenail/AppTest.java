@@ -1196,7 +1196,7 @@ class AppTest {
         %8 = hwarith.constant 0 : ui1
         %9 = coredsl.cast %8 : ui1 to ui32
         %10 = hwarith.constant 1 : ui1
-        %11 = hwarith.add %7, %10 : ui33
+        %11 = hwarith.add %7, %10 : (ui32, ui1) -> ui33
         %12 = hwarith.cast %2 : (ui32) -> i33
         %13 = hwarith.cast %11 : (ui33) -> i33
         %14 = hw.constant 1 : i33
@@ -1224,22 +1224,24 @@ class AppTest {
         %8 = hwarith.constant 0 : ui1
         %9 = coredsl.cast %8 : ui1 to ui32
         %10 = hwarith.constant 0 : ui1
-        %11 = hwarith.sub %10, %2 : si32
-        %12 = hwarith.constant 0 : ui1
-        %13 = hwarith.sub %12, %7 : si32
-        %14 = hwarith.cast %11 : (si32) -> i32
-        %15 = hwarith.cast %13 : (si32) -> i32
-        %16 = hw.constant 2 : i32
-        %17 = scf.for %17 = %14 to %15 step %16 iter_args(%21 = %9) -> (ui32) : i32 {
-          %18 = hw.constant 0 : i32
-          %19 = comb.sub %18, %17 : i32
-          %20 = hwarith.cast %19 : (i32) -> si32
-          %23 = hwarith.add %rs1, %20 : (ui5, si32) -> si33
-          %24 = coredsl.cast %23 : si33 to ui32
-          %22 = coredsl.get @MEM[%24 : ui32] : ui8
-          %25 = hwarith.add %21, %22 : (ui32, ui8) -> ui33
-          %26 = coredsl.cast %25 : ui33 to ui32
-          scf.yield %26 : ui32
+        %11 = hwarith.sub %10, %2 : (ui1, si32) -> si33
+        %12 = hwarith.cast %11 : (si33) -> si32
+        %13 = hwarith.constant 0 : ui1
+        %14 = hwarith.sub %13, %7 : (ui1, si32) -> si33
+        %15 = hwarith.cast %14 : (si33) -> si32
+        %16 = hwarith.cast %12 : (si32) -> i32
+        %17 = hwarith.cast %15 : (si32) -> i32
+        %18 = hw.constant 2 : i32
+        %19 = scf.for %19 = %16 to %17 step %18 iter_args(%23 = %9) -> (ui32) : i32 {
+          %20 = hw.constant 0 : i32
+          %21 = comb.sub %20, %19 : i32
+          %22 = hwarith.cast %21 : (i32) -> si32
+          %25 = hwarith.add %rs1, %22 : (ui5, si32) -> si33
+          %26 = coredsl.cast %25 : si33 to ui32
+          %24 = coredsl.get @MEM[%26 : ui32] : ui8
+          %27 = hwarith.add %23, %24 : (ui32, ui8) -> ui33
+          %28 = coredsl.cast %27 : ui33 to ui32
+          scf.yield %28 : ui32
         }
     """));
     assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundsGE"));
@@ -1255,25 +1257,27 @@ class AppTest {
         %8 = hwarith.constant 0 : ui1
         %9 = coredsl.cast %8 : ui1 to ui32
         %10 = hwarith.constant 1 : ui1
-        %11 = hwarith.sub %7, %10 : si33
+        %11 = hwarith.sub %7, %10 : (si32, ui1) -> si33
         %12 = hwarith.constant 0 : ui1
-        %13 = hwarith.sub %12, %2 : si32
-        %14 = hwarith.constant 0 : ui1
-        %15 = hwarith.sub %14, %11 : si33
-        %16 = hwarith.cast %13 : (si32) -> i33
-        %17 = hwarith.cast %15 : (si33) -> i33
-        %18 = hw.constant 2 : i33
-        %19 = scf.for %19 = %16 to %17 step %18 iter_args(%24 = %9) -> (ui32) : i33 {
-          %20 = hw.constant 0 : i33
-          %21 = comb.sub %20, %19 : i33
-          %22 = hwarith.cast %21 : (i33) -> si33
-          %23 = coredsl.cast %22 : si33 to si32
-          %26 = hwarith.add %rs1, %23 : (ui5, si32) -> si33
-          %27 = coredsl.cast %26 : si33 to ui32
-          %25 = coredsl.get @MEM[%27 : ui32] : ui8
-          %28 = hwarith.add %24, %25 : (ui32, ui8) -> ui33
-          %29 = coredsl.cast %28 : ui33 to ui32
-          scf.yield %29 : ui32
+        %13 = hwarith.sub %12, %2 : (ui1, si32) -> si33
+        %14 = hwarith.cast %13 : (si33) -> si32
+        %15 = hwarith.constant 0 : ui1
+        %16 = hwarith.sub %15, %11 : (ui1, si33) -> si34
+        %17 = hwarith.cast %16 : (si34) -> si33
+        %18 = hwarith.cast %14 : (si32) -> i33
+        %19 = hwarith.cast %17 : (si33) -> i33
+        %20 = hw.constant 2 : i33
+        %21 = scf.for %21 = %18 to %19 step %20 iter_args(%26 = %9) -> (ui32) : i33 {
+          %22 = hw.constant 0 : i33
+          %23 = comb.sub %22, %21 : i33
+          %24 = hwarith.cast %23 : (i33) -> si33
+          %25 = coredsl.cast %24 : si33 to si32
+          %28 = hwarith.add %rs1, %25 : (ui5, si32) -> si33
+          %29 = coredsl.cast %28 : si33 to ui32
+          %27 = coredsl.get @MEM[%29 : ui32] : ui8
+          %30 = hwarith.add %26, %27 : (ui32, ui8) -> ui33
+          %31 = coredsl.cast %30 : ui33 to ui32
+          scf.yield %31 : ui32
         }
     """));
 
