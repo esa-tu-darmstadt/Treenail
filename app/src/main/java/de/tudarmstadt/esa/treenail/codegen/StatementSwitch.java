@@ -1,7 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
+import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -128,7 +128,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   }
 
   private record SwitchFinalBranchesRes(
-      LinkedHashSet<NamedEntity> updatedEntities, List<MLIRType> returnTypes,
+      LinkedHashSet<NamedEntity> updatedEntities, List<MLIRIntType> returnTypes,
       String returnTypesString,
       // The values representing the updated entities after the switch is done
       List<MLIRValue> resultValues) {}
@@ -154,7 +154,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var ac = cc.getAnalysisContext();
     var returnTypes = updatedEntities.stream()
                           .map(ac::getDeclaredType)
-                          .map(MLIRType::mapType)
+                          .map(MLIRIntType::mapType)
                           .toList();
     var returnTypesStr =
         returnTypes.stream().map(Object::toString).collect(joining(", "));
@@ -245,11 +245,13 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       // For an empty switch statement, there is nothing to do
       return this;
     }
+    assert condVal.type instanceof MLIRIntType;
+    var condValIntType = (MLIRIntType)condVal.type;
     // The case values need to fit into a signed n bit integer, so if we have
     // an unsigned value, the max value of that type may be a case value,
     // which is not representable as n bit signed integer
     final int condWidth =
-        condVal.type.isSigned ? condVal.type.width : condVal.type.width + 1;
+        condValIntType.isSigned ? condValIntType.width : condValIntType.width + 1;
     // cf.switch wants signless values
     final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
     var sectionCCs = new ArrayList<ConstructionContext>();
@@ -527,12 +529,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var isActualSigned =
         minTypeInit.isSigned || minTypeStep.isSigned || minTypeBound.isSigned;
     var isUnsignedCmp = !isActualSigned;
-    Function<MLIRType, Integer> getBitWidth =
+    Function<MLIRIntType, Integer> getBitWidth =
         x -> x.width + (isActualSigned != x.isSigned ? 1 : 0);
     var minBitWidth = Math.max(getBitWidth.apply(minTypeInit),
                                Math.max(getBitWidth.apply(minTypeStep),
                                         getBitWidth.apply(minTypeBound)));
-    var actualIterType = MLIRType.getType(minBitWidth, isActualSigned);
+    var actualIterType = MLIRIntType.getType(minBitWidth, isActualSigned);
 
     // For now, only loops with constant bounds/trip counts are supported.
     var from = initValue.getAsMLIRValue(actualIterType);
@@ -546,23 +548,23 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var forCC = cc.createDerivedCC();
 
     // Make the iterator available as an ui/si value in the body.
-    var iterIndex = forCC.makeAnonymousValue(MLIRType.DUMMY);
+    var iterIndex = forCC.makeAnonymousValue(MLIRSignlessIntType.getType(actualIterType.width));
     var iterMlirVal = iterIndex;
     if (mustNegateItVar) {
       var zeroConst = forCC.makeHWConst(BigInteger.ZERO, actualIterType.width);
-      var negatedIdx = forCC.makeAnonymousValue(MLIRType.DUMMY);
-      forCC.emitLn("%s = comb.sub %s, %s : i%d", negatedIdx, zeroConst,
-                   iterIndex, actualIterType.width);
+      var negatedIdx = forCC.makeAnonymousValue(iterIndex.type);
+      forCC.emitLn("%s = comb.sub %s, %s : %s", negatedIdx, zeroConst,
+                   iterIndex, iterIndex.type);
       iterMlirVal = negatedIdx;
     }
     var iterRawVal = forCC.makeHWConstCast(
         iterMlirVal, actualIterType.width,
-        MLIRType.getType(actualIterType.width, expectedIterType.isSigned));
+        MLIRIntType.getType(actualIterType.width, expectedIterType.isSigned));
     iterMlirVal = forCC.makeCast(iterRawVal, expectedIterType);
     forCC.setValue(iterVar, iterMlirVal);
 
     // Make other iterArgs available in the body, and create result values.
-    var iterArgTypes = new LinkedList<MLIRType>();
+    var iterArgTypes = new LinkedList<MLIRIntType>();
     var iterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var results = new LinkedList<MLIRValue>();
     for (var v : iterArgVars) {
@@ -641,7 +643,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var beforeCC = cc.createDerivedCC();
     var afterCC = cc.createDerivedCC();
 
-    var argTypes = new LinkedList<MLIRType>();
+    var argTypes = new LinkedList<MLIRIntType>();
     var beforeArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var afterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var results = new LinkedList<MLIRValue>();

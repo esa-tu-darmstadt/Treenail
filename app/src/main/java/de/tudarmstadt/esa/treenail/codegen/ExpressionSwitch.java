@@ -1,8 +1,8 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.getType;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
+import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.getType;
+import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.mapType;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.Streams;
@@ -46,7 +46,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     private record StoreInfo(boolean isBitAccess,
                              RangeAnalyzer.RangeResult index,
                              // The original value modified through this store
-                             MLIRValue modifiedValue, MLIRType accessType) {}
+                             MLIRValue modifiedValue, MLIRIntType accessType) {}
     private final Stack<StoreInfo> storeStack = new Stack<>();
     // The final store is special, because we are not setting an MLIRValue, but
     // a NamedEntity
@@ -56,7 +56,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                    // For other accesses, we can write to destEntity directly,
                    // but for bit accesses, we first need to use bitset on the
                    // value originally loaded from entity, then set it
-                   MLIRValue bitAccessOldValue, MLIRType accessType) {}
+                   MLIRValue bitAccessOldValue, MLIRIntType accessType) {}
     private FinalStoreInfo finalStore = null;
     StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
 
@@ -223,12 +223,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var lhsVal = doSwitch(lhs);
 
       var binOpr = opr.substring(0, opr.length() - 1);
-      var lhsTy = lhsVal.type;
-      var rhsTy = rhsVal.type;
+      assert lhsVal.type instanceof MLIRIntType;
+      assert rhsVal.type instanceof MLIRIntType;
+      var lhsTy = (MLIRIntType)lhsVal.type;
+      var rhsTy = (MLIRIntType)rhsVal.type;
 
       // The result type of the underlying binary op cannot be queried from the
       // analysis context, so we have to manually compute it again here.
-      MLIRType type = null;
+      MLIRIntType type = null;
       switch (binOpr) {
       case "&":
       case "|":
@@ -365,12 +367,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   private static MLIRValue convertIntToBool(MLIRValue value,
                                             ConstructionContext cc) {
-    if (value.type.isSigned || value.type.width > 1) {
-      var zero = cc.makeConst(BigInteger.ZERO, value.type);
-      var valueAsBool = cc.makeAnonymousValue(MLIRType.DUMMY);
+    assert value.type instanceof MLIRIntType;
+    var valIntType = (MLIRIntType)value.type;
+    if (valIntType.isSigned || valIntType.width > 1) {
+      var zero = cc.makeConst(BigInteger.ZERO, valIntType);
+      var valueAsBool = cc.makeAnonymousValue(MLIRSignlessIntType.getType(1));
       cc.emitLn("%s = hwarith.icmp ne %s, %s : %s, %s", valueAsBool, value,
                 zero, value.type, zero.type);
-      var hwarithBoolVal = cc.makeAnonymousValue(MLIRType.getType(1, false));
+      var hwarithBoolVal = cc.makeAnonymousValue(MLIRIntType.getType(1, false));
       cc.emitLn("%s = hwarith.cast %s : (i1) -> ui1", hwarithBoolVal,
                 valueAsBool);
       return hwarithBoolVal;
@@ -447,7 +451,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   public static MLIRValue emitIncrementOrDecrement(ConstructionContext cc,
                                                    MLIRValue value,
                                                    boolean decrement) {
-    var type = getType(value.type.width + 1, value.type.isSigned || decrement);
+    assert value.type instanceof MLIRIntType;
+    var valueType = (MLIRIntType)value.type;
+    var type = getType(valueType.width + 1, valueType.isSigned || decrement);
     var one = cc.makeConst(BigInteger.ONE, getType(1, false));
     return emitBinaryOp(cc, binaryOperatorMap.get(decrement ? "-" : "+"), type,
                         value, one);
@@ -507,9 +513,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     var head = doSwitch(parts.get(0));
     for (int i = 1; i < parts.size(); ++i) {
+      assert head.type instanceof MLIRIntType;
       var next = doSwitch(parts.get(i));
-      head = emitBinaryOp(cc, "coredsl.concat",
-                          getType(head.type.width + next.type.width, false),
+      assert next.type instanceof MLIRIntType;
+      var nextIntType = (MLIRIntType)next.type;
+      var headIntType = (MLIRIntType)head.type;
+      head = emitBinaryOp("coredsl.concat",
+                          getType(headIntType.width + nextIntType.width, false),
                           head, next);
     }
 
@@ -624,7 +634,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     var args = call.getArguments().stream().map(this::doSwitch).toList();
     var argTys =
-        funcTy.getParamTypes().stream().map(MLIRType::mapType).toList();
+        funcTy.getParamTypes().stream().map(MLIRIntType::mapType).toList();
     var argsCastStr = Streams
                           .zip(args.stream(), argTys.stream(),
                                (arg, ty) -> cc.makeCast(arg, ty))
@@ -635,7 +645,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     if (funcTy.getReturnType().isVoid()) {
       cc.emitLn("func.call @%s(%s) : (%s) -> ()", callee.getName(), argsCastStr,
                 argTysStr);
-      return cc.makeAnonymousValue(MLIRType.DUMMY);
+      return cc.makeAnonymousValue(MLIRType.VOID);
     }
 
     var retTy = mapType(funcTy.getReturnType());
@@ -648,6 +658,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue defaultCase(EObject obj) {
     cc.emitLn("// unhandled: %s", obj);
-    return cc.makeAnonymousValue(MLIRType.DUMMY);
+    return cc.makeAnonymousValue(MLIRType.VOID);
   }
 }

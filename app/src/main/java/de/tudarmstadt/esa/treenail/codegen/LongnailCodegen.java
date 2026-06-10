@@ -1,7 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigInteger;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
+import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
@@ -27,7 +27,7 @@ import com.minres.coredsl.coreDsl.Statement;
 import com.minres.coredsl.coreDsl.TypeQualifier;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
-import com.minres.coredsl.type.CoreDslType;
+
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
