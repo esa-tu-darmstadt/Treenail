@@ -3,7 +3,6 @@ package de.tudarmstadt.esa.treenail.codegen;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
-import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.BitField;
 import com.minres.coredsl.coreDsl.BitValue;
 import com.minres.coredsl.coreDsl.NamedEntity;
@@ -71,7 +70,7 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
     // Collect all bit fields
     var fields =
         splitValues.computeIfAbsent(field.getName(), s -> new ArrayList<>());
-    var type = MLIRType.getType(start - end + 1, false);
+    var type = MLIRIntType.getType(start - end + 1, false);
     var value = new MLIRValue(
         UNIQUE_PREFIX + field.getName() + '_' + start + '_' + end, type);
     fields.add(new EncodingValue(field, value, start, end, reversed));
@@ -88,9 +87,10 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
       var parts = e.getValue();
       int width = 0;
       for (var v : parts) {
-        width += v.val.type.width;
+        assert v.val.type instanceof MLIRIntType;
+        width += ((MLIRIntType)v.val.type).width;
       }
-      var type = MLIRType.getType(width, false);
+      var type = MLIRIntType.getType(width, false);
       var targetValue = new MLIRValue(e.getKey(), type);
       // Ensure that the mapping to the target value exists
       values.put(parts.get(0).name, targetValue);
@@ -135,8 +135,12 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
         }
 
         if (tmpVal != null) {
+          assert tmpVal.type instanceof MLIRIntType;
+          assert partVal.type instanceof MLIRIntType;
+          var tmpValIntType = (MLIRIntType)tmpVal.type;
+          var partValIntType = (MLIRIntType)partVal.type;
           var tmpType =
-              MLIRType.getType(tmpVal.type.width + partVal.type.width, false);
+              MLIRIntType.getType(tmpValIntType.width + partValIntType.width, false);
           var newTmpVar = new MLIRValue(UNIQUE_PREFIX + tmpValCnt++, tmpType);
           splitValueDefStmts.add(newTmpVar + " = coredsl.concat " + partVal +
                                  ", " + tmpVal + " : " + partVal.type + ", " +
