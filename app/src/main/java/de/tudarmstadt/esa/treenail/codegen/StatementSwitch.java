@@ -250,8 +250,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // The case values need to fit into a signed n bit integer, so if we have
     // an unsigned value, the max value of that type may be a case value,
     // which is not representable as n bit signed integer
-    final int condWidth =
-        condValIntType.isSigned ? condValIntType.width : condValIntType.width + 1;
+    final int condWidth = condValIntType.isSigned ? condValIntType.width
+                                                  : condValIntType.width + 1;
     // cf.switch wants signless values
     final var condValSignless = cc.makeSignlessCast(condVal, condWidth);
     var sectionCCs = new ArrayList<ConstructionContext>();
@@ -548,7 +548,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var forCC = cc.createDerivedCC();
 
     // Make the iterator available as an ui/si value in the body.
-    var iterIndex = forCC.makeAnonymousValue(MLIRSignlessIntType.getType(actualIterType.width));
+    var iterIndex = forCC.makeAnonymousValue(
+        MLIRSignlessIntType.getType(actualIterType.width));
     var iterMlirVal = iterIndex;
     if (mustNegateItVar) {
       var zeroConst = forCC.makeHWConst(BigInteger.ZERO, actualIterType.width);
