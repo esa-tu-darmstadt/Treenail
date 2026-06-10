@@ -1294,4 +1294,15 @@ class AppTest {
     assertFalse(instrHasSCFFor(mlirCode, "NotViableStepModified"));
     // clang-format on
   }
+
+  @Test
+  void structsWork() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("structs.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    // TODO: remove when actual test implemented
+    assertFalse(true);
+  }
 }

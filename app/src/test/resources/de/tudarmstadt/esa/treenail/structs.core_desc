@@ -1,0 +1,17 @@
+InstructionSet Structs {
+  architectural_state {
+    struct Simple {
+      unsigned<32> x, y;
+      signed<16> a, b, c, d;
+    }
+  }
+
+  instructions {
+    StructTest {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+
+      }
+    }
+  }
+}
