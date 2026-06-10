@@ -10,8 +10,9 @@ class MLIRIntType extends MLIRType {
   int width;
   boolean isSigned;
 
-  private static Map<Integer, MLIRIntType> unsignedTypes = new LinkedHashMap<>(),
-                                        signedTypes = new LinkedHashMap<>();
+  private static Map<Integer, MLIRIntType> unsignedTypes =
+                                               new LinkedHashMap<>(),
+                                           signedTypes = new LinkedHashMap<>();
 
   private MLIRIntType(int width, boolean isSigned) {
     assert width > 0;

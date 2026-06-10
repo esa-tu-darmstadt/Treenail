@@ -139,8 +139,8 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
           assert partVal.type instanceof MLIRIntType;
           var tmpValIntType = (MLIRIntType)tmpVal.type;
           var partValIntType = (MLIRIntType)partVal.type;
-          var tmpType =
-              MLIRIntType.getType(tmpValIntType.width + partValIntType.width, false);
+          var tmpType = MLIRIntType.getType(
+              tmpValIntType.width + partValIntType.width, false);
           var newTmpVar = new MLIRValue(UNIQUE_PREFIX + tmpValCnt++, tmpType);
           splitValueDefStmts.add(newTmpVar + " = coredsl.concat " + partVal +
                                  ", " + tmpVal + " : " + partVal.type + ", " +
