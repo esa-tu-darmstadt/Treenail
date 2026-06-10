@@ -1349,4 +1349,15 @@ class AppTest {
         mlirCode.contains("} {coredsl.attr.unroll, coredsl.attr.pipeline = 2}"),
         "for-loop attributes should be forwarded onto scf.for");
   }
+
+  @Test
+  void structsWork() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("structs.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    // TODO: remove when actual test implemented
+    assertFalse(true);
+  }
 }
