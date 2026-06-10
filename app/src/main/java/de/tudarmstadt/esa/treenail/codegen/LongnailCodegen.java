@@ -6,28 +6,13 @@ import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
 import com.minres.coredsl.analysis.AnalysisContext;
+import com.minres.coredsl.coreDsl.*;
 import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
-import com.minres.coredsl.coreDsl.AlwaysBlock;
-import com.minres.coredsl.coreDsl.Attribute;
-import com.minres.coredsl.coreDsl.Declaration;
-import com.minres.coredsl.coreDsl.DeclarationStatement;
-import com.minres.coredsl.coreDsl.Declarator;
-import com.minres.coredsl.coreDsl.DescriptionContent;
-import com.minres.coredsl.coreDsl.Encoding;
-import com.minres.coredsl.coreDsl.EntityReference;
-import com.minres.coredsl.coreDsl.ExpressionInitializer;
-import com.minres.coredsl.coreDsl.FunctionDefinition;
-import com.minres.coredsl.coreDsl.ISA;
-import com.minres.coredsl.coreDsl.IndexAccessExpression;
-import com.minres.coredsl.coreDsl.Instruction;
-import com.minres.coredsl.coreDsl.ListInitializer;
-import com.minres.coredsl.coreDsl.NamedEntity;
-import com.minres.coredsl.coreDsl.Statement;
-import com.minres.coredsl.coreDsl.TypeQualifier;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
 
+import java.awt.desktop.SystemSleepEvent;
 import java.math.BigInteger;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
@@ -89,6 +74,26 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var sb = new StringBuilder();
 
     sb.append(format("coredsl.isax \"%s\" {\n", isa.getName()));
+    for (var typeDecl : isa.getTypeDeclarations()) {
+      if (typeDecl instanceof StructTypeDeclaration structDecl) {
+        var members = new LinkedHashMap<String, MLIRType>();
+        for (var member : structDecl.getMembers()) {
+          // TODO: qualifiers
+          // - structs with volatile members exist
+          // TODO: non-int types (for now only other structs, later arrays and maybe unions)
+          var memberType = mapType(ctx.getSpecifiedType(member.getType()));
+          for (var dtor : member.getDeclarators()) {
+            var memberName = dtor.getName();
+            members.put(memberName, memberType);
+          }
+        }
+        MLIRStructType.registerStructType(structDecl.getName(), members);
+      } else if (typeDecl instanceof UnionTypeDeclaration) {
+        assert false : "NYI: Unions";
+      } else if (typeDecl instanceof EnumTypeDeclaration) {
+        assert false : "NYI: Enums";
+      }
+    }
     for (var stmt : isa.getArchStateBody()) {
       if (!(stmt instanceof DeclarationStatement)) {
         System.out.println(
