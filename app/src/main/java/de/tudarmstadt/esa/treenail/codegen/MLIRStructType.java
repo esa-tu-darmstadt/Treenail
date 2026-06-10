@@ -3,12 +3,12 @@ package de.tudarmstadt.esa.treenail.codegen;
 import java.util.LinkedHashMap;
 
 class MLIRStructType extends MLIRType {
-  private LinkedHashMap<String, MLIRType> members;
+  private final LinkedHashMap<String, MLIRType> members;
   private MLIRStructType(LinkedHashMap<String, MLIRType> members) {
     this.members = members;
   }
 
-  private static LinkedHashMap<String, MLIRStructType> types =
+  private static final LinkedHashMap<String, MLIRStructType> types =
       new LinkedHashMap<>();
   public static MLIRStructType getType(String typeName) {
     assert types.containsKey(typeName) : "Unknown struct type " + typeName;
