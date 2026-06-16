@@ -64,8 +64,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     @Override
     public MLIRValue caseEntityReference(EntityReference reference) {
       var entity = reference.getTarget();
-      var type = mapType(ac.getDeclaredType(entity));
-      var castValue = cc.makeCast(newValue, type);
+      var type = MLIRType.mapType(ac.getDeclaredType(entity));
+      var castValue = type instanceof MLIRIntType intType ? cc.makeCast(newValue, intType) : newValue;
 
       if (cc.hasValue(entity)) {
         // It's a local variable, just put it in the value map.
@@ -309,10 +309,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       // It's a local variable, retrieve its last definition.
       return cc.getValue(entity);
 
-    var type = mapType(ac.getDeclaredType(entity));
-    if (cc.isConstant(reference))
+    var type = MLIRType.mapType(ac.getDeclaredType(entity));
+    if (cc.isConstant(reference)) {
+      assert type instanceof MLIRIntType : "NYI: Struct / Array / Union / Enum constants";
+      var intType = (MLIRIntType)type;
       // If it's a compile-time parameter emit a constant
-      return cc.makeConst(cc.getConstantValue(reference, type), type);
+      return cc.makeConst(cc.getConstantValue(reference, intType), intType);
+    }
 
     // Otherwise, emit a `coredsl.get`.
     var result = cc.makeAnonymousValue(type);
