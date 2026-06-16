@@ -1,0 +1,19 @@
+InstructionSet StructRegisters {
+  architectural_state {
+    struct UVec2 {
+      unsigned<32> x, y;
+    }
+    register struct UVec2 STRUCT_REG;
+  }
+
+  instructions {
+    StructRegDirectStore {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+        struct UVec2 localStruct = STRUCT_REG;
+        localStruct.x = rs1;
+        STRUCT_REG = localStruct;
+      }
+    }
+  }
+}
