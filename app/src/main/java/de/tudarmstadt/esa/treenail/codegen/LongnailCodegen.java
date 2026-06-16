@@ -172,38 +172,47 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       return format("coredsl.register %s%s%s @%s%s : %s\n", protoStr, constStr,
                     volatileStr, name, initStr, targetType);
     }
+    if (type.isArrayType()) {
+      assert type.isArrayType();
+      // Array type
+      var arType = (ArrayType) type;
+      var elementType = arType.elementType;
+      var numElements = arType.count;
+      var width = elementType.getBitSize();
 
-    assert type.isArrayType();
-    // Array type
-    var arType = (ArrayType)type;
-    var elementType = arType.elementType;
-    var numElements = arType.count;
-    var width = elementType.getBitSize();
+      assert elementType.isIntegerType() : "NYI: Multi-dimensional registers";
 
-    assert elementType.isIntegerType() : "NYI: Multi-dimensional registers";
+      if (hasAttr(dtor.getAttributes(), "is_main_reg"))
+        protoStr = "core_x";
 
-    if (hasAttr(dtor.getAttributes(), "is_main_reg"))
-      protoStr = "core_x";
-
-    var mappedElementType = mapType(elementType);
-    if (init != null) {
-      assert init instanceof ListInitializer;
-      var listInit = (ListInitializer)init;
-      initStr = listInit.getInitializers()
-                    .stream()
-                    .map(i -> {
-                      var ei = (ExpressionInitializer)i;
-                      var cv = ctx.getExpressionValue(ei.getValue());
-                      assert cv.getStatus() == StatusCode.success
+      var mappedElementType = mapType(elementType);
+      if (init != null) {
+        assert init instanceof ListInitializer;
+        var listInit = (ListInitializer) init;
+        initStr = listInit.getInitializers()
+                .stream()
+                .map(i -> {
+                  var ei = (ExpressionInitializer) i;
+                  var cv = ctx.getExpressionValue(ei.getValue());
+                  assert cv.getStatus() == StatusCode.success
                           : "Non-constant initializer";
-                      return ensureBigInteger(cv.getValue(), mappedElementType);
-                    })
-                    .map(Object::toString)
-                    .collect(joining(", ", " = [", "]"));
+                  return ensureBigInteger(cv.getValue(), mappedElementType);
+                })
+                .map(Object::toString)
+                .collect(joining(", ", " = [", "]"));
+      }
+      return format("coredsl.register %s%s%s @%s[%d]%s : %s\n", protoStr,
+              constStr, volatileStr, name, numElements, initStr,
+              mappedElementType);
+    } else if (type.isStructType()) {
+      assert init == null : "NYI: initializers for struct registers";
+      var structType = MLIRStructType.mapType(type);
+      return format("coredsl.register %s%s%s @%s : %s", protoStr, constStr, volatileStr, name, structType);
+    } else {
+      assert false : "NYI: Union / Enum registers";
     }
-    return format("coredsl.register %s%s%s @%s[%d]%s : %s\n", protoStr,
-                  constStr, volatileStr, name, numElements, initStr,
-                  mappedElementType);
+    assert false : "Should be unreachable";
+    return null;
   }
 
   private String emitAddressSpace(Declarator dtor, boolean isConst,
