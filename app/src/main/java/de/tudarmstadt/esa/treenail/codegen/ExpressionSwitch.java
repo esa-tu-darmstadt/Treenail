@@ -221,6 +221,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var castValue = cc.makeCast(newValue, (MLIRIntType)memberType);
       var resultValue = cc.makeAnonymousValue(structType);
       cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue, entityVal, memberName, castValue, structType);
+      cc.setValue(targetEntity, resultValue);
       return resultValue;
     }
 
