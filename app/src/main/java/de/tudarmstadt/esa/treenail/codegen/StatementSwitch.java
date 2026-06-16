@@ -73,21 +73,30 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     for (var dtor : decl.getDeclarators()) {
       assert ac.getStorageClass(dtor) == StorageClass.local;
       var type = ac.getDeclaredType(dtor);
-      assert type.isIntegerType() : "NYI: Local arrays";
-      var init = dtor.getInitializer();
-      if (init == null) {
-        // Spec: Unitialized variables have an undefined value. It simplifies IR
-        // construction if we just assume them to be zero. Unnecessary const ops
-        // will be canonicalized away later in MLIR.
-        var zero = cc.makeConst(BigInteger.ZERO, mapType(type));
-        cc.setValue(dtor, zero);
-        continue;
-      }
+      if (type.isIntegerType()) {
+        var init = dtor.getInitializer();
+        if (init == null) {
+          // Spec: Unitialized variables have an undefined value. It simplifies IR
+          // construction if we just assume them to be zero. Unnecessary const ops
+          // will be canonicalized away later in MLIR.
+          var zero = cc.makeConst(BigInteger.ZERO, mapType(type));
+          cc.setValue(dtor, zero);
+          continue;
+        }
 
-      assert init instanceof ExpressionInitializer : "NYI: List initializers";
-      var value = exprSwitch.doSwitch(((ExpressionInitializer)init).getValue());
-      var castValue = cc.makeCast(value, mapType(type));
-      cc.setValue(dtor, castValue);
+        assert init instanceof ExpressionInitializer : "NYI: List initializers";
+        var value = exprSwitch.doSwitch(((ExpressionInitializer) init).getValue());
+        var castValue = cc.makeCast(value, mapType(type));
+        cc.setValue(dtor, castValue);
+      } else if (type.isStructType()) {
+        var mlirType = MLIRStructType.mapType(type);
+        var init = dtor.getInitializer();
+        assert init == null : "NYI: List Initializers";
+        var zeroedValue = cc.makeZeroedStruct(mlirType);
+        cc.setValue(dtor, zeroedValue);
+      } else {
+        assert false : "NYI: local arrays and unions";
+      }
     }
 
     return this;
