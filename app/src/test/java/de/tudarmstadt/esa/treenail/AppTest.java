@@ -1302,7 +1302,24 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
-    // TODO: remove when actual test implemented
+    assertTrue(mlirCode.contains("""
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hwarith.constant 0 : si16
+        %3 = hwarith.constant 0 : si16
+        %4 = hwarith.constant 0 : si16
+        %5 = hwarith.constant 0 : si16
+        %6 = hw.struct_create (%0, %1, %2, %3, %4, %5) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %7 = hwarith.constant 10 : ui4
+        %8 = coredsl.cast %7 : ui4 to ui32
+        %9 = hw.struct_inject %6["x"], %8 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %10 = hwarith.constant 1 : ui1
+        %11 = hwarith.constant 0 : ui1
+        %12 = hwarith.sub %11, %10 : (ui1, ui1) -> si2
+        %13 = coredsl.cast %12 : si2 to si16
+        %14 = hw.struct_inject %9["c"], %13 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+    """));
+    // TODO: remove when tests completed
     assertFalse(true);
   }
 }
