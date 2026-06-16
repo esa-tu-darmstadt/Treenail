@@ -44,9 +44,9 @@ class MLIRStructType extends MLIRType {
     for (var item : members.entrySet()) {
       String key = item.getKey();
       MLIRType val = item.getValue();
-      sb.append(val);
-      sb.append(": ");
       sb.append(key);
+      sb.append(": ");
+      sb.append(val);
       if (currIdx != lastIdx) {
         sb.append(", ");
       }
