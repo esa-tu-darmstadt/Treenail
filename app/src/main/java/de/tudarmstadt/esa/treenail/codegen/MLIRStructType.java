@@ -1,5 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
+import com.minres.coredsl.type.CoreDslType;
+
 import java.util.LinkedHashMap;
 
 class MLIRStructType extends MLIRType {
@@ -19,6 +21,22 @@ class MLIRStructType extends MLIRType {
     assert !types.containsKey(name) : "Duplicate struct name";
     types.put(name, new MLIRStructType(members));
   }
+
+  public static MLIRStructType mapType(CoreDslType type) {
+    assert type.isStructType();
+    // toString() returns "struct <name>", but we only need the name
+    String structName = type.toString().substring(7);
+    return MLIRStructType.getType(structName);
+  }
+
+  public MLIRType getMemberType(String memberName) {
+    assert members.containsKey(memberName);
+    return members.get(memberName);
+  }
+
+  // TODO: this allows the user to modify members
+  public LinkedHashMap<String, MLIRType> getMembers() { return members; }
+  // TODO: it may make sense to compute this once and store it
   public String toString() {
     StringBuilder sb = new StringBuilder("!hw.struct<");
     final int lastIdx = members.size() - 1;
