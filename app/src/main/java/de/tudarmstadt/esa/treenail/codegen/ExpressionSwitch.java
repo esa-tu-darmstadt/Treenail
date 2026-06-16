@@ -15,6 +15,7 @@ import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.FunctionCallExpression;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
+import com.minres.coredsl.coreDsl.MemberAccessExpression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
 import com.minres.coredsl.coreDsl.NamedEntity;
@@ -202,6 +203,25 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       }
       assert returnValue != null;
       return returnValue;
+    }
+
+    @Override
+    public MLIRValue caseMemberAccessExpression(MemberAccessExpression memberAccess) {
+      assert memberAccess.getTarget() instanceof EntityReference : "NYI: Array of structs";
+      var targetEntityRef = (EntityReference)memberAccess.getTarget();
+      var targetEntity = targetEntityRef.getTarget();
+      var entityVal = cc.getValue(targetEntity);
+      assert entityVal != null : "NYI: access to registers of struct type";
+      String memberName = memberAccess.getDeclarator().getName();
+      var declaredType = ac.getDeclaredType(targetEntity);
+      assert declaredType.isStructType();
+      var structType = MLIRStructType.mapType(declaredType);
+      var memberType = structType.getMemberType(memberName);
+      assert memberType instanceof MLIRIntType;
+      var castValue = cc.makeCast(newValue, (MLIRIntType)memberType);
+      var resultValue = cc.makeAnonymousValue(structType);
+      cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue, entityVal, memberName, castValue, structType);
+      return resultValue;
     }
 
     @Override
