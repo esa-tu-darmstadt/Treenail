@@ -12,6 +12,7 @@ InstructionSet Structs {
       behavior: {
         struct Simple localStruct;
         localStruct.x = 10;
+        localStruct.c = -1;
       }
     }
   }
