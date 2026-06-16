@@ -13,6 +13,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 class ConstructionContext {
@@ -87,6 +88,29 @@ class ConstructionContext {
   MLIRValue makeAnonymousValue(MLIRType type) {
     return new MLIRValue(Integer.toString(valueCounter.getAndIncrement()),
                          type);
+  }
+
+  MLIRValue makeZeroedStruct(MLIRStructType type) {
+    var members = type.getMembers();
+    var vals = new ArrayList<MLIRValue>();
+    for (var memberType : members.values()) {
+      assert memberType instanceof MLIRIntType : "NYI: struct, union, enum struct members";
+      var intType = (MLIRIntType)memberType;
+      vals.add(makeConst(BigInteger.ZERO, intType));
+    }
+    var res = makeAnonymousValue(type);
+    emit("%s = hw.struct_create (", res);
+    final int last = vals.size() - 1;
+    int currIdx = 0;
+    for (var mlirVal : vals) {
+      emit("%s", mlirVal);
+      if (currIdx != last) {
+        emit(", ");
+      }
+      ++currIdx;
+    }
+    emitLn(") : %s", type);
+    return res;
   }
 
   MLIRValue makeConst(BigInteger value, MLIRIntType type) {
