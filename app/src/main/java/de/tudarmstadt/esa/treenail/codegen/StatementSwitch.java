@@ -91,9 +91,15 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       } else if (type.isStructType()) {
         var mlirType = MLIRStructType.mapType(type);
         var init = dtor.getInitializer();
-        assert init == null : "NYI: List Initializers";
-        var zeroedValue = cc.makeZeroedStruct(mlirType);
-        cc.setValue(dtor, zeroedValue);
+        if (init instanceof ExpressionInitializer exprInit) {
+          var val = new ExpressionSwitch(cc).doSwitch(exprInit.getValue());
+          cc.setValue(dtor, val);
+        } else if (init != null) {
+          assert false : "NYI: List Initializers";
+        } else {
+          var zeroedValue = cc.makeZeroedStruct(mlirType);
+          cc.setValue(dtor, zeroedValue);
+        }
       } else {
         assert false : "NYI: local arrays and unions";
       }
