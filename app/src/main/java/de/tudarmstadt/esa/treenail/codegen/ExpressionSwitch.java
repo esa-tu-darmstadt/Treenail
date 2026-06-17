@@ -45,22 +45,18 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
     private boolean isNestedLvalue = false;
     private static abstract class StoreOperation {
-      // The original value modified through this store
-      protected MLIRValue modifiedValue;
-      protected MLIRType accessType;
-      StoreOperation(MLIRValue modifiedValue, MLIRType accessType) {
-        this.modifiedValue = modifiedValue;
-        this.accessType = accessType;
-      }
-
       abstract MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore);
     }
 
-    private static class BitFieldStore extends StoreOperation {
+    private static final class BitFieldIntermediateStore
+        extends StoreOperation {
+      MLIRValue modifiedValue;
+      MLIRType accessType;
       RangeAnalyzer.RangeResult index;
-      BitFieldStore(RangeAnalyzer.RangeResult index, MLIRValue modifiedValue,
-                    MLIRType accessType) {
-        super(modifiedValue, accessType);
+      BitFieldIntermediateStore(RangeAnalyzer.RangeResult index,
+                                MLIRValue modifiedValue, MLIRType accessType) {
+        this.modifiedValue = modifiedValue;
+        this.accessType = accessType;
         this.index = index;
       }
 
@@ -72,18 +68,59 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         return resVal;
       }
     }
+
+    private static final class BitFieldNamedEntityStore extends StoreOperation {
+      NamedEntity destEntity;
+      MLIRType destEntityType;
+      RangeAnalyzer.RangeResult index;
+      MLIRValue bitAccessOldValue;
+      MLIRIntType accessType;
+      BitFieldNamedEntityStore(NamedEntity destEntity, MLIRType destEntityType,
+                               RangeAnalyzer.RangeResult index,
+                               MLIRValue bitAccessOldValue,
+                               MLIRIntType accessType) {
+        this.destEntity = destEntity;
+        this.destEntityType = destEntityType;
+        this.index = index;
+        this.bitAccessOldValue = bitAccessOldValue;
+        this.accessType = accessType;
+      }
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        var updatedValue = cc.makeAnonymousValue(destEntityType);
+        cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
+                  updatedValue, bitAccessOldValue, index, toStore,
+                  destEntityType, accessType, updatedValue.type);
+        if (cc.hasValue(destEntity)) {
+          cc.setValue(destEntity, updatedValue);
+        } else {
+          cc.emitLn("coredsl.set @%s = %s : %s", destEntity.getName(),
+                    updatedValue, destEntityType);
+        }
+        return updatedValue;
+      }
+    }
+
+    private static final class ArrayNamedEntityStore extends StoreOperation {
+      NamedEntity destEntity;
+      MLIRIntType accessType;
+      RangeAnalyzer.RangeResult index;
+      ArrayNamedEntityStore(NamedEntity destEntity, MLIRIntType accessType,
+                            RangeAnalyzer.RangeResult index) {
+        this.destEntity = destEntity;
+        this.accessType = accessType;
+        this.index = index;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        assert !cc.hasValue(destEntity) : "NYI: local arrays";
+        cc.emitLn("coredsl.set @%s[%s] = %s : %s", destEntity.getName(), index,
+                  toStore, accessType);
+        return toStore;
+      }
+    }
     private final Stack<StoreOperation> storeStack = new Stack<>();
 
-    // The final store is special, because we are not setting an MLIRValue, but
-    // a NamedEntity
-    private record
-    FinalStoreInfo(boolean isBitAccess, RangeAnalyzer.RangeResult index,
-                   NamedEntity destEntity,
-                   // For other accesses, we can write to destEntity directly,
-                   // but for bit accesses, we first need to use bitset on the
-                   // value originally loaded from entity, then set it
-                   MLIRValue bitAccessOldValue, MLIRIntType accessType) {}
-    private FinalStoreInfo finalStore = null;
+    private StoreOperation finalStore = null;
     StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
 
     @Override
@@ -148,8 +185,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           }
         }
         assert finalStore == null;
-        finalStore = new FinalStoreInfo(isBitAccess, index, entity,
-                                        bitAccessOldValue, accessType);
+        if (isBitAccess) {
+          final var entityType = mapType(ac.getDeclaredType(entity));
+          finalStore = new BitFieldNamedEntityStore(
+              entity, entityType, index, bitAccessOldValue, accessType);
+        } else {
+          finalStore = new ArrayNamedEntityStore(entity, accessType, index);
+        }
       } else {
         assert target instanceof IndexAccessExpression
             : "NYI: Nested Lvalues other than IndexAccessExpression: " +
@@ -186,7 +228,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
         StoreOperation op;
         if (isBitAccess) {
-          op = new BitFieldStore(index, valueToStore, accessType);
+          op = new BitFieldIntermediateStore(index, valueToStore, accessType);
         } else {
           // TODO: This can only be implemented when multi dimensional arrays
           // are implemented, which is only possible with local arrays
@@ -204,26 +246,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           toStore = store.emitStore(cc, toStore);
         }
         assert finalStore != null;
-        final boolean isLocal = cc.hasValue(finalStore.destEntity);
-        if (finalStore.isBitAccess) {
-          var dstType = mapType(ac.getDeclaredType(finalStore.destEntity));
-          var updatedValue = cc.makeAnonymousValue(dstType);
-          cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
-                    updatedValue, finalStore.bitAccessOldValue,
-                    finalStore.index, toStore, dstType, finalStore.accessType,
-                    updatedValue.type);
-          if (isLocal) {
-            cc.setValue(finalStore.destEntity, updatedValue);
-          } else {
-            cc.emitLn("coredsl.set @%s = %s : %s",
-                      finalStore.destEntity.getName(), updatedValue, dstType);
-          }
-        } else {
-          assert !isLocal : "NYI: local arrays";
-          cc.emitLn("coredsl.set @%s[%s] = %s : %s",
-                    finalStore.destEntity.getName(), finalStore.index, toStore,
-                    finalStore.accessType);
-        }
+        finalStore.emitStore(cc, toStore);
         return castValue;
       }
       assert returnValue != null;
