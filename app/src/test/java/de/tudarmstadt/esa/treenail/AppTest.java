@@ -1302,6 +1302,7 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
+    System.out.println(mlirCode);
     // clang-format off
     assertTrue(mlirCode.contains("""
         %0 = hwarith.constant 0 : ui32
@@ -1333,6 +1334,11 @@ class AppTest {
         %26 = hw.struct_create (%20, %21, %22, %23, %24, %25) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
         %27 = hw.struct_create (%19, %26) : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
         %28 = hw.struct_inject %27["nested"], %18 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %29 = hwarith.constant 42 : ui6
+        %30 = hw.struct_extract %28["nested"] : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %31 = coredsl.cast %29 : ui6 to si16
+        %32 = hw.struct_inject %30["b"], %31 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %33 = hw.struct_inject %28["nested"], %32 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
     """));
     // clang-format on
     // TODO: remove when tests completed
