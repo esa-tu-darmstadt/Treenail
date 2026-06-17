@@ -18,8 +18,9 @@ InstructionSet Structs {
         localStruct.x = 10;
         localStruct.c = -1;
         localStruct.x -= rs1;
-        struct Nested nested;
-        nested.nested = localStruct;
+        struct Nested nestedStruct;
+        nestedStruct.nested = localStruct;
+        nestedStruct.nested.b = 42;
       }
     }
   }
