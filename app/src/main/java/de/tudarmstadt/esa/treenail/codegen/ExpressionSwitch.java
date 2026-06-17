@@ -211,17 +211,26 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var targetEntityRef = (EntityReference)memberAccess.getTarget();
       var targetEntity = targetEntityRef.getTarget();
       var entityVal = cc.getValue(targetEntity);
+      var declaredType = ac.getDeclaredType(targetEntity);
+      var structType = MLIRStructType.mapType(declaredType);
+      assert declaredType.isStructType() : "NYI: Member access to union registers";
+      final boolean isArchitecturalState = entityVal == null;
+      if (isArchitecturalState) {
+        entityVal = cc.makeAnonymousValue(structType);
+        cc.emitLn("%s = coredsl.get @%s : %s", entityVal, targetEntity.getName(), structType);
+      }
       assert entityVal != null : "NYI: access to registers of struct type";
       String memberName = memberAccess.getDeclarator().getName();
-      var declaredType = ac.getDeclaredType(targetEntity);
-      assert declaredType.isStructType();
-      var structType = MLIRStructType.mapType(declaredType);
       var memberType = structType.getMemberType(memberName);
       assert memberType instanceof MLIRIntType;
       var castValue = cc.makeCast(newValue, (MLIRIntType)memberType);
       var resultValue = cc.makeAnonymousValue(structType);
       cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue, entityVal, memberName, castValue, structType);
-      cc.setValue(targetEntity, resultValue);
+      if (isArchitecturalState) {
+        cc.emitLn("coredsl.set @%s = %s : %s", targetEntity.getName(), resultValue, structType);
+      } else {
+        cc.setValue(targetEntity, resultValue);
+      }
       return resultValue;
     }
 
