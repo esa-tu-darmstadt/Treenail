@@ -1346,6 +1346,14 @@ class AppTest {
         %1 = coredsl.cast %rs1 : ui5 to ui32
         %2 = hw.struct_inject %0["x"], %1 : !hw.struct<x: ui32, y: ui32>
         coredsl.set @STRUCT_REG = %2 : !hw.struct<x: ui32, y: ui32>
+        %3 = hwarith.constant 1 : ui1
+        %4 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %5 = hw.struct_extract %4["x"] : !hw.struct<x: ui32, y: ui32>
+        %6 = hwarith.sub %5, %3 : (ui32, ui1) -> si33
+        %7 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %8 = coredsl.cast %6 : si33 to ui32
+        %9 = hw.struct_inject %7["x"], %8 : !hw.struct<x: ui32, y: ui32>
+        coredsl.set @STRUCT_REG = %9 : !hw.struct<x: ui32, y: ui32>
     """));
     // clang-format on
 

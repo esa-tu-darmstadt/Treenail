@@ -13,6 +13,7 @@ InstructionSet StructRegisters {
         struct UVec2 localStruct = STRUCT_REG;
         localStruct.x = rs1;
         STRUCT_REG = localStruct;
+        STRUCT_REG.x -= 1;
       }
     }
   }
