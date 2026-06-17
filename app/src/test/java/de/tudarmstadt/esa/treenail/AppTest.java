@@ -1302,6 +1302,7 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
+    // clang-format off
     assertTrue(mlirCode.contains("""
         %0 = hwarith.constant 0 : ui32
         %1 = hwarith.constant 0 : ui32
@@ -1323,6 +1324,7 @@ class AppTest {
         %17 = coredsl.cast %16 : si33 to ui32
         %18 = hw.struct_inject %14["x"], %17 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
     """));
+    // clang-format on
     // TODO: remove when tests completed
     assertFalse(true);
   }
