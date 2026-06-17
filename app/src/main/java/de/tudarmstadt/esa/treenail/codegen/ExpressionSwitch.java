@@ -340,7 +340,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var valueToStore = doSwitch(memberAccess.getTarget());
         assert valueToStore.type instanceof MLIRStructType;
         if (!isTopLevel) {
-          // TODO: this path is not tested yet
           var structType = (MLIRStructType)valueToStore.type;
           resultValue =
               cc.makeAnonymousValue(structType.getMemberType(memberName));
