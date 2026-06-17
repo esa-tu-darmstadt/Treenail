@@ -15,9 +15,9 @@ import com.minres.coredsl.coreDsl.EntityReference;
 import com.minres.coredsl.coreDsl.FunctionCallExpression;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
-import com.minres.coredsl.coreDsl.MemberAccessExpression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
+import com.minres.coredsl.coreDsl.MemberAccessExpression;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ParenthesisExpression;
 import com.minres.coredsl.coreDsl.PostfixExpression;
@@ -65,7 +65,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     public MLIRValue caseEntityReference(EntityReference reference) {
       var entity = reference.getTarget();
       var type = MLIRType.mapType(ac.getDeclaredType(entity));
-      var castValue = type instanceof MLIRIntType intType ? cc.makeCast(newValue, intType) : newValue;
+      var castValue = type instanceof MLIRIntType intType
+                          ? cc.makeCast(newValue, intType)
+                          : newValue;
 
       if (cc.hasValue(entity)) {
         // It's a local variable, just put it in the value map.
@@ -206,18 +208,22 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
 
     @Override
-    public MLIRValue caseMemberAccessExpression(MemberAccessExpression memberAccess) {
-      assert memberAccess.getTarget() instanceof EntityReference : "NYI: Array of structs";
+    public MLIRValue
+    caseMemberAccessExpression(MemberAccessExpression memberAccess) {
+      assert memberAccess.getTarget() instanceof EntityReference
+          : "NYI: Array of structs";
       var targetEntityRef = (EntityReference)memberAccess.getTarget();
       var targetEntity = targetEntityRef.getTarget();
       var entityVal = cc.getValue(targetEntity);
       var declaredType = ac.getDeclaredType(targetEntity);
       var structType = MLIRStructType.mapType(declaredType);
-      assert declaredType.isStructType() : "NYI: Member access to union registers";
+      assert declaredType.isStructType()
+          : "NYI: Member access to union registers";
       final boolean isArchitecturalState = entityVal == null;
       if (isArchitecturalState) {
         entityVal = cc.makeAnonymousValue(structType);
-        cc.emitLn("%s = coredsl.get @%s : %s", entityVal, targetEntity.getName(), structType);
+        cc.emitLn("%s = coredsl.get @%s : %s", entityVal,
+                  targetEntity.getName(), structType);
       }
       assert entityVal != null : "NYI: access to registers of struct type";
       String memberName = memberAccess.getDeclarator().getName();
@@ -225,9 +231,11 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       assert memberType instanceof MLIRIntType;
       var castValue = cc.makeCast(newValue, (MLIRIntType)memberType);
       var resultValue = cc.makeAnonymousValue(structType);
-      cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue, entityVal, memberName, castValue, structType);
+      cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue,
+                entityVal, memberName, castValue, structType);
       if (isArchitecturalState) {
-        cc.emitLn("coredsl.set @%s = %s : %s", targetEntity.getName(), resultValue, structType);
+        cc.emitLn("coredsl.set @%s = %s : %s", targetEntity.getName(),
+                  resultValue, structType);
       } else {
         cc.setValue(targetEntity, resultValue);
       }
@@ -320,7 +328,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     var type = MLIRType.mapType(ac.getDeclaredType(entity));
     if (cc.isConstant(reference)) {
-      assert type instanceof MLIRIntType : "NYI: Struct / Array / Union / Enum constants";
+      assert type instanceof MLIRIntType
+          : "NYI: Struct / Array / Union / Enum constants";
       var intType = (MLIRIntType)type;
       // If it's a compile-time parameter emit a constant
       return cc.makeConst(cc.getConstantValue(reference, intType), intType);
@@ -689,14 +698,17 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   }
 
   @Override
-  public MLIRValue caseMemberAccessExpression(MemberAccessExpression memberAccess) {
+  public MLIRValue
+  caseMemberAccessExpression(MemberAccessExpression memberAccess) {
     var targetStruct = doSwitch(memberAccess.getTarget());
-    assert targetStruct.type instanceof MLIRStructType : "NYI: union member access";
+    assert targetStruct.type instanceof MLIRStructType
+        : "NYI: union member access";
     var structType = (MLIRStructType)targetStruct.type;
     var memberName = memberAccess.getDeclarator().getName();
     var resultType = structType.getMemberType(memberName);
     var resultVal = cc.makeAnonymousValue(resultType);
-    cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultVal, targetStruct, memberName, structType);
+    cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultVal, targetStruct,
+              memberName, structType);
     return resultVal;
   }
 
