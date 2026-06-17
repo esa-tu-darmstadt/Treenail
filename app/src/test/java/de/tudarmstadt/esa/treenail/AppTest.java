@@ -1302,7 +1302,6 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
-    System.out.println(mlirCode);
     // clang-format off
     assertTrue(mlirCode.contains("""
         %0 = hwarith.constant 0 : ui32
