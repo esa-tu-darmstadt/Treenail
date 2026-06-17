@@ -80,8 +80,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         for (var member : structDecl.getMembers()) {
           // TODO: qualifiers
           // - structs with volatile members exist
-          // TODO: non-int types (for now only other structs, later arrays and maybe unions)
-          var memberType = mapType(ctx.getSpecifiedType(member.getType()));
+          var memberType = MLIRType.mapType(ctx.getSpecifiedType(member.getType()));
           for (var dtor : member.getDeclarators()) {
             var memberName = dtor.getName();
             members.put(memberName, memberType);
