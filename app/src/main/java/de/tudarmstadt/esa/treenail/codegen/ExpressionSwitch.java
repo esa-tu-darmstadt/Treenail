@@ -241,6 +241,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var castValue = cc.makeCast(newValue, accessType);
         var toStore = castValue;
 
+        assert storeStack.firstElement() instanceof ArrayNamedEntityStore ||
+            storeStack.firstElement() instanceof BitFieldNamedEntityStore
+            : "Last emitted store must store to a NamedEntity";
         assert !storeStack.empty();
         while (!storeStack.isEmpty()) {
           final StoreOperation store = storeStack.pop();
