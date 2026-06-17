@@ -1338,6 +1338,28 @@ class AppTest {
         %31 = coredsl.cast %29 : ui6 to si16
         %32 = hw.struct_inject %30["b"], %31 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
         %33 = hw.struct_inject %28["nested"], %32 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %34 = hwarith.constant 0 : ui32
+        %35 = hwarith.constant 0 : ui32
+        %36 = hwarith.constant 0 : ui32
+        %37 = hwarith.constant 0 : ui32
+        %38 = hwarith.constant 0 : si16
+        %39 = hwarith.constant 0 : si16
+        %40 = hwarith.constant 0 : si16
+        %41 = hwarith.constant 0 : si16
+        %42 = hw.struct_create (%36, %37, %38, %39, %40, %41) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %43 = hw.struct_create (%35, %42) : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %44 = hw.struct_create (%34, %43) : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %45 = hw.struct_inject %44["nested2"], %33 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %46 = hw.struct_extract %45["nested2"] : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %47 = hw.struct_inject %46["nested"], %18 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %48 = hw.struct_inject %45["nested2"], %47 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %49 = hwarith.constant 67 : ui7
+        %50 = hw.struct_extract %48["nested2"] : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %51 = hw.struct_extract %50["nested"] : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %52 = coredsl.cast %49 : ui7 to si16
+        %53 = hw.struct_inject %51["d"], %52 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %54 = hw.struct_inject %50["nested"], %53 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %55 = hw.struct_inject %48["nested2"], %54 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
     """));
     // clang-format on
     // TODO: remove when tests completed

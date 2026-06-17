@@ -8,6 +8,11 @@ InstructionSet Structs {
       unsigned<32> notNested;
       struct Simple nested;
     }
+
+    struct TripleNested {
+      unsigned<32> notNestedAgain;
+      struct Nested nested2;
+    }
   }
 
   instructions {
@@ -21,6 +26,10 @@ InstructionSet Structs {
         struct Nested nestedStruct;
         nestedStruct.nested = localStruct;
         nestedStruct.nested.b = 42;
+        struct TripleNested triple;
+        triple.nested2 = nestedStruct;
+        triple.nested2.nested = localStruct;
+        triple.nested2.nested.d = 67;
       }
     }
   }
