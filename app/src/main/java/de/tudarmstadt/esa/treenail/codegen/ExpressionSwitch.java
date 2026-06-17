@@ -120,7 +120,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
     private final Stack<StoreOperation> storeStack = new Stack<>();
 
-    private StoreOperation finalStore = null;
     StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
 
     @Override
@@ -184,7 +183,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
             returnValue = writtenValue;
           }
         }
-        assert finalStore == null;
+        StoreOperation finalStore;
         if (isBitAccess) {
           final var entityType = mapType(ac.getDeclaredType(entity));
           finalStore = new BitFieldNamedEntityStore(
@@ -192,6 +191,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         } else {
           finalStore = new ArrayNamedEntityStore(entity, accessType, index);
         }
+        storeStack.push(finalStore);
       } else {
         assert target instanceof IndexAccessExpression
             : "NYI: Nested Lvalues other than IndexAccessExpression: " +
@@ -241,12 +241,11 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var castValue = cc.makeCast(newValue, accessType);
         var toStore = castValue;
 
+        assert !storeStack.empty();
         while (!storeStack.isEmpty()) {
           final StoreOperation store = storeStack.pop();
           toStore = store.emitStore(cc, toStore);
         }
-        assert finalStore != null;
-        finalStore.emitStore(cc, toStore);
         return castValue;
       }
       assert returnValue != null;
