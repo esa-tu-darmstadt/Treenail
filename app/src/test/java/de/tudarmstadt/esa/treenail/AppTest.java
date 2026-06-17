@@ -1323,6 +1323,16 @@ class AppTest {
         %16 = hwarith.sub %15, %rs1 : (ui32, ui5) -> si33
         %17 = coredsl.cast %16 : si33 to ui32
         %18 = hw.struct_inject %14["x"], %17 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %19 = hwarith.constant 0 : ui32
+        %20 = hwarith.constant 0 : ui32
+        %21 = hwarith.constant 0 : ui32
+        %22 = hwarith.constant 0 : si16
+        %23 = hwarith.constant 0 : si16
+        %24 = hwarith.constant 0 : si16
+        %25 = hwarith.constant 0 : si16
+        %26 = hw.struct_create (%20, %21, %22, %23, %24, %25) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %27 = hw.struct_create (%19, %26) : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %28 = hw.struct_inject %27["nested"], %18 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
     """));
     // clang-format on
     // TODO: remove when tests completed
