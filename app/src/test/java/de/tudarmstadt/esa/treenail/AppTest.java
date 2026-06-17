@@ -1318,6 +1318,10 @@ class AppTest {
         %12 = hwarith.sub %11, %10 : (ui1, ui1) -> si2
         %13 = coredsl.cast %12 : si2 to si16
         %14 = hw.struct_inject %9["c"], %13 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %15 = hw.struct_extract %14["x"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %16 = hwarith.sub %15, %rs1 : (ui32, ui5) -> si33
+        %17 = coredsl.cast %16 : si33 to ui32
+        %18 = hw.struct_inject %14["x"], %17 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
     """));
     // TODO: remove when tests completed
     assertFalse(true);

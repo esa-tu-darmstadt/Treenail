@@ -13,6 +13,7 @@ InstructionSet Structs {
         struct Simple localStruct;
         localStruct.x = 10;
         localStruct.c = -1;
+        localStruct.x -= rs1;
       }
     }
   }
