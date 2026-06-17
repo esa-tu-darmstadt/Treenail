@@ -44,11 +44,36 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   class StoreSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
     private boolean isNestedLvalue = false;
-    private record StoreInfo(boolean isBitAccess,
-                             RangeAnalyzer.RangeResult index,
-                             // The original value modified through this store
-                             MLIRValue modifiedValue, MLIRIntType accessType) {}
-    private final Stack<StoreInfo> storeStack = new Stack<>();
+    private static abstract class StoreOperation {
+      // The original value modified through this store
+      protected MLIRValue modifiedValue;
+      protected MLIRType accessType;
+      StoreOperation(MLIRValue modifiedValue, MLIRType accessType) {
+        this.modifiedValue = modifiedValue;
+        this.accessType = accessType;
+      }
+
+      abstract MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore);
+    }
+
+    private static class BitFieldStore extends StoreOperation {
+      RangeAnalyzer.RangeResult index;
+      BitFieldStore(RangeAnalyzer.RangeResult index, MLIRValue modifiedValue,
+                    MLIRType accessType) {
+        super(modifiedValue, accessType);
+        this.index = index;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        var resVal = cc.makeAnonymousValue(modifiedValue.type);
+        cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal,
+                  modifiedValue, index, toStore, modifiedValue.type, accessType,
+                  modifiedValue.type);
+        return resVal;
+      }
+    }
+    private final Stack<StoreOperation> storeStack = new Stack<>();
+
     // The final store is special, because we are not setting an MLIRValue, but
     // a NamedEntity
     private record
@@ -158,27 +183,25 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                     valueToStore, index, valueToStore.type, accessType);
           returnValue = resValue;
         }
-        storeStack.push(
-            new StoreInfo(isBitAccess, index, valueToStore, accessType));
+
+        StoreOperation op;
+        if (isBitAccess) {
+          op = new BitFieldStore(index, valueToStore, accessType);
+        } else {
+          // TODO: This can only be implemented when multi dimensional arrays
+          // are implemented, which is only possible with local arrays
+          assert false : "NYI: Array stores by value";
+          op = null;
+        }
+        storeStack.push(op);
       }
       if (isTopLevel) {
         var castValue = cc.makeCast(newValue, accessType);
         var toStore = castValue;
 
         while (!storeStack.isEmpty()) {
-          final StoreInfo store = storeStack.pop();
-          // TODO: This can only be implemented when multi dimensional arrays
-          // are implemented, which is only possible with local arrays
-          assert store.isBitAccess
-              : ("Non-bit accesses should be impossible if they follow an "
-                 + "IndexAccessExpression as long as multi-dimensional arrays "
-                 + "are not implemented");
-          var resVal = cc.makeAnonymousValue(store.modifiedValue.type);
-          cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal,
-                    store.modifiedValue, store.index, toStore,
-                    store.modifiedValue.type, store.accessType,
-                    store.modifiedValue.type);
-          toStore = resVal;
+          final StoreOperation store = storeStack.pop();
+          toStore = store.emitStore(cc, toStore);
         }
         assert finalStore != null;
         final boolean isLocal = cc.hasValue(finalStore.destEntity);
@@ -211,7 +234,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     public MLIRValue
     caseMemberAccessExpression(MemberAccessExpression memberAccess) {
       assert memberAccess.getTarget() instanceof EntityReference
-          : "NYI: Array of structs";
+          : "NYI: Array of structs or nested structs";
       var targetEntityRef = (EntityReference)memberAccess.getTarget();
       var targetEntity = targetEntityRef.getTarget();
       var entityVal = cc.getValue(targetEntity);
