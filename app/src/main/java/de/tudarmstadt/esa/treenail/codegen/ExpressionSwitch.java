@@ -118,6 +118,44 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         return toStore;
       }
     }
+
+    // TODO: this is not really a struct, but just a plain NamedEntity store
+    private static final class StructNamedEntityStore extends StoreOperation {
+      NamedEntity destEntity;
+      MLIRType structType;
+
+      StructNamedEntityStore(NamedEntity destEntity, MLIRType structType) {
+        this.destEntity = destEntity;
+        this.structType = structType;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue value) {
+        if (!cc.hasValue(destEntity)) {
+          cc.emitLn("coredsl.set @%s = %s : %s", destEntity.getName(), value,
+                    structType);
+        } else {
+          cc.setValue(destEntity, value);
+        }
+        return value;
+      }
+    }
+
+    private static final class StructMemberStore extends StoreOperation {
+      MLIRValue structVal;
+      String memberName;
+      StructMemberStore(MLIRValue structVal, String memberName) {
+        this.structVal = structVal;
+        this.memberName = memberName;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        var resultValue = cc.makeAnonymousValue(structVal.type);
+        cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue,
+                  structVal, memberName, toStore, structVal.type);
+        return resultValue;
+      }
+    }
+
     private final Stack<StoreOperation> storeStack = new Stack<>();
 
     StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
@@ -139,6 +177,24 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       // Otherwise, we update an architectural state element and have to emit a
       // `coredsl.set`.
       cc.emitLn("coredsl.set @%s = %s : %s", entity.getName(), castValue, type);
+      return castValue;
+    }
+
+    private MLIRValue resolveStoreStack(MLIRType storedValueType) {
+      var castValue = storedValueType instanceof MLIRIntType intType
+                          ? cc.makeCast(newValue, intType)
+                          : newValue;
+      var toStore = castValue;
+
+      assert storeStack.firstElement() instanceof ArrayNamedEntityStore ||
+          storeStack.firstElement() instanceof BitFieldNamedEntityStore ||
+          storeStack.firstElement() instanceof StructNamedEntityStore
+          : "Last emitted store must store to a NamedEntity";
+      assert !storeStack.empty();
+      while (!storeStack.isEmpty()) {
+        final StoreOperation store = storeStack.pop();
+        toStore = store.emitStore(cc, toStore);
+      }
       return castValue;
     }
 
@@ -238,18 +294,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         storeStack.push(op);
       }
       if (isTopLevel) {
-        var castValue = cc.makeCast(newValue, accessType);
-        var toStore = castValue;
-
-        assert storeStack.firstElement() instanceof ArrayNamedEntityStore ||
-            storeStack.firstElement() instanceof BitFieldNamedEntityStore
-            : "Last emitted store must store to a NamedEntity";
-        assert !storeStack.empty();
-        while (!storeStack.isEmpty()) {
-          final StoreOperation store = storeStack.pop();
-          toStore = store.emitStore(cc, toStore);
-        }
-        return castValue;
+        return resolveStoreStack(accessType);
       }
       assert returnValue != null;
       return returnValue;
@@ -258,35 +303,56 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     @Override
     public MLIRValue
     caseMemberAccessExpression(MemberAccessExpression memberAccess) {
-      assert memberAccess.getTarget() instanceof EntityReference
-          : "NYI: Array of structs or nested structs";
-      var targetEntityRef = (EntityReference)memberAccess.getTarget();
-      var targetEntity = targetEntityRef.getTarget();
-      var entityVal = cc.getValue(targetEntity);
-      var declaredType = ac.getDeclaredType(targetEntity);
-      var structType = MLIRStructType.mapType(declaredType);
-      assert declaredType.isStructType()
-          : "NYI: Member access to union registers";
-      final boolean isArchitecturalState = entityVal == null;
-      if (isArchitecturalState) {
-        entityVal = cc.makeAnonymousValue(structType);
-        cc.emitLn("%s = coredsl.get @%s : %s", entityVal,
-                  targetEntity.getName(), structType);
-      }
-      String memberName = memberAccess.getDeclarator().getName();
-      var memberType = structType.getMemberType(memberName);
-      var castValue = memberType instanceof MLIRIntType memberIntType
-                          ? cc.makeCast(newValue, memberIntType)
-                          : newValue;
-      var resultValue = cc.makeAnonymousValue(structType);
-      cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue,
-                entityVal, memberName, castValue, structType);
-      if (isArchitecturalState) {
-        cc.emitLn("coredsl.set @%s = %s : %s", targetEntity.getName(),
-                  resultValue, structType);
+      final var accessType =
+          MLIRType.mapType(ac.getExpressionType(memberAccess));
+      final boolean isTopLevel = !isNestedLvalue;
+      final String memberName = memberAccess.getDeclarator().getName();
+      MLIRValue resultValue = null;
+      if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
+        var targetEntity = targetEntityRef.getTarget();
+        var entityVal = cc.getValue(targetEntity);
+        var declaredType = ac.getDeclaredType(targetEntity);
+        var structType = MLIRStructType.mapType(declaredType);
+        assert declaredType.isStructType()
+            : "NYI: Member access to union registers";
+        final boolean isArchitecturalState = entityVal == null;
+        if (isArchitecturalState) {
+          entityVal = cc.makeAnonymousValue(structType);
+          cc.emitLn("%s = coredsl.get @%s : %s", entityVal,
+                    targetEntity.getName(), structType);
+        }
+        resultValue = entityVal;
+        // If this is top level, we don't need to extract the member because we
+        // can write it directly
+        if (!isTopLevel) {
+          resultValue =
+              cc.makeAnonymousValue(structType.getMemberType(memberName));
+          cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultValue,
+                    entityVal, memberName, entityVal.type);
+        }
+        assert entityVal != null;
+        storeStack.push(new StructNamedEntityStore(targetEntity, structType));
+        storeStack.push(new StructMemberStore(entityVal, memberName));
       } else {
-        cc.setValue(targetEntity, resultValue);
+        assert memberAccess.getTarget() instanceof MemberAccessExpression
+            : "NYI: Array of structs";
+        isNestedLvalue = true;
+        var valueToStore = doSwitch(memberAccess.getTarget());
+        assert valueToStore.type instanceof MLIRStructType;
+        if (!isTopLevel) {
+          // TODO: this path is not tested yet
+          var structType = (MLIRStructType)valueToStore.type;
+          resultValue =
+              cc.makeAnonymousValue(structType.getMemberType(memberName));
+          cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultValue,
+                    valueToStore, memberName, valueToStore.type);
+        }
+        storeStack.push(new StructMemberStore(valueToStore, memberName));
       }
+      if (isTopLevel) {
+        return resolveStoreStack(accessType);
+      }
+      assert resultValue != null;
       return resultValue;
     }
 
