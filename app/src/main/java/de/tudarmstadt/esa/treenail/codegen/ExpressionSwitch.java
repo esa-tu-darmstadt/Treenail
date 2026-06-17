@@ -680,6 +680,18 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   }
 
   @Override
+  public MLIRValue caseMemberAccessExpression(MemberAccessExpression memberAccess) {
+    var targetStruct = doSwitch(memberAccess.getTarget());
+    assert targetStruct.type instanceof MLIRStructType : "NYI: union member access";
+    var structType = (MLIRStructType)targetStruct.type;
+    var memberName = memberAccess.getDeclarator().getName();
+    var resultType = structType.getMemberType(memberName);
+    var resultVal = cc.makeAnonymousValue(resultType);
+    cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultVal, targetStruct, memberName, structType);
+    return resultVal;
+  }
+
+  @Override
   public MLIRValue defaultCase(EObject obj) {
     cc.emitLn("// unhandled: %s", obj);
     return cc.makeAnonymousValue(MLIRType.VOID);
