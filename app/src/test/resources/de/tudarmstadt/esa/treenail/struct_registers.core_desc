@@ -3,7 +3,12 @@ InstructionSet StructRegisters {
     struct UVec2 {
       unsigned<32> x, y;
     }
+    struct VecAndInt {
+      signed<32> notNested;
+      struct UVec2 vec;
+    }
     register struct UVec2 STRUCT_REG;
+    register struct VecAndInt NESTED_STRUCT_REG;
   }
 
   instructions {
@@ -14,6 +19,7 @@ InstructionSet StructRegisters {
         localStruct.x = rs1;
         STRUCT_REG = localStruct;
         STRUCT_REG.x -= 1;
+        NESTED_STRUCT_REG.vec.x = 7;
       }
     }
   }

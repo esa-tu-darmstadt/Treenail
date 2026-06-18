@@ -1393,6 +1393,13 @@ class AppTest {
         %8 = coredsl.cast %6 : si33 to ui32
         %9 = hw.struct_inject %7["x"], %8 : !hw.struct<x: ui32, y: ui32>
         coredsl.set @STRUCT_REG = %9 : !hw.struct<x: ui32, y: ui32>
+        %10 = hwarith.constant 7 : ui3
+        %11 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %12 = hw.struct_extract %11["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %13 = coredsl.cast %10 : ui3 to ui32
+        %14 = hw.struct_inject %12["x"], %13 : !hw.struct<x: ui32, y: ui32>
+        %15 = hw.struct_inject %11["vec"], %14 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @NESTED_STRUCT_REG = %15 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
     """));
     // clang-format on
 
