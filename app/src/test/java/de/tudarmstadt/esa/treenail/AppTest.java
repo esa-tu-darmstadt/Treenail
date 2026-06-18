@@ -1360,6 +1360,20 @@ class AppTest {
         %53 = hw.struct_inject %51["d"], %52 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
         %54 = hw.struct_inject %50["nested"], %53 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
         %55 = hw.struct_inject %48["nested2"], %54 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %56 = hwarith.constant 3 : ui2
+        %57 = hw.struct_extract %18["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %58 = coredsl.cast %56 : ui2 to ui5
+        %59 = coredsl.bitset %57[4:0] = %58 : (ui32, ui5) -> ui32
+        %60 = hw.struct_inject %18["y"], %59 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %61 = hwarith.constant 42 : ui6
+        %62 = hw.struct_extract %55["nested2"] : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %63 = hw.struct_extract %62["nested"] : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %64 = hw.struct_extract %63["c"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %65 = coredsl.cast %61 : ui6 to ui8
+        %66 = coredsl.bitset %64[7:0] = %65 : (si16, ui8) -> si16
+        %67 = hw.struct_inject %63["c"], %66 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %68 = hw.struct_inject %62["nested"], %67 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %69 = hw.struct_inject %55["nested2"], %68 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
     """));
     // clang-format on
     // TODO: remove when tests completed
