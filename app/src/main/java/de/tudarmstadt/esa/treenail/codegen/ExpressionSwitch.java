@@ -249,9 +249,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         }
         storeStack.push(finalStore);
       } else {
-        assert target instanceof IndexAccessExpression
-            : "NYI: Nested Lvalues other than IndexAccessExpression: " +
-              target.getClass();
         // For nested IndexAccessExpressions, we need to generate code like
         // this:
         // CoreDSL: "a[b][c][d] = res;"
