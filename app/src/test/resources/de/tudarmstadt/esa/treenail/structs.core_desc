@@ -20,16 +20,21 @@ InstructionSet Structs {
       encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
       behavior: {
         struct Simple localStruct;
+        // Member access
         localStruct.x = 10;
         localStruct.c = -1;
         localStruct.x -= rs1;
         struct Nested nestedStruct;
+        // Nested access
         nestedStruct.nested = localStruct;
         nestedStruct.nested.b = 42;
         struct TripleNested triple;
         triple.nested2 = nestedStruct;
         triple.nested2.nested = localStruct;
         triple.nested2.nested.d = 67;
+        // bit access to members
+        localStruct.y[4:0] = 3;
+        triple.nested2.nested.c[7:0] = 42;
       }
     }
   }
