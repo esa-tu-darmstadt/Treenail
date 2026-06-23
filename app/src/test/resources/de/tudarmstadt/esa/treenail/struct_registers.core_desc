@@ -15,11 +15,17 @@ InstructionSet StructRegisters {
     StructRegDirectStore {
       encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
       behavior: {
+        // Reading whole register
         struct UVec2 localStruct = STRUCT_REG;
         localStruct.x = rs1;
+        // Writing whole register
         STRUCT_REG = localStruct;
+        // Register member read / write
         STRUCT_REG.x -= 1;
+        // Register nested member write
         NESTED_STRUCT_REG.vec.x = 7;
+        // Bit access to members
+        STRUCT_REG.x[7:0] = 255;
       }
     }
   }
