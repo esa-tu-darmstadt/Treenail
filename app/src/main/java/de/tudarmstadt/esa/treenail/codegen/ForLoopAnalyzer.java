@@ -92,7 +92,7 @@ class ForLoopAnalyzer {
       var zero = cc.makeConst(BigInteger.ZERO, zeroIntType);
       var currValueIntType = (MLIRIntType)currValue.type;
       int resWidth = currValueIntType.isSigned ? currValueIntType.width
-                                             : currValueIntType.width + 1;
+                                               : currValueIntType.width + 1;
       var resultType = MLIRIntType.getType(resWidth, true);
       var intermediateResultType =
           MLIRIntType.getSubResultType(zeroIntType, currValueIntType);
