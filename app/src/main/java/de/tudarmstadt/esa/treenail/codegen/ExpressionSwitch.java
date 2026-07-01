@@ -350,9 +350,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       m("<=", "hwarith.icmp le"), m(">", "hwarith.icmp gt"),
       m(">=", "hwarith.icmp ge"));
 
-  private static MLIRValue emitBinaryOp(ConstructionContext cc, String op,
-                                        MLIRType resType, MLIRValue lhs,
-                                        MLIRValue rhs) {
+  public static MLIRValue emitBinaryOp(ConstructionContext cc, String op,
+                                       MLIRType resType, MLIRValue lhs,
+                                       MLIRValue rhs) {
     var res = cc.makeAnonymousValue(resType);
     var isICMP = op.startsWith("hwarith.icmp");
     if (op.startsWith("hwarith.") && !isICMP)
