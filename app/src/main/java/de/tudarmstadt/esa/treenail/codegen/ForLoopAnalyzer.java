@@ -93,10 +93,8 @@ class ForLoopAnalyzer {
       var resultType = MLIRType.getType(resWidth, true);
       var intermediateResultType =
           MLIRType.getSubResultType(zero.type, currValue.type);
-      var intermediateRes = cc.makeAnonymousValue(intermediateResultType);
-      cc.emitLn("%s = hwarith.sub %s, %s : (%s, %s) -> %s", intermediateRes,
-                zero, currValue, zero.type, currValue.type,
-                intermediateResultType);
+      var intermediateRes = ExpressionSwitch.emitBinaryOp(
+          cc, "hwarith.sub", intermediateResultType, zero, currValue);
       var newCurr = cc.makeAnonymousValue(resultType);
       cc.emitLn("%s = hwarith.cast %s : (%s) -> %s", newCurr, intermediateRes,
                 intermediateRes.type, resultType);
@@ -273,10 +271,9 @@ class ForLoopAnalyzer {
     return res;
   }
 
-  private static Action analyzeCompoundAssignmentAction(Expression expr,
-                                                        List<Statement> loopBody,
-                                                        ConstructionContext cc,
-                                                        AnalysisContext ac) {
+  private static Action
+  analyzeCompoundAssignmentAction(Expression expr, List<Statement> loopBody,
+                                  ConstructionContext cc, AnalysisContext ac) {
     var res = new Action();
     try {
       var assign = (AssignmentExpression)expr;
