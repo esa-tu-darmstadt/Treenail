@@ -101,13 +101,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
         MLIRValue bitAccessOldValue = null;
         if (isBitAccess) {
-          if (isLocal)
-            bitAccessOldValue = cc.getValue(entity);
-          else {
-            bitAccessOldValue = cc.makeAnonymousValue(mapType(targetType));
-            cc.emitLn("%s = coredsl.get @%s : %s", bitAccessOldValue,
-                      entity.getName(), bitAccessOldValue.type);
-          }
+          bitAccessOldValue = cc.getOrLoad(entity);
 
           if (!isTopLevel) {
             var resValue = cc.makeAnonymousValue(accessType);
@@ -217,16 +211,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
   }
 
-  private int getAddSubResultWidth(MLIRType lhsTy, MLIRType rhsTy) {
-    if (lhsTy.isSigned == rhsTy.isSigned)
-      return Math.max(lhsTy.width, rhsTy.width) + 1;
-
-    // Extra bit necessary if the respective operand is _unsigned_.
-    int lhsExtraBit = lhsTy.isSigned ? 0 : 1;
-    int rhsExtraBit = rhsTy.isSigned ? 0 : 1;
-    return Math.max(lhsTy.width + lhsExtraBit, rhsTy.width + rhsExtraBit) + 1;
-  }
-
   @Override
   public MLIRValue caseAssignmentExpression(AssignmentExpression assign) {
     var lhs = assign.getTarget();
@@ -255,11 +239,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         type = lhsTy;
         break;
       case "+":
-        type = getType(getAddSubResultWidth(lhsTy, rhsTy),
-                       lhsTy.isSigned | rhsTy.isSigned);
+        type = MLIRType.getAddResultType(lhsTy, rhsTy);
         break;
       case "-":
-        type = getType(getAddSubResultWidth(lhsTy, rhsTy), true);
+        type = MLIRType.getSubResultType(lhsTy, rhsTy);
         break;
       case "*":
         type =
@@ -282,7 +265,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       }
 
       rhsVal =
-          emitBinaryOp(binaryOperatorMap.get(binOpr), type, lhsVal, rhsVal);
+          emitBinaryOp(cc, binaryOperatorMap.get(binOpr), type, lhsVal, rhsVal);
     }
 
     // Perform the store (may fail if `lhs` is an unsupported Lvalue).
@@ -361,8 +344,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       m("<=", "hwarith.icmp le"), m(">", "hwarith.icmp gt"),
       m(">=", "hwarith.icmp ge"));
 
-  private MLIRValue emitBinaryOp(String op, MLIRType resType, MLIRValue lhs,
-                                 MLIRValue rhs) {
+  public static MLIRValue emitBinaryOp(ConstructionContext cc, String op,
+                                       MLIRType resType, MLIRValue lhs,
+                                       MLIRValue rhs) {
     var res = cc.makeAnonymousValue(resType);
     var isICMP = op.startsWith("hwarith.icmp");
     if (op.startsWith("hwarith.") && !isICMP)
@@ -454,17 +438,18 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     var op = binaryOperatorMap.get(opr);
     assert op != null : "NYI: operator " + opr;
-    return emitBinaryOp(op, type, lhs, rhs);
+    return emitBinaryOp(cc, op, type, lhs, rhs);
   }
 
   private static final Map<String, String> unaryOperatorMap = Map.ofEntries(
       m("-", "hwarith.sub"), m("!", "hwarith.icmp ne"), m("~", "coredsl.xor"));
 
-  private MLIRValue emitIncrementOrDecrement(MLIRValue value,
-                                             boolean decrement) {
+  public static MLIRValue emitIncrementOrDecrement(ConstructionContext cc,
+                                                   MLIRValue value,
+                                                   boolean decrement) {
     var type = getType(value.type.width + 1, value.type.isSigned || decrement);
     var one = cc.makeConst(BigInteger.ONE, getType(1, false));
-    return emitBinaryOp(binaryOperatorMap.get(decrement ? "-" : "+"), type,
+    return emitBinaryOp(cc, binaryOperatorMap.get(decrement ? "-" : "+"), type,
                         value, one);
   }
 
@@ -487,13 +472,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       } else {
         lhs = cc.makeConst(BigInteger.ZERO, getType(1, false));
       }
-      return emitBinaryOp(unaryOperatorMap.get(opr), type, lhs, oprnd);
+      return emitBinaryOp(cc, unaryOperatorMap.get(opr), type, lhs, oprnd);
     }
 
     assert "++".equals(opr) || "--".equals(opr)
         : "Prefix expression is neither increment nor decrement";
 
-    var incrDecr = emitIncrementOrDecrement(oprnd, "--".equals(opr));
+    var incrDecr = emitIncrementOrDecrement(cc, oprnd, "--".equals(opr));
 
     // Store the incremented/decremented value (may fail if the operand is not a
     // supported Lvalue).
@@ -509,7 +494,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var oprndExpr = expr.getOperand();
     var oprnd = doSwitch(oprndExpr);
 
-    var incrDecr = emitIncrementOrDecrement(oprnd, "--".equals(opr));
+    var incrDecr = emitIncrementOrDecrement(cc, oprnd, "--".equals(opr));
     new StoreSwitch(incrDecr).doSwitch(oprndExpr);
 
     return oprnd;
@@ -523,7 +508,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var head = doSwitch(parts.get(0));
     for (int i = 1; i < parts.size(); ++i) {
       var next = doSwitch(parts.get(i));
-      head = emitBinaryOp("coredsl.concat",
+      head = emitBinaryOp(cc, "coredsl.concat",
                           getType(head.type.width + next.type.width, false),
                           head, next);
     }

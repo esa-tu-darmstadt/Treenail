@@ -460,9 +460,14 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // Check whether this loop can be represented as an `scf.for` operation. If
     // not, fail early; the construction will fall-back to a generic
     // `scf.while` (which may be unsupported by Longnail).
-    var initAna = ForLoopAnalyzer.analyzeInitialization(loop);
-    var condAna = ForLoopAnalyzer.analyzeCondition(loop, cc);
-    var actionAna = ForLoopAnalyzer.analyzeAction(loop);
+
+    // Temporary construction context, as any changes to runtime variables will
+    // need to be written into a ConstructionContext, but can only be written
+    // after we have confirmed that this can be represented by scf.for
+    ConstructionContext tmpCC = cc.createDerivedCC();
+    var initAna = ForLoopAnalyzer.analyzeInitialization(loop, tmpCC, ac);
+    var condAna = ForLoopAnalyzer.analyzeCondition(loop, tmpCC, ac);
+    var actionAna = ForLoopAnalyzer.analyzeAction(loop, tmpCC, ac);
     if (initAna == null || condAna == null || actionAna == null ||
         initAna.variable != condAna.variable ||
         condAna.variable != actionAna.variable)
@@ -471,6 +476,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     if (!ForLoopAnalyzer.FOR_COMPATIBLE_CMP.contains(condAna.relation))
       return false;
 
+    ForLoopAnalyzer.ConstOrRuntimeValue bound = condAna.bound;
+    ForLoopAnalyzer.ConstOrRuntimeValue stepVal = actionAna.step;
+    ForLoopAnalyzer.ConstOrRuntimeValue initValue = initAna.value;
     boolean mustNegateItVar = false;
     switch (condAna.relation) {
     case "<":
@@ -478,18 +486,18 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       break;
     case "<=":
       // a <= b <-> a < b + 1
-      condAna.bound = condAna.bound.add(BigInteger.ONE);
+      bound.addOne();
       break;
 
     case ">=":
       // a >= b <-> a > b - 1
-      condAna.bound = condAna.bound.subtract(BigInteger.ONE);
+      bound.subOne();
       // Fallthrough to convert a > b to a < b
     case ">":
       mustNegateItVar = true;
-      initAna.value = initAna.value.negate();
-      actionAna.step = actionAna.step.negate();
-      condAna.bound = condAna.bound.negate();
+      initValue.negate();
+      stepVal.negate();
+      bound.negate();
       break;
     default:
       assert false : "emitScfFor: NYI relation";
@@ -497,8 +505,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     }
 
     // scf.for demands that the step value is positive!
-    if (actionAna.step.signum() < 0)
+    if (stepVal.mayBeNegative()) {
+      // Nothing will be written, as all the operations on runtime variables
+      // were written into tmpCC, not cc
       return false;
+    }
 
     // The iterator is special in `scf.for`; separate it from the remaining
     // loop-carried variables.
@@ -509,9 +520,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var expectedIterType = mapType(ac.getDeclaredType(iterVar));
 
     // Find minimal common type for initAna.value, actionAna.step, condAna.bound
-    var minTypeInit = MLIRType.determineType(initAna.value);
-    var minTypeStep = MLIRType.determineType(actionAna.step);
-    var minTypeBound = MLIRType.determineType(condAna.bound);
+    var minTypeInit = initValue.getType();
+    var minTypeStep = stepVal.getType();
+    var minTypeBound = bound.getType();
 
     var isActualSigned =
         minTypeInit.isSigned || minTypeStep.isSigned || minTypeBound.isSigned;
@@ -524,9 +535,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var actualIterType = MLIRType.getType(minBitWidth, isActualSigned);
 
     // For now, only loops with constant bounds/trip counts are supported.
-    var from = cc.makeHWConst(initAna.value, actualIterType.width);
-    var to = cc.makeHWConst(condAna.bound, actualIterType.width);
-    var step = cc.makeHWConst(actionAna.step, actualIterType.width);
+    var from = initValue.getAsMLIRValue(actualIterType);
+    var to = bound.getAsMLIRValue(actualIterType);
+    var step = stepVal.getAsMLIRValue(actualIterType);
+
+    // Append tmpCC, because getAsMLIRValue() writes into tmpCC
+    cc.appendDerivedCC(tmpCC);
 
     // This nested construction will be used for the loop body.
     var forCC = cc.createDerivedCC();

@@ -133,6 +133,18 @@ class ConstructionContext {
     return result;
   }
 
+  // Either get the existing MLIR value that represents a local value or load
+  // the value using coredsl.get if it is architectural state
+  MLIRValue getOrLoad(NamedEntity entity) {
+    var mlirValue = getValue(entity);
+    if (mlirValue == null) {
+      var type = MLIRType.mapType(ac.getDeclaredType(entity));
+      mlirValue = makeAnonymousValue(type);
+      emitLn("%s = coredsl.get @%s : %s", mlirValue, entity.getName(), type);
+    }
+    return mlirValue;
+  }
+
   void emit(String format, Object... args) {
     sb.append(String.format(format, args));
   }
@@ -160,9 +172,24 @@ class ConstructionContext {
 
   StringBuilder getStringBuilder() { return sb; }
 
+  // Create a ConstructionContext with a copy of the current value map
   ConstructionContext createDerivedCC() {
     return new ConstructionContext(new LinkedHashMap<>(values),
                                    new AtomicInteger(getValueCounter()), ac,
                                    new StringBuilder());
+  }
+
+  // This should only be used for contexts gotten from createDerivedCC
+  // Useful for operations that we don't know yet whether they are needed or
+  // not. These can be emitted into a derived context, which is then merged
+  // using this function when we know that the operations are needed in the
+  // main context
+  void appendDerivedCC(ConstructionContext derived) {
+    assert getValueCounter() <= derived.getValueCounter();
+    valueCounter.set(derived.getValueCounter());
+    // TODO: make this check if all values of values are in derived.values (not
+    //  necessarily the same value but same key)
+    values.putAll(derived.values);
+    emit("%s", derived.sb.toString());
   }
 }
