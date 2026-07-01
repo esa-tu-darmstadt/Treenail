@@ -95,10 +95,7 @@ class ForLoopAnalyzer {
           MLIRType.getSubResultType(zero.type, currValue.type);
       var intermediateRes = ExpressionSwitch.emitBinaryOp(
           cc, "hwarith.sub", intermediateResultType, zero, currValue);
-      var newCurr = cc.makeAnonymousValue(resultType);
-      cc.emitLn("%s = hwarith.cast %s : (%s) -> %s", newCurr, intermediateRes,
-                intermediateRes.type, resultType);
-      currValue = newCurr;
+      currValue = cc.makeCast(intermediateRes, resultType);
     }
 
     @Override
