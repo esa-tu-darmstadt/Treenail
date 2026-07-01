@@ -115,10 +115,7 @@ class ForLoopAnalyzer {
 
     @Override
     MLIRValue getAsMLIRValue(MLIRType type) {
-      var res = cc.makeAnonymousValue(MLIRType.DUMMY);
-      cc.emitLn("%s = hwarith.cast %s : (%s) -> i%d", res, currValue,
-                currValue.type, type.width);
-      return res;
+      return cc.makeSignlessCast(currValue, type.width);
     }
   }
 
