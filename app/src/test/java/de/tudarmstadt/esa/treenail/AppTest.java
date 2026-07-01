@@ -1291,6 +1291,7 @@ class AppTest {
     // NOTE: this would technically be viable, but we don't check far enough for now
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedViableBitRef"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleBitRef"));
+    assertFalse(instrHasSCFFor(mlirCode, "NotViableStepModified"));
     // clang-format on
   }
 }

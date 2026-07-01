@@ -327,5 +327,21 @@ InstructionSet TestScfForLoop {
         MEM[Imm6:Imm6 + 3] = sum;
       }
     }
+    NotViableStepModified {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> x = MEM[Imm6];
+        unsigned<32> y = MEM[Imm6 + 1];
+        unsigned<32> sum = 0;
+        unsigned<32> step = MEM[Imm6 + 2];
+        for (unsigned<32> i = x; i < y; i += step) {
+          if (MEM[rs1 + i] == 123) {
+            step *= 2;
+          }
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
   }
 }
