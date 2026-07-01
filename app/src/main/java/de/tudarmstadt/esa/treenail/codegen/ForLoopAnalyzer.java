@@ -135,20 +135,6 @@ class ForLoopAnalyzer {
   static final Set<String> INCR_DECR = Set.of("++", "--");
   static final Set<String> COMP_ASSIGN = Set.of("+=", "-=");
 
-  // Either get the existing MLIR value that represents entity or load the
-  // value using coredsl.get if it is architectural state
-  static MLIRValue getOrLoadEntityValue(NamedEntity entity,
-                                        ConstructionContext cc,
-                                        AnalysisContext ac) {
-    var mlirValue = cc.getValue(entity);
-    if (mlirValue == null) {
-      var type = MLIRType.mapType(ac.getDeclaredType(entity));
-      mlirValue = cc.makeAnonymousValue(type);
-      cc.emitLn("%s = coredsl.get @%s : %s", mlirValue, entity.getName(), type);
-    }
-    return mlirValue;
-  }
-
   static Initialization analyzeInitialization(ForLoop loop,
                                               ConstructionContext cc,
                                               AnalysisContext ac) {
@@ -169,7 +155,7 @@ class ForLoopAnalyzer {
       var exprInit = (ExpressionInitializer)init;
       res.variable = dtor;
       if (exprInit.getValue() instanceof EntityReference entityRef) {
-        var mlirValue = getOrLoadEntityValue(entityRef.getTarget(), cc, ac);
+        var mlirValue = cc.getOrLoad(entityRef.getTarget());
         res.value = new RuntimeValue(mlirValue, cc);
       } else if (exprInit.getValue() instanceof IntegerConstant konst) {
         var resVal = ensureBigInteger(konst.getValue(), null);
@@ -215,7 +201,7 @@ class ForLoopAnalyzer {
         if (AliasAnalysis.entityMayBeModifiedIn(entity, loopBody)) {
           return null;
         }
-        var mlirValue = getOrLoadEntityValue(entity, cc, ac);
+        var mlirValue = cc.getOrLoad(entity);
         res.bound = new RuntimeValue(mlirValue, cc);
       } else {
         return null;
@@ -288,7 +274,7 @@ class ForLoopAnalyzer {
         if (AliasAnalysis.entityMayBeModifiedIn(stepEntity, loopBody)) {
           return null;
         }
-        var mlirValue = getOrLoadEntityValue(stepEntity, cc, ac);
+        var mlirValue = cc.getOrLoad(stepEntity);
         res.step = new RuntimeValue(mlirValue, cc);
         if ("-=".equals(opr)) {
           // TODO: this always makes it impossible to create an scf.for from

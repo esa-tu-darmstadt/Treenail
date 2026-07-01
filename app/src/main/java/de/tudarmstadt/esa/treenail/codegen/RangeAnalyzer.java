@@ -78,16 +78,7 @@ class RangeAnalyzer {
 
   static MLIRValue getEntityValue(NamedEntity entity, ConstructionContext cc,
                                   MLIRType castType) {
-    var value = cc.getValue(entity);
-    if (value == null) {
-      var ac = cc.getAnalysisContext();
-      var architecturalStateType = MLIRType.mapType(ac.getDeclaredType(entity));
-      var architecturalStateVal = cc.makeAnonymousValue(architecturalStateType);
-      cc.emitLn("%s = coredsl.get @%s : %s", architecturalStateVal,
-                entity.getName(), architecturalStateType);
-      value = architecturalStateVal;
-    }
-    return cc.makeCast(value, castType);
+    return cc.makeCast(cc.getOrLoad(entity), castType);
   }
 
   static RangeResult analyze(Expression fromExpr, Expression toExpr,

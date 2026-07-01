@@ -133,6 +133,18 @@ class ConstructionContext {
     return result;
   }
 
+  // Either get the existing MLIR value that represents a local value or load
+  // the value using coredsl.get if it is architectural state
+  MLIRValue getOrLoad(NamedEntity entity) {
+    var mlirValue = getValue(entity);
+    if (mlirValue == null) {
+      var type = MLIRType.mapType(ac.getDeclaredType(entity));
+      mlirValue = makeAnonymousValue(type);
+      emitLn("%s = coredsl.get @%s : %s", mlirValue, entity.getName(), type);
+    }
+    return mlirValue;
+  }
+
   void emit(String format, Object... args) {
     sb.append(String.format(format, args));
   }

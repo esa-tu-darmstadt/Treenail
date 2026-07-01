@@ -101,13 +101,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
         MLIRValue bitAccessOldValue = null;
         if (isBitAccess) {
-          if (isLocal)
-            bitAccessOldValue = cc.getValue(entity);
-          else {
-            bitAccessOldValue = cc.makeAnonymousValue(mapType(targetType));
-            cc.emitLn("%s = coredsl.get @%s : %s", bitAccessOldValue,
-                      entity.getName(), bitAccessOldValue.type);
-          }
+          bitAccessOldValue = cc.getOrLoad(entity);
 
           if (!isTopLevel) {
             var resValue = cc.makeAnonymousValue(accessType);
