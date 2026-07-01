@@ -389,10 +389,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         type = lhsTy;
         break;
       case "+":
-        type = MLIRType.getAddResultType(lhsTy, rhsTy);
+        type = MLIRIntType.getAddResultType(lhsTy, rhsTy);
         break;
       case "-":
-        type = MLIRType.getSubResultType(lhsTy, rhsTy);
+        type = MLIRIntType.getSubResultType(lhsTy, rhsTy);
         break;
       case "*":
         type =
@@ -670,7 +670,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       assert next.type instanceof MLIRIntType;
       var nextIntType = (MLIRIntType)next.type;
       var headIntType = (MLIRIntType)head.type;
-      head = emitBinaryOp("coredsl.concat",
+      head = emitBinaryOp(cc, "coredsl.concat",
                           getType(headIntType.width + nextIntType.width, false),
                           head, next);
     }

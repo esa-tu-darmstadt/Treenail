@@ -534,12 +534,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var iterArgVars = getLoopCarriedVariables(loop);
     iterArgVars.remove(iterVar);
 
-    var expectedIterType = mapType(ac.getDeclaredType(iterVar));
+    var expectedIterType = MLIRIntType.mapType(ac.getDeclaredType(iterVar));
 
     // Find minimal common type for initAna.value, actionAna.step, condAna.bound
-    var minTypeInit = initValue.getType();
-    var minTypeStep = stepVal.getType();
-    var minTypeBound = bound.getType();
+    var minTypeInit = (MLIRIntType)initValue.getType();
+    var minTypeStep = (MLIRIntType)stepVal.getType();
+    var minTypeBound = (MLIRIntType)bound.getType();
 
     var isActualSigned =
         minTypeInit.isSigned || minTypeStep.isSigned || minTypeBound.isSigned;

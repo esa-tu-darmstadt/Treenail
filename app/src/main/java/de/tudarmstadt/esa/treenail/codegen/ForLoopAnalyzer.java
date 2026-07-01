@@ -56,12 +56,12 @@ class ForLoopAnalyzer {
 
     @Override
     MLIRType getType() {
-      return MLIRType.determineType(value);
+      return MLIRIntType.determineType(value);
     }
 
     @Override
     MLIRValue getAsMLIRValue(MLIRType type) {
-      return cc.makeHWConst(value, type.width);
+      return cc.makeHWConst(value, ((MLIRIntType)type).width);
     }
   }
 
@@ -69,6 +69,7 @@ class ForLoopAnalyzer {
     MLIRValue currValue;
     ConstructionContext cc;
     RuntimeValue(MLIRValue beginValue, ConstructionContext cc) {
+      assert beginValue.type instanceof MLIRIntType;
       this.currValue = beginValue;
       this.cc = cc;
     }
@@ -87,12 +88,14 @@ class ForLoopAnalyzer {
 
     @Override
     void negate() {
-      var zero = cc.makeConst(BigInteger.ZERO, MLIRType.getType(1, false));
-      int resWidth = currValue.type.isSigned ? currValue.type.width
-                                             : currValue.type.width + 1;
-      var resultType = MLIRType.getType(resWidth, true);
+      var zeroIntType = MLIRIntType.getType(1, false);
+      var zero = cc.makeConst(BigInteger.ZERO, zeroIntType);
+      var currValueIntType = (MLIRIntType)currValue.type;
+      int resWidth = currValueIntType.isSigned ? currValueIntType.width
+                                             : currValueIntType.width + 1;
+      var resultType = MLIRIntType.getType(resWidth, true);
       var intermediateResultType =
-          MLIRType.getSubResultType(zero.type, currValue.type);
+          MLIRIntType.getSubResultType(zeroIntType, currValueIntType);
       var intermediateRes = ExpressionSwitch.emitBinaryOp(
           cc, "hwarith.sub", intermediateResultType, zero, currValue);
       currValue = cc.makeCast(intermediateRes, resultType);
@@ -100,7 +103,7 @@ class ForLoopAnalyzer {
 
     @Override
     boolean mayBeNegative() {
-      return currValue.type.isSigned;
+      return ((MLIRIntType)currValue.type).isSigned;
     }
 
     @Override
@@ -110,7 +113,7 @@ class ForLoopAnalyzer {
 
     @Override
     MLIRValue getAsMLIRValue(MLIRType type) {
-      return cc.makeSignlessCast(currValue, type.width);
+      return cc.makeSignlessCast(currValue, ((MLIRIntType)type).width);
     }
   }
 
