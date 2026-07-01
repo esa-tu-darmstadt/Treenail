@@ -1225,10 +1225,10 @@ class AppTest {
         %9 = coredsl.cast %8 : ui1 to ui32
         %10 = hwarith.constant 0 : ui1
         %11 = hwarith.sub %10, %2 : (ui1, si32) -> si33
-        %12 = hwarith.cast %11 : (si33) -> si32
+        %12 = coredsl.cast %11 : si33 to si32
         %13 = hwarith.constant 0 : ui1
         %14 = hwarith.sub %13, %7 : (ui1, si32) -> si33
-        %15 = hwarith.cast %14 : (si33) -> si32
+        %15 = coredsl.cast %14 : si33 to si32
         %16 = hwarith.cast %12 : (si32) -> i32
         %17 = hwarith.cast %15 : (si32) -> i32
         %18 = hw.constant 2 : i32
@@ -1260,10 +1260,10 @@ class AppTest {
         %11 = hwarith.sub %7, %10 : (si32, ui1) -> si33
         %12 = hwarith.constant 0 : ui1
         %13 = hwarith.sub %12, %2 : (ui1, si32) -> si33
-        %14 = hwarith.cast %13 : (si33) -> si32
+        %14 = coredsl.cast %13 : si33 to si32
         %15 = hwarith.constant 0 : ui1
         %16 = hwarith.sub %15, %11 : (ui1, si33) -> si34
-        %17 = hwarith.cast %16 : (si34) -> si33
+        %17 = coredsl.cast %16 : si34 to si33
         %18 = hwarith.cast %14 : (si32) -> i33
         %19 = hwarith.cast %17 : (si33) -> i33
         %20 = hw.constant 2 : i33
