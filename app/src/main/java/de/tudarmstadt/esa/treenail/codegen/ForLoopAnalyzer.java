@@ -191,6 +191,15 @@ class ForLoopAnalyzer {
     return res;
   }
 
+  static List<Statement> getLoopBody(ForLoop loop) {
+    var loopStmt = loop.getBody();
+    if (loopStmt instanceof CompoundStatement compound) {
+      return compound.getStatements();
+    } else {
+      return List.of(loopStmt);
+    }
+  }
+
   static Condition analyzeCondition(ForLoop loop, ConstructionContext cc,
                                     AnalysisContext ac) {
     var expr = loop.getCondition();
@@ -204,13 +213,7 @@ class ForLoopAnalyzer {
     if (!(infix.getLeft() instanceof EntityReference ref)) {
       return null;
     }
-    var loopStmt = loop.getBody();
-    List<Statement> loopBody;
-    if (loopStmt instanceof CompoundStatement compound) {
-      loopBody = compound.getStatements();
-    } else {
-      loopBody = List.of(loopStmt);
-    }
+    List<Statement> loopBody = getLoopBody(loop);
     if (cc.isConstant(infix.getRight())) {
       var constVal = cc.getConstantValue(infix.getRight(), null);
       res.bound = new ConstValue(constVal, cc);
@@ -274,6 +277,7 @@ class ForLoopAnalyzer {
   }
 
   private static Action analyzeCompoundAssignmentAction(Expression expr,
+                                                        List<Statement> loopBody,
                                                         ConstructionContext cc,
                                                         AnalysisContext ac) {
     var res = new Action();
@@ -289,8 +293,11 @@ class ForLoopAnalyzer {
                                  : rhs.getValue().negate();
         res.step = new ConstValue(stepVal, cc);
       } else if (assign.getValue() instanceof EntityReference rhs) {
-        res.step = null;
-        var mlirValue = getOrLoadEntityValue(rhs.getTarget(), cc, ac);
+        var stepEntity = rhs.getTarget();
+        if (AliasAnalysis.entityMayBeModifiedIn(stepEntity, loopBody)) {
+          return null;
+        }
+        var mlirValue = getOrLoadEntityValue(stepEntity, cc, ac);
         res.step = new RuntimeValue(mlirValue, cc);
         if ("-=".equals(opr)) {
           // TODO: this always makes it impossible to create an scf.for from
@@ -322,7 +329,7 @@ class ForLoopAnalyzer {
     res = analyzePostfixAction(expr, cc);
     if (res != null)
       return res;
-    res = analyzeCompoundAssignmentAction(expr, cc, ac);
+    res = analyzeCompoundAssignmentAction(expr, getLoopBody(loop), cc, ac);
     if (res != null)
       return res;
     return null;
