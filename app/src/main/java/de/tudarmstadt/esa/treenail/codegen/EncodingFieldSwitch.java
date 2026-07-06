@@ -154,7 +154,9 @@ class EncodingFieldSwitch extends CoreDslSwitch<String> {
     }
 
     var immAttrVal = '[' + immAttrs.stream().collect(joining(", ")) + ']';
-    var attrs = format(" {lil.enc_immediates = %s} ", immAttrVal);
-    return attrs;
+    // A single attr-dict entry; the caller (LongnailCodegen.emitEncoding)
+    // assembles the instruction's full attribute dict from this plus the
+    // forwarded CoreDSL `[[...]]` attributes.
+    return format("lil.enc_immediates = %s", immAttrVal);
   }
 }

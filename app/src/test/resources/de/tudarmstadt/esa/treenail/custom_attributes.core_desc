@@ -1,0 +1,31 @@
+// CoreDSL [[...]] attributes are forwarded into the emitted MLIR as
+// discardable `coredsl.attr.<name>` attributes: on functions (via the
+// func.func `attributes {...}` clause), instructions (next to
+// lil.enc_immediates), always-blocks, and architectural-state
+// declarators. Attributes fully consumed by the frontend (`enable`) are
+// not forwarded; ISA-level common instruction attributes are shadowed by
+// same-named per-instruction ones.
+
+Core AttrForward {
+  architectural_state {
+             unsigned int    XLEN = 32;
+    register unsigned<XLEN>  X[32] [[is_main_reg]];
+    register unsigned<XLEN>  PC [[is_pc]];
+  }
+
+  functions {
+    extern unsigned<32> my_blackbox(unsigned<32> a, unsigned<32> b)
+        [[ clk_budget = 3 ]] [[ uses_mem ]] [[ my_custom_hint = 2 * 21 ]];
+  }
+
+  instructions [[common_marker]] {
+    ANNOTATED [[no_cont]] [[my_pair(1, 2)]] {
+      encoding: 7'b0000000 :: rs2[4:0] :: rs1[4:0] :: 3'b100 :: rd[4:0] :: 7'b0110011;
+      behavior: if (rd != 0) X[rd] = my_blackbox(X[rs1], X[rs2]);
+    }
+    SHADOWED [[common_marker = 7]] [[enable = 1]] {
+      encoding: 7'b0000001 :: rs2[4:0] :: rs1[4:0] :: 3'b100 :: rd[4:0] :: 7'b0110011;
+      behavior: if (rd != 0) X[rd] = X[rs1] ^ X[rs2];
+    }
+  }
+}

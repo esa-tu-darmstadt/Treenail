@@ -28,6 +28,45 @@ class AppTest {
   }
 
   @Test
+  void customAttributesAreForwarded() {
+    var appInst = App.getInstance();
+    var fileName =
+        getClass().getResource("custom_attributes.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    assertNotNull(content, "app should be able to parse a simple CoreDSL file");
+    var mlirCode = appInst.generateMLIR(content);
+
+    // Function attributes -> `attributes {...}` clause on func.func;
+    // constant parameters are folded (2 * 21 -> 42).
+    assertTrue(
+        mlirCode.contains(
+            "func.func private @my_blackbox(%a : ui32, %b : ui32) -> ui32 "
+            + "attributes {coredsl.attr.clk_budget = 3, coredsl.attr.uses_mem, "
+            + "coredsl.attr.my_custom_hint = 42}"),
+        "function [[...]] attributes should be forwarded");
+
+    // Instruction attributes land next to lil.enc_immediates; multiple
+    // parameters become an array; ISA-level common instruction attributes
+    // are appended after the entity's own.
+    assertTrue(mlirCode.contains("coredsl.attr.no_cont, "
+                                 + "coredsl.attr.my_pair = [1, 2], "
+                                 + "coredsl.attr.common_marker}"),
+               "instruction [[...]] attributes should be forwarded");
+
+    // A same-named instruction attribute shadows the common one; `enable`
+    // is fully consumed by the frontend and not forwarded.
+    assertTrue(mlirCode.contains("coredsl.attr.common_marker = 7}"),
+               "per-instruction attributes should shadow common ones");
+    assertFalse(
+        mlirCode.contains("coredsl.attr.enable"),
+        "the fully consumed `enable` attribute should not be forwarded");
+
+    // Declarator attributes follow the register type.
+    assertTrue(mlirCode.contains(": ui32 {coredsl.attr.is_pc}"),
+               "register [[...]] attributes should be forwarded");
+  }
+
+  @Test
   void splitEncodingFieldWorks() {
     var appInst = App.getInstance();
     var fileName =
