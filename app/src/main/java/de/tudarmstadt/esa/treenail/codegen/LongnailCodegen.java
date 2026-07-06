@@ -413,8 +413,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     // Forward the function's CoreDSL attributes as discardable attributes
     // (func.func places them in a trailing `attributes {...}` clause).
-    var attrStr = attrDictOrEmpty(" attributes ",
-                                  coreDslAttrEntries(ctx, func.getAttributes()));
+    var attrStr = attrDictOrEmpty(
+        " attributes ", coreDslAttrEntries(ctx, func.getAttributes()));
 
     if (isExternal) {
       // We have a blackbox function here, only emit a function declaration
@@ -440,9 +440,10 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     // Instruction attributes shadow the ISA-level common instruction
     // attributes; both land in the instruction's attribute dict next to
     // lil.enc_immediates.
-    var attrEntries = coreDslAttrEntries(ctx, inst.getAttributes(), commonAttrs);
-    var encoding =
-        emitEncoding(inst.getEncoding(), values, splitValueDefStmts, attrEntries);
+    var attrEntries =
+        coreDslAttrEntries(ctx, inst.getAttributes(), commonAttrs);
+    var encoding = emitEncoding(inst.getEncoding(), values, splitValueDefStmts,
+                                attrEntries);
     var behavior = emitBehavior(inst.getBehavior(), ctx, values);
 
     sb.append(
