@@ -8,6 +8,7 @@ import static java.util.stream.Collectors.joining;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
+import com.minres.coredsl.analysis.CoreDslConstantExpressionEvaluator;
 import com.minres.coredsl.coreDsl.AlwaysBlock;
 import com.minres.coredsl.coreDsl.Attribute;
 import com.minres.coredsl.coreDsl.Declaration;
@@ -16,6 +17,7 @@ import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
 import com.minres.coredsl.coreDsl.EntityReference;
+import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.ISA;
@@ -29,6 +31,8 @@ import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.CoreDslType;
 import java.math.BigInteger;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -37,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.eclipse.emf.ecore.EObject;
 import org.eclipse.emf.ecore.EStructuralFeature;
+import org.eclipse.xtext.nodemodel.util.NodeModelUtils;
 import org.eclipse.xtext.validation.ValidationMessageAcceptor;
 
 public class LongnailCodegen implements ValidationMessageAcceptor {
@@ -60,6 +65,64 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         return true;
 
     return false;
+  }
+
+  /**
+   * Serializes CoreDSL {@code [[...]]} attributes into MLIR discardable
+   * attribute-dict entries named {@code coredsl.attr.<name>} so they survive
+   * into the emitted IR for downstream passes. {@code [[name]]} becomes a
+   * unit attribute, {@code [[name=expr]]} / {@code [[name(a, b)]]} become
+   * (arrays of) integer attributes when the parameters are compile-time
+   * constants that fit i64, and fall back to the parameter's source text as
+   * a string attribute otherwise. {@code enable} is fully consumed by the
+   * frontend (it gates emission of the entity) and is not forwarded.
+   * Duplicate names keep the first occurrence, so entity-level attributes
+   * shadow ISA-level common attributes when callers pass the entity list
+   * first.
+   */
+  @SafeVarargs
+  private static List<String> coreDslAttrEntries(AnalysisContext ctx,
+                                                 List<Attribute>... attrLists) {
+    var entries = new ArrayList<String>();
+    var seen = new HashSet<String>();
+    for (var attrs : attrLists) {
+      for (var a : attrs) {
+        var name = a.getAttributeName();
+        if (name.equals("enable") || !seen.add(name))
+          continue;
+        var params = a.getParameters();
+        if (params.isEmpty()) {
+          entries.add("coredsl.attr." + name);
+          continue;
+        }
+        var vals = params.stream()
+                       .map(p -> attrParamValue(ctx, p))
+                       .collect(joining(", "));
+        entries.add(format("coredsl.attr.%s = %s", name,
+                           params.size() == 1 ? vals : "[" + vals + "]"));
+      }
+    }
+    return entries;
+  }
+
+  private static String attrParamValue(AnalysisContext ctx, Expression expr) {
+    var res = ctx.isExpressionValueSet(expr)
+                  ? ctx.getExpressionValue(expr)
+                  : CoreDslConstantExpressionEvaluator.evaluate(ctx, expr);
+    // A bare integer literal parses as an i64 IntegerAttr — reject values
+    // that would not fit.
+    if (res.isValid() && res.getValue().bitLength() <= 63)
+      return res.getValue().toString();
+    var node = NodeModelUtils.getNode(expr);
+    var text = node != null ? NodeModelUtils.getTokenText(node) : "";
+    return '"' + text.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
+  }
+
+  /** Formats attr-dict entries as `<prefix>{e1, e2}`, or "" if empty. */
+  private static String attrDictOrEmpty(String prefix, List<String> entries) {
+    if (entries.isEmpty())
+      return "";
+    return prefix + "{" + String.join(", ", entries) + "}";
   }
 
   private static boolean isEnabled(List<Attribute> attrs, AnalysisContext ctx) {
@@ -109,13 +172,17 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     for (var inst : isa.getInstructions()) {
       // emit only if not disabled via attributes
       if (isEnabled(inst.getAttributes(), ctx))
-        sb.append(emitInstruction(inst, ctx).indent(N_SPACES));
+        sb.append(
+            emitInstruction(inst, ctx, isa.getCommonInstructionAttributes())
+                .indent(N_SPACES));
     }
 
     for (var always : isa.getAlwaysBlocks()) {
       // emit only if not disabled via attributes
       if (isEnabled(always.getAttributes(), ctx))
-        sb.append(emitAlwaysBlock(always, ctx).indent(N_SPACES));
+        sb.append(
+            emitAlwaysBlock(always, ctx, isa.getCommonAlwaysBlockAttributes())
+                .indent(N_SPACES));
     }
 
     sb.append("}\n");
@@ -151,6 +218,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var constStr = isConst ? " const" : "";
     var volatileStr = isVolatile ? " volatile" : "";
     var initStr = "";
+    // Declarator attributes travel as discardable attrs after the type.
+    var attrStr =
+        attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
 
     if (type.isIntegerType()) {
       var targetType = mapType(type);
@@ -164,8 +234,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
             : "Non-constant initializer";
         initStr = " = " + ensureBigInteger(cv.value, targetType);
       }
-      return format("coredsl.register %s%s%s @%s%s : %s\n", protoStr, constStr,
-                    volatileStr, name, initStr, targetType);
+      return format("coredsl.register %s%s%s @%s%s : %s%s\n", protoStr,
+                    constStr, volatileStr, name, initStr, targetType, attrStr);
     }
 
     assert type.isArrayType();
@@ -196,9 +266,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                     .map(Object::toString)
                     .collect(joining(", ", " = [", "]"));
     }
-    return format("coredsl.register %s%s%s @%s[%d]%s : %s\n", protoStr,
+    return format("coredsl.register %s%s%s @%s[%d]%s : %s%s\n", protoStr,
                   constStr, volatileStr, name, numElements, initStr,
-                  mappedElementType);
+                  mappedElementType, attrStr);
   }
 
   private String emitAddressSpace(Declarator dtor, boolean isConst,
@@ -237,9 +307,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     final String constString = isConst ? " const" : "";
     final String volatileString = isVolatile ? " volatile" : "";
-    return format("coredsl.addrspace %s%s%s @%s : (ui%d) -> %s\n", proto,
+    final String attrStr =
+        attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
+    return format("coredsl.addrspace %s%s%s @%s : (ui%d) -> %s%s\n", proto,
                   constString, volatileString, name, addressWidth,
-                  mapType(asType.elementType));
+                  mapType(asType.elementType), attrStr);
   }
 
   private String emitAlias(Declarator dtor, boolean isConst, boolean isVolatile,
@@ -248,10 +320,12 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var init = dtor.getInitializer();
     assert init != null && init instanceof ExpressionInitializer;
     var expr = ((ExpressionInitializer)init).getValue();
+    var attrStr =
+        attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
 
     if (expr instanceof EntityReference) {
       var refName = ((EntityReference)expr).getTarget().getName();
-      return format("coredsl.alias @%s = @%s\n", name, refName);
+      return format("coredsl.alias @%s = @%s%s\n", name, refName, attrStr);
     }
 
     assert expr instanceof IndexAccessExpression;
@@ -272,8 +346,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     final String constString = isConst ? " const" : "";
     final String volatileString = isVolatile ? " volatile" : "";
-    return format("coredsl.alias%s%s @%s = @%s[%s]\n", constString,
-                  volatileString, name, refName, index);
+    return format("coredsl.alias%s%s @%s = @%s[%s]%s\n", constString,
+                  volatileString, name, refName, index, attrStr);
   }
 
   private String emitArchitecturalStateElement(Declaration decl,
@@ -337,27 +411,39 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         format("func.func %s@%s(%s)%s", isExternal ? "private " : "",
                func.getName(), parameters, returnType);
 
+    // Forward the function's CoreDSL attributes as discardable attributes
+    // (func.func places them in a trailing `attributes {...}` clause).
+    var attrStr = attrDictOrEmpty(
+        " attributes ", coreDslAttrEntries(ctx, func.getAttributes()));
+
     if (isExternal) {
       // We have a blackbox function here, only emit a function declaration
-      sb.append(funcSignature + "\n");
+      sb.append(funcSignature + attrStr + "\n");
       return sb.toString();
     }
 
     var behavior = emitBehavior(body, ctx, values, "return");
 
-    sb.append(funcSignature + " {\n")
+    sb.append(funcSignature + attrStr + " {\n")
         .append(behavior.indent(N_SPACES))
         .append("}\n");
 
     return sb.toString();
   }
 
-  private String emitInstruction(Instruction inst, AnalysisContext ctx) {
+  private String emitInstruction(Instruction inst, AnalysisContext ctx,
+                                 List<Attribute> commonAttrs) {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
     List<String> splitValueDefStmts = new LinkedList<>();
-    var encoding = emitEncoding(inst.getEncoding(), values, splitValueDefStmts);
+    // Instruction attributes shadow the ISA-level common instruction
+    // attributes; both land in the instruction's attribute dict next to
+    // lil.enc_immediates.
+    var attrEntries =
+        coreDslAttrEntries(ctx, inst.getAttributes(), commonAttrs);
+    var encoding = emitEncoding(inst.getEncoding(), values, splitValueDefStmts,
+                                attrEntries);
     var behavior = emitBehavior(inst.getBehavior(), ctx, values);
 
     sb.append(
@@ -372,7 +458,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
   public String emitEncoding(Encoding encoding,
                              Map<NamedEntity, MLIRValue> values,
-                             List<String> splitValueDefStmts) {
+                             List<String> splitValueDefStmts,
+                             List<String> extraAttrEntries) {
     var encodingFieldSwitch = new EncodingFieldSwitch(values);
 
     var enc = '(' +
@@ -382,20 +469,27 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                   .collect(joining(", ")) +
               ')';
 
-    var attrs = encodingFieldSwitch.combineSplitValues(splitValueDefStmts);
+    var attrEntries = new ArrayList<String>();
+    attrEntries.add(encodingFieldSwitch.combineSplitValues(splitValueDefStmts));
+    attrEntries.addAll(extraAttrEntries);
 
-    return attrs + enc;
+    return " {" + String.join(", ", attrEntries) + "} " + enc;
   }
 
-  public String emitAlwaysBlock(AlwaysBlock always, AnalysisContext ctx) {
+  public String emitAlwaysBlock(AlwaysBlock always, AnalysisContext ctx,
+                                List<Attribute> commonAttrs) {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
     var behavior = emitBehavior(always.getBehavior(), ctx, values);
 
+    // coredsl.always prints its attribute dict after the body region.
+    var attrStr = attrDictOrEmpty(
+        " ", coreDslAttrEntries(ctx, always.getAttributes(), commonAttrs));
+
     sb.append(format("coredsl.always @%s {\n", always.getName()))
         .append(behavior.indent(N_SPACES))
-        .append("}\n");
+        .append("}" + attrStr + "\n");
 
     return sb.toString();
   }
