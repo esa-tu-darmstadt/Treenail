@@ -578,13 +578,18 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // Recurse into loop body.
     new StatementSwitch(forCC).doSwitch(loop.getBody());
 
+    // Forward the loop's CoreDSL attributes as discardable attributes; scf.for
+    // prints its attribute dict after the body region (like coredsl.always).
+    var attrDict = LongnailCodegen.attrDictOrEmpty(
+        " ", LongnailCodegen.coreDslAttrEntries(ac, loop.getAttributes()));
+
     // Handle simple case first: no `iter_args`/results.
     if (iterArgs.isEmpty()) {
       forCC.emitLn("scf.yield");
-      cc.emitLn("scf.for %s%s = %s to %s step %s : i%d {\n%s}",
+      cc.emitLn("scf.for %s%s = %s to %s step %s : i%d {\n%s}%s",
                 isUnsignedCmp ? "unsigned " : "", iterIndex, from, to, step,
                 actualIterType.width,
-                forCC.getStringBuilder().toString().indent(N_SPACES));
+                forCC.getStringBuilder().toString().indent(N_SPACES), attrDict);
       return true;
     }
 
@@ -608,10 +613,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         results.stream().map(Object::toString).collect(joining(", "));
 
     cc.emitLn("%s = scf.for %s%s = %s to %s step %s iter_args(%s) -> (%s) : "
-                  + "i%d {\n%s}",
+                  + "i%d {\n%s}%s",
               resultsStr, isUnsignedCmp ? "unsigned " : "", iterIndex, from, to,
               step, iterArgsStr, iterArgTypesStr, actualIterType.width,
-              forCC.getStringBuilder().toString().indent(N_SPACES));
+              forCC.getStringBuilder().toString().indent(N_SPACES), attrDict);
 
     // Update the surrounding construction's value table.
     Streams.forEachPair(iterArgVars.stream(), results.stream(), cc::setValue);

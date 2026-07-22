@@ -1333,4 +1333,20 @@ class AppTest {
     assertFalse(instrHasSCFFor(mlirCode, "NotViableStepModified"));
     // clang-format on
   }
+
+  @Test
+  void loopAttributesAreForwarded() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("scf_for.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    // The for-loop's [[...]] attributes are forwarded as discardable
+    // attributes printed after the scf.for region (like coredsl.always):
+    // [[unroll]] -> unit attr, [[pipeline = 2]] -> i64 integer attr.
+    assertTrue(instrHasSCFFor(mlirCode, "AttributedForLoop"));
+    assertTrue(
+        mlirCode.contains("} {coredsl.attr.unroll, coredsl.attr.pipeline = 2}"),
+        "for-loop attributes should be forwarded onto scf.for");
+  }
 }

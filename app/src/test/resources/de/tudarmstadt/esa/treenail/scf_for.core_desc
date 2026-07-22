@@ -343,5 +343,18 @@ InstructionSet TestScfForLoop {
         MEM[Imm6:Imm6 + 3] = sum;
       }
     }
+    // The for-loop's [[...]] attributes are forwarded onto the emitted scf.for
+    // as discardable `coredsl.attr.<name>` attributes. `unroll`/`pipeline` are
+    // custom names (frontend warning only) and forward as-is.
+    AttributedForLoop {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        unsigned<32> sum = 0;
+        for (unsigned<32> i = 0; i < 20; ++i) [[unroll]] [[pipeline = 2]] {
+          sum += MEM[rs1 + i];
+        }
+        MEM[Imm6:Imm6 + 3] = sum;
+      }
+    }
   }
 }

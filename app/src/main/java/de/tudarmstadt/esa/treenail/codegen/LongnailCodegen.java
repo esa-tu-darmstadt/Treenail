@@ -81,8 +81,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
    * first.
    */
   @SafeVarargs
-  private static List<String> coreDslAttrEntries(AnalysisContext ctx,
-                                                 List<Attribute>... attrLists) {
+  static List<String> coreDslAttrEntries(AnalysisContext ctx,
+                                         List<Attribute>... attrLists) {
     var entries = new ArrayList<String>();
     var seen = new HashSet<String>();
     for (var attrs : attrLists) {
@@ -119,7 +119,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   }
 
   /** Formats attr-dict entries as `<prefix>{e1, e2}`, or "" if empty. */
-  private static String attrDictOrEmpty(String prefix, List<String> entries) {
+  static String attrDictOrEmpty(String prefix, List<String> entries) {
     if (entries.isEmpty())
       return "";
     return prefix + "{" + String.join(", ", entries) + "}";
