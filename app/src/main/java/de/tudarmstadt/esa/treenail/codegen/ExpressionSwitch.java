@@ -242,8 +242,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         StoreOperation finalStore;
         if (isBitAccess) {
           final var entityType = mapType(ac.getDeclaredType(entity));
-          finalStore = new BitFieldNamedEntityStore(
-              entity, entityType, index, bitAccessOldValue, (MLIRIntType)accessType);
+          finalStore = new BitFieldNamedEntityStore(entity, entityType, index,
+                                                    bitAccessOldValue,
+                                                    (MLIRIntType)accessType);
         } else {
           finalStore = new ArrayNamedEntityStore(entity, accessType, index);
         }

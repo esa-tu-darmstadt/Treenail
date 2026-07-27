@@ -6,9 +6,9 @@ import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
 import com.minres.coredsl.analysis.AnalysisContext;
-import com.minres.coredsl.coreDsl.*;
 import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
+import com.minres.coredsl.coreDsl.*;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
 
@@ -140,7 +140,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         for (var member : structDecl.getMembers()) {
           // TODO: qualifiers
           // - structs with volatile members exist
-          var memberType = MLIRType.mapType(ctx.getSpecifiedType(member.getType()));
+          var memberType =
+              MLIRType.mapType(ctx.getSpecifiedType(member.getType()));
           for (var dtor : member.getDeclarators()) {
             var memberName = dtor.getName();
             members.put(memberName, memberType);
@@ -241,7 +242,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     if (type.isArrayType()) {
       assert type.isArrayType();
       // Array type
-      var arType = (ArrayType) type;
+      var arType = (ArrayType)type;
       var elementType = arType.elementType;
       var numElements = arType.count;
       var width = elementType.getBitSize();
@@ -254,28 +255,30 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       var mappedElementType = MLIRType.mapType(elementType);
       if (init != null) {
         assert init instanceof ListInitializer;
-        var listInit = (ListInitializer) init;
-        assert mappedElementType instanceof MLIRIntType : "CoreDSL does not support nested list initializers";
+        var listInit = (ListInitializer)init;
+        assert mappedElementType instanceof MLIRIntType
+            : "CoreDSL does not support nested list initializers";
         var intElementType = (MLIRIntType)mappedElementType;
         initStr = listInit.getInitializers()
-                .stream()
-                .map(i -> {
-                  var ei = (ExpressionInitializer) i;
-                  var cv = ctx.getExpressionValue(ei.getValue());
-                  assert cv.getStatus() == StatusCode.success
-                          : "Non-constant initializer";
-                  return ensureBigInteger(cv.getValue(), intElementType);
-                })
-                .map(Object::toString)
-                .collect(joining(", ", " = [", "]"));
+                      .stream()
+                      .map(i -> {
+                        var ei = (ExpressionInitializer)i;
+                        var cv = ctx.getExpressionValue(ei.getValue());
+                        assert cv.getStatus() == StatusCode.success
+                            : "Non-constant initializer";
+                        return ensureBigInteger(cv.getValue(), intElementType);
+                      })
+                      .map(Object::toString)
+                      .collect(joining(", ", " = [", "]"));
       }
       return format("coredsl.register %s%s%s @%s[%d]%s : %s\n", protoStr,
-              constStr, volatileStr, name, numElements, initStr,
-              mappedElementType);
+                    constStr, volatileStr, name, numElements, initStr,
+                    mappedElementType);
     } else if (type.isStructType()) {
       assert init == null : "NYI: initializers for struct registers";
       var structType = MLIRStructType.mapType(type);
-      return format("coredsl.register %s%s%s @%s : %s", protoStr, constStr, volatileStr, name, structType);
+      return format("coredsl.register %s%s%s @%s : %s", protoStr, constStr,
+                    volatileStr, name, structType);
     } else {
       assert false : "NYI: Union / Enum registers";
     }
