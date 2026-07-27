@@ -8,6 +8,7 @@ import static java.util.stream.Collectors.joining;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.analysis.ConstantValue.StatusCode;
 import com.minres.coredsl.analysis.CoreDslAnalyzer;
+import com.minres.coredsl.analysis.CoreDslConstantExpressionEvaluator;
 import com.minres.coredsl.coreDsl.*;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
