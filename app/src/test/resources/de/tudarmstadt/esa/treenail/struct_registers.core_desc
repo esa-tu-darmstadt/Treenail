@@ -9,6 +9,7 @@ InstructionSet StructRegisters {
     }
     register struct UVec2 STRUCT_REG;
     register struct VecAndInt NESTED_STRUCT_REG;
+    register struct VecAndInt STRUCT_REGS[32];
   }
 
   instructions {
@@ -26,6 +27,10 @@ InstructionSet StructRegisters {
         NESTED_STRUCT_REG.vec.x = 7;
         // Bit access to members
         STRUCT_REG.x[7:0] = 255;
+        // Simple register file write
+        STRUCT_REGS[2] = NESTED_STRUCT_REG;
+        // Register file nested write
+        STRUCT_REGS[rs1].notNested = 10;
       }
     }
   }
