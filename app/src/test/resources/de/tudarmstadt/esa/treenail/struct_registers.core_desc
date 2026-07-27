@@ -31,6 +31,7 @@ InstructionSet StructRegisters {
         STRUCT_REGS[2] = NESTED_STRUCT_REG;
         // Register file nested write
         STRUCT_REGS[rs1].notNested = 10;
+        // TODO: struct ranged array accesses are typed as x bit integers
       }
     }
   }
