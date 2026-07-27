@@ -246,15 +246,17 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       var numElements = arType.count;
       var width = elementType.getBitSize();
 
-      assert elementType.isIntegerType() : "NYI: Multi-dimensional registers";
+      assert !elementType.isArrayType() : "NYI : Multi-dimensional registers";
 
       if (hasAttr(dtor.getAttributes(), "is_main_reg"))
         protoStr = "core_x";
 
-      var mappedElementType = mapType(elementType);
+      var mappedElementType = MLIRType.mapType(elementType);
       if (init != null) {
         assert init instanceof ListInitializer;
         var listInit = (ListInitializer) init;
+        assert mappedElementType instanceof MLIRIntType : "CoreDSL does not support nested list initializers";
+        var intElementType = (MLIRIntType)mappedElementType;
         initStr = listInit.getInitializers()
                 .stream()
                 .map(i -> {
@@ -262,7 +264,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                   var cv = ctx.getExpressionValue(ei.getValue());
                   assert cv.getStatus() == StatusCode.success
                           : "Non-constant initializer";
-                  return ensureBigInteger(cv.getValue(), mappedElementType);
+                  return ensureBigInteger(cv.getValue(), intElementType);
                 })
                 .map(Object::toString)
                 .collect(joining(", ", " = [", "]"));

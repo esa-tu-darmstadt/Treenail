@@ -102,9 +102,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     private static final class ArrayNamedEntityStore extends StoreOperation {
       NamedEntity destEntity;
-      MLIRIntType accessType;
+      MLIRType accessType;
       RangeAnalyzer.RangeResult index;
-      ArrayNamedEntityStore(NamedEntity destEntity, MLIRIntType accessType,
+      ArrayNamedEntityStore(NamedEntity destEntity, MLIRType accessType,
                             RangeAnalyzer.RangeResult index) {
         this.destEntity = destEntity;
         this.accessType = accessType;
@@ -204,7 +204,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var targetType = ac.getExpressionType(target);
       var isBitAccess = targetType.isIntegerType();
 
-      var accessType = mapType(ac.getExpressionType(access));
+      var accessType = MLIRType.mapType(ac.getExpressionType(access));
       var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
                                         targetType, cc, ExpressionSwitch.this);
       final boolean isTopLevel = !isNestedLvalue;
@@ -243,7 +243,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         if (isBitAccess) {
           final var entityType = mapType(ac.getDeclaredType(entity));
           finalStore = new BitFieldNamedEntityStore(
-              entity, entityType, index, bitAccessOldValue, accessType);
+              entity, entityType, index, bitAccessOldValue, (MLIRIntType)accessType);
         } else {
           finalStore = new ArrayNamedEntityStore(entity, accessType, index);
         }
@@ -331,8 +331,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         storeStack.push(new StructNamedEntityStore(targetEntity, structType));
         storeStack.push(new StructMemberStore(entityVal, memberName));
       } else {
-        assert memberAccess.getTarget() instanceof MemberAccessExpression
-            : "NYI: Array of structs";
         isNestedLvalue = true;
         var valueToStore = doSwitch(memberAccess.getTarget());
         assert valueToStore.type instanceof MLIRStructType;
