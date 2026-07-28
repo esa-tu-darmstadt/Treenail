@@ -456,7 +456,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     // type of the expression that is indexed into, and the presence of an end
     // index (i.e. it's a range index).
 
-    var type = MLIRIntType.mapType(ac.getExpressionType(access));
+    var type = MLIRType.mapType(ac.getExpressionType(access));
     var targetType = ac.getExpressionType(access.getTarget());
     var result = cc.makeAnonymousValue(type);
     var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
