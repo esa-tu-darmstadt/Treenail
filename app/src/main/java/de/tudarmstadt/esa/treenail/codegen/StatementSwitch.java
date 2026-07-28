@@ -1,7 +1,6 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toSet;
@@ -76,17 +75,19 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       if (type.isIntegerType()) {
         var init = dtor.getInitializer();
         if (init == null) {
-          // Spec: Unitialized variables have an undefined value. It simplifies IR
-          // construction if we just assume them to be zero. Unnecessary const ops
-          // will be canonicalized away later in MLIR.
-          var zero = cc.makeConst(BigInteger.ZERO, mapType(type));
+          // Spec: Unitialized variables have an undefined value. It simplifies
+          // IR construction if we just assume them to be zero. Unnecessary
+          // const ops will be canonicalized away later in MLIR.
+          var zero = cc.makeConst(BigInteger.ZERO, MLIRIntType.mapType(type));
           cc.setValue(dtor, zero);
           continue;
         }
 
-        assert init instanceof ExpressionInitializer : "NYI: List initializers";
-        var value = exprSwitch.doSwitch(((ExpressionInitializer) init).getValue());
-        var castValue = cc.makeCast(value, mapType(type));
+        assert init instanceof ExpressionInitializer : ("NYI: List " +
+                                                        "initializers");
+        var value =
+            exprSwitch.doSwitch(((ExpressionInitializer)init).getValue());
+        var castValue = cc.makeCast(value, MLIRIntType.mapType(type));
         cc.setValue(dtor, castValue);
       } else if (type.isStructType()) {
         var mlirType = MLIRStructType.mapType(type);
@@ -135,7 +136,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     assert funcDef != null : "Return statement outside of function?";
 
     var sig = ac.getFunctionSignature((FunctionDefinition)funcDef);
-    var retTy = mapType(sig.getReturnType());
+    var retTy = MLIRIntType.mapType(sig.getReturnType());
     var retVal = cc.makeCast(exprSwitch.doSwitch(expr), retTy);
     cc.emitLn("return %s : %s", retVal, retTy);
     cc.setTerminatorWasEmitted();
@@ -584,7 +585,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var iterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var results = new LinkedList<MLIRValue>();
     for (var v : iterArgVars) {
-      var type = mapType(ac.getDeclaredType(v));
+      var type = MLIRIntType.mapType(ac.getDeclaredType(v));
       iterArgTypes.add(type);
 
       forCC.setValue(v, forCC.makeAnonymousValue(type));
@@ -669,7 +670,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var afterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var results = new LinkedList<MLIRValue>();
     for (var v : loopCarriedVars) {
-      var type = mapType(ac.getDeclaredType(v));
+      var type = MLIRIntType.mapType(ac.getDeclaredType(v));
       argTypes.add(type);
 
       beforeCC.setValue(v, beforeCC.makeAnonymousValue(type));

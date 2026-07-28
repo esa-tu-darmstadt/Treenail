@@ -2,7 +2,6 @@ package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
 import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.getType;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.mapType;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.Streams;
@@ -241,7 +240,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         }
         StoreOperation finalStore;
         if (isBitAccess) {
-          final var entityType = mapType(ac.getDeclaredType(entity));
+          final var entityType =
+              MLIRIntType.mapType(ac.getDeclaredType(entity));
           finalStore = new BitFieldNamedEntityStore(entity, entityType, index,
                                                     bitAccessOldValue,
                                                     (MLIRIntType)accessType);
@@ -423,7 +423,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   @Override
   public MLIRValue caseIntegerConstant(IntegerConstant konst) {
-    var type = mapType(ac.getExpressionType(konst));
+    var type = MLIRIntType.mapType(ac.getExpressionType(konst));
     var value = cc.getConstantValue(konst, type);
     return cc.makeConst(value, type);
   }
@@ -456,7 +456,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     // type of the expression that is indexed into, and the presence of an end
     // index (i.e. it's a range index).
 
-    var type = mapType(ac.getExpressionType(access));
+    var type = MLIRIntType.mapType(ac.getExpressionType(access));
     var targetType = ac.getExpressionType(access.getTarget());
     var result = cc.makeAnonymousValue(type);
     var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
@@ -537,7 +537,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   public MLIRValue caseInfixExpression(InfixExpression expr) {
     var lhs = doSwitch(expr.getLeft());
     var opr = expr.getOperator();
-    var type = mapType(ac.getExpressionType(expr));
+    var type = MLIRIntType.mapType(ac.getExpressionType(expr));
     final boolean isLAnd = "&&".equals(opr);
     final boolean isLOr = "||".equals(opr);
     if (isLAnd || isLOr) {
@@ -621,7 +621,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       // The target dialect don't have unary operations, hence we must construct
       // equivalent binary operations here.
       MLIRValue lhs;
-      var type = mapType(ac.getExpressionType(expr));
+      var type = MLIRIntType.mapType(ac.getExpressionType(expr));
       if ("~".equals(opr)) {
         // To invert the value we need a -1 constant to xor with
         lhs = cc.makeHWConst(BigInteger.ONE.negate(), type.width);
@@ -743,7 +743,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   @Override
   public MLIRValue caseConditionalExpression(ConditionalExpression expr) {
-    var type = mapType(ac.getExpressionType(expr));
+    var type = MLIRIntType.mapType(ac.getExpressionType(expr));
 
     var cond = doSwitch(expr.getCondition());
     var cast = cc.makeI1Cast(cond);
@@ -766,7 +766,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue caseCastExpression(CastExpression cast) {
     var source = doSwitch(cast.getOperand());
-    var type = mapType(ac.getExpressionType(cast));
+    var type = MLIRIntType.mapType(ac.getExpressionType(cast));
     return cc.makeCast(source, type);
   }
 
@@ -799,7 +799,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return cc.makeAnonymousValue(MLIRType.VOID);
     }
 
-    var retTy = mapType(funcTy.getReturnType());
+    var retTy = MLIRIntType.mapType(funcTy.getReturnType());
     var retVal = cc.makeAnonymousValue(retTy);
     cc.emitLn("%s = func.call @%s(%s) : (%s) -> %s", retVal, callee.getName(),
               argsCastStr, argTysStr, retTy);

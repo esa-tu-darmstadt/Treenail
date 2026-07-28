@@ -1,7 +1,6 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigInteger;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
@@ -12,7 +11,6 @@ import com.minres.coredsl.analysis.CoreDslConstantExpressionEvaluator;
 import com.minres.coredsl.coreDsl.*;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
-
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -204,7 +202,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var exprInit = (ExpressionInitializer)init;
     var cv = ctx.getExpressionValue(exprInit.getValue());
     assert cv.getStatus() == StatusCode.success : "Non-constant initializer";
-    var constType = mapType(type);
+    var constType = MLIRIntType.mapType(type);
     // Instead of a hwarith.constant we will emit a local const register, which
     // will be optimized away but allows being accessed even in isolated from
     // above regions (esp. func.func)
@@ -226,7 +224,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
 
     if (type.isIntegerType()) {
-      var targetType = mapType(type);
+      var targetType = MLIRIntType.mapType(type);
       if (hasAttr(dtor.getAttributes(), "is_pc"))
         protoStr = "core_pc";
       if (init != null) {
@@ -327,7 +325,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
     return format("coredsl.addrspace %s%s%s @%s : (ui%d) -> %s%s\n", proto,
                   constString, volatileString, name, addressWidth,
-                  mapType(asType.elementType), attrStr);
+                  MLIRIntType.mapType(asType.elementType), attrStr);
   }
 
   private String emitAlias(Declarator dtor, boolean isConst, boolean isVolatile,
@@ -410,7 +408,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
     Function<Declaration, String> emitParam = (d) -> {
       var dtor = d.getDeclarators().get(0);
-      var type = mapType(ctx.getDeclaredType(dtor));
+      var type = MLIRIntType.mapType(ctx.getDeclaredType(dtor));
       var value = new MLIRValue(dtor.getName(), type);
       values.put(dtor, value);
       return format("%s : %s", value, type);
@@ -418,8 +416,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var parameters =
         func.getParameters().stream().map(emitParam).collect(joining(", "));
     var anaReturnType = ctx.getFunctionSignature(func).getReturnType();
-    var returnType =
-        anaReturnType.isVoid() ? "" : format(" -> %s", mapType(anaReturnType));
+    var returnType = anaReturnType.isVoid()
+                         ? ""
+                         : format(" -> %s", MLIRIntType.mapType(anaReturnType));
     var body = func.getBody();
     var isExternal = body == null;
 
