@@ -10,8 +10,6 @@ InstructionSet StructRegisters {
     register struct UVec2 STRUCT_REG;
     register struct VecAndInt NESTED_STRUCT_REG;
     register struct VecAndInt STRUCT_REGS[32];
-    register struct UVec2 VECS[32];
-    register unsigned<32> UINTS[32];
   }
 
   instructions {
