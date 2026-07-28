@@ -1482,6 +1482,8 @@ class AppTest {
         %24 = coredsl.cast %22 : ui4 to si32
         %25 = hw.struct_inject %23["notNested"], %24 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
         coredsl.set @STRUCT_REGS[%rs1 : ui5] = %25 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %26 = coredsl.get @STRUCT_REGS[31] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @NESTED_STRUCT_REG = %26 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
     """));
     // clang-format on
 

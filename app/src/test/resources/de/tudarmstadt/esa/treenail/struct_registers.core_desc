@@ -10,6 +10,8 @@ InstructionSet StructRegisters {
     register struct UVec2 STRUCT_REG;
     register struct VecAndInt NESTED_STRUCT_REG;
     register struct VecAndInt STRUCT_REGS[32];
+    register struct UVec2 VECS[32];
+    register unsigned<32> UINTS[32];
   }
 
   instructions {
@@ -31,6 +33,8 @@ InstructionSet StructRegisters {
         STRUCT_REGS[2] = NESTED_STRUCT_REG;
         // Register file nested write
         STRUCT_REGS[rs1].notNested = 10;
+        // Register file read
+        NESTED_STRUCT_REG = STRUCT_REGS[31];
         // TODO: struct ranged array accesses are typed as x bit integers
       }
     }
