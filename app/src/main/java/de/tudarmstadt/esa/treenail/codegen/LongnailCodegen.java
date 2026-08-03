@@ -408,7 +408,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
     Function<Declaration, String> emitParam = (d) -> {
       var dtor = d.getDeclarators().get(0);
-      var type = MLIRIntType.mapType(ctx.getDeclaredType(dtor));
+      var type = MLIRType.mapType(ctx.getDeclaredType(dtor));
       var value = new MLIRValue(dtor.getName(), type);
       values.put(dtor, value);
       return format("%s : %s", value, type);
