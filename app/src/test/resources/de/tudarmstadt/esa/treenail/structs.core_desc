@@ -22,6 +22,20 @@ InstructionSet Structs {
       res.y = y;
       return res;
     }
+    // Function with struct argument
+    unsigned<64> convertSimple(struct Simple arg) {
+      unsigned<64> retVal = arg.x * arg.y;
+      retVal += (unsigned<32>)(arg.a * arg.b);
+      retVal *= (unsigned<32>)(arg.c / arg.d);
+      return retVal;
+    }
+    // Function with both struct arguments and struct return type
+    struct Nested makeNested(unsigned<32> notNested, struct Simple simple) {
+        struct Nested res;
+        res.notNested = notNested;
+        res.nested = simple;
+        return res;
+    }
   }
 
   instructions {

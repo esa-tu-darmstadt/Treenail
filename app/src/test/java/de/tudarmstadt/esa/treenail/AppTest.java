@@ -1371,6 +1371,38 @@ class AppTest {
         %8 = hw.struct_inject %7["y"], %y : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
         return %8 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
       }
+      func.func @convertSimple(%arg : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> ui64 {
+        %0 = hw.struct_extract %arg["x"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %1 = hw.struct_extract %arg["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %2 = hwarith.mul %0, %1 : (ui32, ui32) -> ui64
+        %3 = hw.struct_extract %arg["a"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %4 = hw.struct_extract %arg["b"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %5 = hwarith.mul %3, %4 : (si16, si16) -> si32
+        %6 = coredsl.cast %5 : si32 to ui32
+        %7 = hwarith.add %2, %6 : (ui64, ui32) -> ui65
+        %8 = coredsl.cast %7 : ui65 to ui64
+        %9 = hw.struct_extract %arg["c"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %10 = hw.struct_extract %arg["d"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %11 = hwarith.div %9, %10 : (si16, si16) -> si17
+        %12 = coredsl.cast %11 : si17 to ui32
+        %13 = hwarith.mul %8, %12 : (ui64, ui32) -> ui96
+        %14 = coredsl.cast %13 : ui96 to ui64
+        return %14 : ui64
+      }
+      func.func @makeNested(%notNested : ui32, %simple : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>> {
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hwarith.constant 0 : ui32
+        %3 = hwarith.constant 0 : si16
+        %4 = hwarith.constant 0 : si16
+        %5 = hwarith.constant 0 : si16
+        %6 = hwarith.constant 0 : si16
+        %7 = hw.struct_create (%1, %2, %3, %4, %5, %6) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %8 = hw.struct_create (%0, %7) : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %9 = hw.struct_inject %8["notNested"], %notNested : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %10 = hw.struct_inject %9["nested"], %simple : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        return %10 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+      }
     """));
     assertTrue(mlirCode.contains("""
         %0 = hwarith.constant 0 : ui32
