@@ -1319,6 +1319,30 @@ class AppTest {
           scf.yield %31 : ui32
         }
     """));
+    // StructMemberModifiedInLoop
+    assertTrue(mlirCode.contains("""
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hw.struct_create (%0, %1) : !hw.struct<x: ui32, y: ui32>
+        %3 = hw.constant 0 : i5
+        %4 = hw.constant 20 : i5
+        %5 = hw.constant 1 : i5
+        %6 = scf.for unsigned %6 = %3 to %4 step %5 iter_args(%9 = %2) -> (!hw.struct<x: ui32, y: ui32>) : i5 {
+          %7 = hwarith.cast %6 : (i5) -> ui5
+          %8 = coredsl.cast %7 : ui5 to ui32
+          %11 = hwarith.add %rs1, %8 : (ui5, ui32) -> ui33
+          %12 = coredsl.cast %11 : ui33 to ui32
+          %10 = coredsl.get @MEM[%12 : ui32] : ui8
+          %13 = hw.struct_extract %9["x"] : !hw.struct<x: ui32, y: ui32>
+          %14 = hwarith.add %13, %10 : (ui32, ui8) -> ui33
+          %15 = coredsl.cast %14 : ui33 to ui32
+          %16 = hw.struct_inject %9["x"], %15 : !hw.struct<x: ui32, y: ui32>
+          scf.yield %16 : !hw.struct<x: ui32, y: ui32>
+        }
+        %7 = hw.struct_extract %6["x"] : !hw.struct<x: ui32, y: ui32>
+        %8 = coredsl.cast %Imm6 : ui6 to ui32
+        coredsl.set @MEM[%8 : ui32, 0:3] = %7 : ui32
+    """));
 
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableBoundModified"));
@@ -1326,6 +1350,7 @@ class AppTest {
     assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundedViableRefModification"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointee"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointer"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundInArrayAccess"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleRef"));
     // NOTE: this would technically be viable, but we don't check far enough for now
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedViableBitRef"));
