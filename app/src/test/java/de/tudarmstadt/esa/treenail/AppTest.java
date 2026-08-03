@@ -1484,6 +1484,29 @@ class AppTest {
         %76 = hwarith.constant 10 : ui4
         %77 = coredsl.cast %76 : ui4 to ui32
         %78 = func.call @makeNested(%77, %74) : (ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %79 = hwarith.cast %75 : (ui64) -> i65
+        %80 = scf.execute_region -> (!hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) {
+          cf.switch %79 : i65, [
+            default: ^default,
+            10: ^case_10,
+            3: ^case_3
+          ]
+          ^case_10():
+            %80 = hwarith.constant 10 : ui4
+            %81 = coredsl.cast %80 : ui4 to ui32
+            %82 = hw.struct_inject %74["x"], %81 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+            cf.br ^switch_end(%82 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>)
+          ^case_3():
+            %83 = hwarith.constant 10 : ui4
+            %84 = coredsl.cast %83 : ui4 to ui32
+            %85 = hw.struct_inject %74["y"], %84 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+            cf.br ^switch_end(%85 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>)
+          ^default():
+            cf.br ^switch_end(%74 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>)
+          ^switch_end(%86: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>):
+            scf.yield %86 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        }
+        %81 = hw.struct_inject %78["nested"], %80 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
     """));
     // clang-format on
     // TODO: remove when tests completed

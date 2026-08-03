@@ -63,6 +63,18 @@ InstructionSet Structs {
         struct Simple simple = makeSimple(6, 7);
         unsigned<64> converted = convertSimple(simple);
         struct Nested nested = makeNested(10, simple);
+        // Struct modified in switch statement
+        switch (converted) {
+          case 10:
+            simple.x = 10;
+            break;
+          case 3:
+            simple.y = 10;
+            break;
+          default:
+            break;
+        }
+        nested.nested = simple;
       }
     }
   }
