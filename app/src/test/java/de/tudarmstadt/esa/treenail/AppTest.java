@@ -1359,6 +1359,20 @@ class AppTest {
     assertNotNull(mlirCode);
     // clang-format off
     assertTrue(mlirCode.contains("""
+      func.func @makeSimple(%x : ui32, %y : ui32) -> !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16> {
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hwarith.constant 0 : si16
+        %3 = hwarith.constant 0 : si16
+        %4 = hwarith.constant 0 : si16
+        %5 = hwarith.constant 0 : si16
+        %6 = hw.struct_create (%0, %1, %2, %3, %4, %5) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %7 = hw.struct_inject %6["x"], %x : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %8 = hw.struct_inject %7["y"], %y : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        return %8 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+      }
+    """));
+    assertTrue(mlirCode.contains("""
         %0 = hwarith.constant 0 : ui32
         %1 = hwarith.constant 0 : ui32
         %2 = hwarith.constant 0 : si16

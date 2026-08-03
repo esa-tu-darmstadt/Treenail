@@ -14,6 +14,15 @@ InstructionSet Structs {
       struct Nested nested2;
     }
   }
+  functions {
+    // Function with struct return type
+    struct Simple makeSimple(unsigned<32> x, unsigned<32> y) {
+      struct Simple res;
+      res.x = x;
+      res.y = y;
+      return res;
+    }
+  }
 
   instructions {
     StructTest {
