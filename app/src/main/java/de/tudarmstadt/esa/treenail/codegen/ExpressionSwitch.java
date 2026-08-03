@@ -785,10 +785,16 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     var args = call.getArguments().stream().map(this::doSwitch).toList();
     var argTys =
-        funcTy.getParamTypes().stream().map(MLIRIntType::mapType).toList();
+        funcTy.getParamTypes().stream().map(MLIRType::mapType).toList();
     var argsCastStr = Streams
                           .zip(args.stream(), argTys.stream(),
-                               (arg, ty) -> cc.makeCast(arg, ty))
+                               (arg, ty) -> {
+                                 if (ty instanceof MLIRIntType intTy) {
+                                   return cc.makeCast(arg, intTy);
+                                 } else {
+                                   return arg;
+                                 }
+                               })
                           .map(Object::toString)
                           .collect(joining(", "));
     var argTysStr =
@@ -799,7 +805,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return cc.makeAnonymousValue(MLIRType.VOID);
     }
 
-    var retTy = MLIRIntType.mapType(funcTy.getReturnType());
+    var retTy = MLIRType.mapType(funcTy.getReturnType());
     var retVal = cc.makeAnonymousValue(retTy);
     cc.emitLn("%s = func.call @%s(%s) : (%s) -> %s", retVal, callee.getName(),
               argsCastStr, argTysStr, retTy);
