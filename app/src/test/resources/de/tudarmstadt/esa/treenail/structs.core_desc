@@ -14,6 +14,7 @@ InstructionSet Structs {
       struct Nested nested2;
     }
   }
+
   functions {
     // Function with struct return type
     struct Simple makeSimple(unsigned<32> x, unsigned<32> y) {
@@ -58,6 +59,10 @@ InstructionSet Structs {
         // bit access to members
         localStruct.y[4:0] = 3;
         triple.nested2.nested.c[7:0] = 42;
+        // function calls
+        struct Simple simple = makeSimple(6, 7);
+        unsigned<64> converted = convertSimple(simple);
+        struct Nested nested = makeNested(10, simple);
       }
     }
   }

@@ -1475,6 +1475,15 @@ class AppTest {
         %67 = hw.struct_inject %63["c"], %66 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
         %68 = hw.struct_inject %62["nested"], %67 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
         %69 = hw.struct_inject %55["nested2"], %68 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %70 = hwarith.constant 6 : ui3
+        %71 = hwarith.constant 7 : ui3
+        %72 = coredsl.cast %70 : ui3 to ui32
+        %73 = coredsl.cast %71 : ui3 to ui32
+        %74 = func.call @makeSimple(%72, %73) : (ui32, ui32) -> !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %75 = func.call @convertSimple(%74) : (!hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> ui64
+        %76 = hwarith.constant 10 : ui4
+        %77 = coredsl.cast %76 : ui4 to ui32
+        %78 = func.call @makeNested(%77, %74) : (ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
     """));
     // clang-format on
     // TODO: remove when tests completed
