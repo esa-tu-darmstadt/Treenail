@@ -147,7 +147,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   }
 
   private record SwitchFinalBranchesRes(
-      LinkedHashSet<NamedEntity> updatedEntities, List<MLIRIntType> returnTypes,
+      LinkedHashSet<NamedEntity> updatedEntities, List<MLIRType> returnTypes,
       String returnTypesString,
       // The values representing the updated entities after the switch is done
       List<MLIRValue> resultValues) {}
@@ -173,7 +173,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var ac = cc.getAnalysisContext();
     var returnTypes = updatedEntities.stream()
                           .map(ac::getDeclaredType)
-                          .map(MLIRIntType::mapType)
+                          .map(MLIRType::mapType)
                           .toList();
     var returnTypesStr =
         returnTypes.stream().map(Object::toString).collect(joining(", "));
