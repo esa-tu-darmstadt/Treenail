@@ -418,7 +418,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var anaReturnType = ctx.getFunctionSignature(func).getReturnType();
     var returnType = anaReturnType.isVoid()
                          ? ""
-                         : format(" -> %s", MLIRIntType.mapType(anaReturnType));
+                         : format(" -> %s", MLIRType.mapType(anaReturnType));
     var body = func.getBody();
     var isExternal = body == null;
 
