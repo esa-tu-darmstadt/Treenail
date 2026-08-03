@@ -1,7 +1,6 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import com.minres.coredsl.type.CoreDslType;
-
 import java.util.LinkedHashMap;
 
 class MLIRStructType extends MLIRType {
@@ -18,7 +17,11 @@ class MLIRStructType extends MLIRType {
   }
   public static void
   registerStructType(String name, LinkedHashMap<String, MLIRType> members) {
-    assert !types.containsKey(name) : "Duplicate struct name";
+    // Because types is static, it may read the same structs multiple times in
+    // the tests. Thus, we want to check if in any case a struct is redefined
+    // with different members.
+    assert !types.containsKey(name) || types.get(name).members.equals(members)
+        : "Redefinition of type with different members";
     types.put(name, new MLIRStructType(members));
   }
 
