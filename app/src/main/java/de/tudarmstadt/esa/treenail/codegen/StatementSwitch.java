@@ -136,8 +136,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     assert funcDef != null : "Return statement outside of function?";
 
     var sig = ac.getFunctionSignature((FunctionDefinition)funcDef);
-    var retTy = MLIRIntType.mapType(sig.getReturnType());
-    var retVal = cc.makeCast(exprSwitch.doSwitch(expr), retTy);
+    var retTy = MLIRType.mapType(sig.getReturnType());
+    var retVal = exprSwitch.doSwitch(expr);
+    if (retTy instanceof MLIRIntType retIntType) {
+      retVal = cc.makeCast(retVal, retIntType);
+    }
     cc.emitLn("return %s : %s", retVal, retTy);
     cc.setTerminatorWasEmitted();
     return this;
