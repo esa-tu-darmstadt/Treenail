@@ -668,12 +668,12 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var beforeCC = cc.createDerivedCC();
     var afterCC = cc.createDerivedCC();
 
-    var argTypes = new LinkedList<MLIRIntType>();
+    var argTypes = new LinkedList<MLIRType>();
     var beforeArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var afterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var results = new LinkedList<MLIRValue>();
     for (var v : loopCarriedVars) {
-      var type = MLIRIntType.mapType(ac.getDeclaredType(v));
+      var type = MLIRType.mapType(ac.getDeclaredType(v));
       argTypes.add(type);
 
       beforeCC.setValue(v, beforeCC.makeAnonymousValue(type));
