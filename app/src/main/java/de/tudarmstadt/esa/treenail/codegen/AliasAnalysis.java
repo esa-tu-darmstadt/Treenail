@@ -110,8 +110,10 @@ class AliasAnalysis {
     while (expr instanceof IndexAccessExpression indexAccess) {
       expr = indexAccess.getTarget();
     }
-    // Because our iterators are limited to integers, a member access
-    // expression can never reference the iterator value
+    // For now, we are only checking integer values here, as ForLoopAnalyzer
+    // ignores more complicated expressions as bounds
+    // TODO: This won't work if ForLoopAnalyzer accepts more complicated
+    // expressions as loop bounds (e.g. "i < aStruct.intMember")
     if (expr instanceof MemberAccessExpression) {
       return false;
     }
