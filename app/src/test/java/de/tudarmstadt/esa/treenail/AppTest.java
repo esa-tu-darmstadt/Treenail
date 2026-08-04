@@ -1429,6 +1429,7 @@ class AppTest {
         return %10 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
       }
     """));
+    // StructLocalVals
     assertTrue(mlirCode.contains("""
         %0 = hwarith.constant 0 : ui32
         %1 = hwarith.constant 0 : ui32
@@ -1555,25 +1556,7 @@ class AppTest {
         }
         %85 = hw.struct_inject %81["nested"], %84 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
     """));
-    // clang-format on
-    // TODO: remove when tests completed
-    assertFalse(true);
-  }
-
-  // TODO: this is only separate from structsWork, because there is no support
-  //  for struct typed registers in shortnail yet. Until that is the case,
-  //  these test cases should be separate, so the parts supported by shortnail
-  //  can be checked using shortnail without errors
-  // TODO: should be moved into structsWork when struct typed registers are
-  //  supported in shortnail
-  @Test
-  void structRegistersWork() {
-    var appInst = App.getInstance();
-    var fileName = getClass().getResource("struct_registers.core_desc").getPath();
-    var content = appInst.parse(fileName);
-    var mlirCode = appInst.generateMLIR(content);
-    assertNotNull(mlirCode);
-    // clang-format off
+    // StructReg
     assertTrue(mlirCode.contains("""
         %0 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
         %1 = coredsl.cast %rs1 : ui5 to ui32
@@ -1617,7 +1600,6 @@ class AppTest {
         coredsl.set @STRUCT_REG = %31 : !hw.struct<x: ui32, y: ui32>
     """));
     // clang-format on
-
     // TODO: remove when tests completed
     assertFalse(true);
   }

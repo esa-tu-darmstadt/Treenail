@@ -4,6 +4,7 @@ InstructionSet Structs {
       unsigned<32> x, y;
       signed<16> a, b, c, d;
     }
+
     struct Nested {
       unsigned<32> notNested;
       struct Simple nested;
@@ -13,6 +14,18 @@ InstructionSet Structs {
       unsigned<32> notNestedAgain;
       struct Nested nested2;
     }
+    struct UVec2 {
+      unsigned<32> x, y;
+    }
+
+    struct VecAndInt {
+      signed<32> notNested;
+      struct UVec2 vec;
+    }
+
+    register struct UVec2 STRUCT_REG;
+    register struct VecAndInt NESTED_STRUCT_REG;
+    register struct VecAndInt STRUCT_REGS[32];
   }
 
   functions {
@@ -40,7 +53,7 @@ InstructionSet Structs {
   }
 
   instructions {
-    StructTest {
+    StructLocalVals {
       encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
       behavior: {
         struct Simple localStruct;
@@ -80,6 +93,31 @@ InstructionSet Structs {
             simple.y -= (unsigned<32>)(i * simple.y);
         }
         nested.nested = simple;
+      }
+    }
+    StructReg {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+        // Reading whole register
+        struct UVec2 localStruct = STRUCT_REG;
+        localStruct.x = rs1;
+        // Writing whole register
+        STRUCT_REG = localStruct;
+        // Register member read / write
+        STRUCT_REG.x -= 1;
+        // Register nested member write
+        NESTED_STRUCT_REG.vec.x = 7;
+        // Bit access to members
+        STRUCT_REG.x[7:0] = 255;
+        // Simple register file write
+        STRUCT_REGS[2] = NESTED_STRUCT_REG;
+        // Register file nested write
+        STRUCT_REGS[rs1].notNested = 10;
+        // Register file read
+        NESTED_STRUCT_REG = STRUCT_REGS[31];
+        // Register file nested read
+        STRUCT_REG.y = STRUCT_REGS[0].vec.x;
+        // TODO: struct ranged array accesses are typed as x bit integers
       }
     }
   }
