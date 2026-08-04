@@ -75,6 +75,11 @@ InstructionSet Structs {
             break;
         }
         nested.nested = simple;
+        // For loop that compiles to scf while
+        for (unsigned<32> i = simple.x; i < simple.y; ++i) {
+            simple.y -= (unsigned<32>)(i * simple.y);
+        }
+        nested.nested = simple;
       }
     }
   }

@@ -1532,6 +1532,28 @@ class AppTest {
             scf.yield %86 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
         }
         %81 = hw.struct_inject %78["nested"], %80 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %82 = hw.struct_extract %80["x"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %83, %84 = scf.while (%83 = %82, %84 = %80) : (ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> (ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) {
+          %85 = hw.struct_extract %84["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %87 = hwarith.icmp lt %83, %85 : ui32, ui32
+          %86 = hwarith.cast %87 : (i1) -> ui1
+          %88 = coredsl.cast %86 : ui1 to i1
+          scf.condition(%88) %83, %84 : ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        } do {
+        ^bb0(%83: ui32, %84: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>):
+          %85 = hw.struct_extract %84["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %86 = hwarith.mul %83, %85 : (ui32, ui32) -> ui64
+          %87 = coredsl.cast %86 : ui64 to ui32
+          %88 = hw.struct_extract %84["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %89 = hwarith.sub %88, %87 : (ui32, ui32) -> si33
+          %90 = coredsl.cast %89 : si33 to ui32
+          %91 = hw.struct_inject %84["y"], %90 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %92 = hwarith.constant 1 : ui1
+          %93 = hwarith.add %83, %92 : (ui32, ui1) -> ui33
+          %94 = coredsl.cast %93 : ui33 to ui32
+          scf.yield %94, %91 : ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        }
+        %85 = hw.struct_inject %81["nested"], %84 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
     """));
     // clang-format on
     // TODO: remove when tests completed
