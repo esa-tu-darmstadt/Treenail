@@ -44,7 +44,8 @@ class MLIRIntType extends MLIRType {
     return getType(bits, isNegative);
   }
 
-  private static int getAddSubResultWidth(MLIRIntType lhsTy, MLIRIntType rhsTy) {
+  private static int getAddSubResultWidth(MLIRIntType lhsTy,
+                                          MLIRIntType rhsTy) {
     if (lhsTy.isSigned == rhsTy.isSigned)
       return Math.max(lhsTy.width, rhsTy.width) + 1;
 
@@ -54,12 +55,14 @@ class MLIRIntType extends MLIRType {
     return Math.max(lhsTy.width + lhsExtraBit, rhsTy.width + rhsExtraBit) + 1;
   }
 
-  public static MLIRIntType getAddResultType(MLIRIntType lhsTy, MLIRIntType rhsTy) {
+  public static MLIRIntType getAddResultType(MLIRIntType lhsTy,
+                                             MLIRIntType rhsTy) {
     return getType(getAddSubResultWidth(lhsTy, rhsTy),
                    lhsTy.isSigned | rhsTy.isSigned);
   }
 
-  public static MLIRIntType getSubResultType(MLIRIntType lhsTy, MLIRIntType rhsTy) {
+  public static MLIRIntType getSubResultType(MLIRIntType lhsTy,
+                                             MLIRIntType rhsTy) {
     return getType(getAddSubResultWidth(lhsTy, rhsTy), true);
   }
 
