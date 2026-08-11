@@ -157,7 +157,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       if (typeDecl instanceof StructTypeDeclaration structDecl) {
         var members = new LinkedHashMap<String, MLIRType>();
         for (var member : structDecl.getMembers()) {
-          assert !member.getQualifiers().contains(TypeQualifier.VOLATILE) : "NYI: Volatile struct members";
+          assert !member.getQualifiers().contains(TypeQualifier.VOLATILE)
+              : "NYI: Volatile struct members";
           var memberType =
               MLIRType.mapType(ctx.getSpecifiedType(member.getType()));
           for (var dtor : member.getDeclarators()) {
