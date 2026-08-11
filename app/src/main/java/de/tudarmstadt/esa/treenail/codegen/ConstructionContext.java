@@ -8,12 +8,12 @@ import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.IntegerType;
 import com.minres.coredsl.util.TypedBigInteger;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 
 class ConstructionContext {

@@ -83,8 +83,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
           continue;
         }
 
-        assert init instanceof ExpressionInitializer : ("NYI: List " +
-                                                        "initializers");
+        assert init instanceof ExpressionInitializer : ("NYI: List "
+                                                        + "initializers");
         var value =
             exprSwitch.doSwitch(((ExpressionInitializer)init).getValue());
         var castValue = cc.makeCast(value, MLIRIntType.mapType(type));
