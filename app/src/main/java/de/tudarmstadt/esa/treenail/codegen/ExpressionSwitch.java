@@ -118,20 +118,19 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       }
     }
 
-    // TODO: this is not really a struct, but just a plain NamedEntity store
-    private static final class StructNamedEntityStore extends StoreOperation {
+    private static final class DirectNamedEntityStore extends StoreOperation {
       NamedEntity destEntity;
-      MLIRType structType;
+      MLIRType type;
 
-      StructNamedEntityStore(NamedEntity destEntity, MLIRType structType) {
+      DirectNamedEntityStore(NamedEntity destEntity, MLIRType type) {
         this.destEntity = destEntity;
-        this.structType = structType;
+        this.type = type;
       }
 
       MLIRValue emitStore(ConstructionContext cc, MLIRValue value) {
         if (!cc.hasValue(destEntity)) {
           cc.emitLn("coredsl.set @%s = %s : %s", destEntity.getName(), value,
-                    structType);
+                    type);
         } else {
           cc.setValue(destEntity, value);
         }
@@ -187,7 +186,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
       assert storeStack.firstElement() instanceof ArrayNamedEntityStore ||
           storeStack.firstElement() instanceof BitFieldNamedEntityStore ||
-          storeStack.firstElement() instanceof StructNamedEntityStore
+          storeStack.firstElement() instanceof DirectNamedEntityStore
           : "Last emitted store must store to a NamedEntity";
       assert !storeStack.empty();
       while (!storeStack.isEmpty()) {
@@ -329,7 +328,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                     entityVal, memberName, entityVal.type);
         }
         assert entityVal != null;
-        storeStack.push(new StructNamedEntityStore(targetEntity, structType));
+        storeStack.push(new DirectNamedEntityStore(targetEntity, structType));
         storeStack.push(new StructMemberStore(entityVal, memberName));
       } else {
         isNestedLvalue = true;
