@@ -1600,7 +1600,5 @@ class AppTest {
         coredsl.set @STRUCT_REG = %31 : !hw.struct<x: ui32, y: ui32>
     """));
     // clang-format on
-    // TODO: remove when tests completed
-    assertFalse(true);
   }
 }
