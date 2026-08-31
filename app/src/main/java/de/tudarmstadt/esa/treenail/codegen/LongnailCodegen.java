@@ -316,7 +316,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     assert type.isAddressSpaceType() : "NYI: Single-element address 'spaces'";
     var asType = (AddressSpaceType)type;
     assert asType.elementType.isIntegerType()
-        : "NYI: Multi-dimensional address spaces";
+        : "CoreDSL does not support multi-dimensional address spaces";
 
     var width = asType.elementType.getBitSize();
     var numElements = asType.count;
