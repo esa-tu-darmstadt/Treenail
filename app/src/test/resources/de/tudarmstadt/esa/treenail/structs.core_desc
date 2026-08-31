@@ -117,7 +117,7 @@ InstructionSet Structs {
         NESTED_STRUCT_REG = STRUCT_REGS[31];
         // Register file nested read
         STRUCT_REG.y = STRUCT_REGS[0].vec.x;
-        // TODO: struct ranged array accesses are typed as x bit integers
+        unsigned<1056> val = STRUCT_REGS[rs1:rs1 + 10];
       }
     }
   }
