@@ -1,7 +1,6 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigInteger;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
@@ -17,6 +16,7 @@ import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
 import com.minres.coredsl.coreDsl.EntityReference;
+import com.minres.coredsl.coreDsl.EnumTypeDeclaration;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
@@ -26,10 +26,11 @@ import com.minres.coredsl.coreDsl.Instruction;
 import com.minres.coredsl.coreDsl.ListInitializer;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
+import com.minres.coredsl.coreDsl.StructTypeDeclaration;
 import com.minres.coredsl.coreDsl.TypeQualifier;
+import com.minres.coredsl.coreDsl.UnionTypeDeclaration;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
-import com.minres.coredsl.type.CoreDslType;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -152,6 +153,26 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var sb = new StringBuilder();
 
     sb.append(format("coredsl.isax \"%s\" {\n", isa.getName()));
+    for (var typeDecl : isa.getTypeDeclarations()) {
+      if (typeDecl instanceof StructTypeDeclaration structDecl) {
+        var members = new LinkedHashMap<String, MLIRType>();
+        for (var member : structDecl.getMembers()) {
+          assert !member.getQualifiers().contains(TypeQualifier.VOLATILE)
+              : "NYI: Volatile struct members";
+          var memberType =
+              MLIRType.mapType(ctx.getSpecifiedType(member.getType()));
+          for (var dtor : member.getDeclarators()) {
+            var memberName = dtor.getName();
+            members.put(memberName, memberType);
+          }
+        }
+        MLIRStructType.registerStructType(structDecl.getName(), members);
+      } else if (typeDecl instanceof UnionTypeDeclaration) {
+        assert false : "NYI: Unions";
+      } else if (typeDecl instanceof EnumTypeDeclaration) {
+        assert false : "NYI: Enums";
+      }
+    }
     for (var stmt : isa.getArchStateBody()) {
       if (!(stmt instanceof DeclarationStatement)) {
         System.out.println(
@@ -201,7 +222,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var exprInit = (ExpressionInitializer)init;
     var cv = ctx.getExpressionValue(exprInit.getValue());
     assert cv.getStatus() == StatusCode.success : "Non-constant initializer";
-    var constType = mapType(type);
+    var constType = MLIRIntType.mapType(type);
     // Instead of a hwarith.constant we will emit a local const register, which
     // will be optimized away but allows being accessed even in isolated from
     // above regions (esp. func.func)
@@ -223,7 +244,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
 
     if (type.isIntegerType()) {
-      var targetType = mapType(type);
+      var targetType = MLIRIntType.mapType(type);
       if (hasAttr(dtor.getAttributes(), "is_pc"))
         protoStr = "core_pc";
       if (init != null) {
@@ -237,38 +258,51 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       return format("coredsl.register %s%s%s @%s%s : %s%s\n", protoStr,
                     constStr, volatileStr, name, initStr, targetType, attrStr);
     }
+    if (type.isArrayType()) {
+      assert type.isArrayType();
+      // Array type
+      var arType = (ArrayType)type;
+      var elementType = arType.elementType;
+      var numElements = arType.count;
+      var width = elementType.getBitSize();
 
-    assert type.isArrayType();
-    // Array type
-    var arType = (ArrayType)type;
-    var elementType = arType.elementType;
-    var numElements = arType.count;
-    var width = elementType.getBitSize();
+      assert !elementType.isArrayType() : "NYI : Multi-dimensional registers";
 
-    assert elementType.isIntegerType() : "NYI: Multi-dimensional registers";
+      if (hasAttr(dtor.getAttributes(), "is_main_reg"))
+        protoStr = "core_x";
 
-    if (hasAttr(dtor.getAttributes(), "is_main_reg"))
-      protoStr = "core_x";
-
-    var mappedElementType = mapType(elementType);
-    if (init != null) {
-      assert init instanceof ListInitializer;
-      var listInit = (ListInitializer)init;
-      initStr = listInit.getInitializers()
-                    .stream()
-                    .map(i -> {
-                      var ei = (ExpressionInitializer)i;
-                      var cv = ctx.getExpressionValue(ei.getValue());
-                      assert cv.getStatus() == StatusCode.success
-                          : "Non-constant initializer";
-                      return ensureBigInteger(cv.getValue(), mappedElementType);
-                    })
-                    .map(Object::toString)
-                    .collect(joining(", ", " = [", "]"));
+      var mappedElementType = MLIRType.mapType(elementType);
+      if (init != null) {
+        assert init instanceof ListInitializer;
+        var listInit = (ListInitializer)init;
+        assert mappedElementType instanceof MLIRIntType
+            : "CoreDSL does not support nested list initializers";
+        var intElementType = (MLIRIntType)mappedElementType;
+        initStr = listInit.getInitializers()
+                      .stream()
+                      .map(i -> {
+                        var ei = (ExpressionInitializer)i;
+                        var cv = ctx.getExpressionValue(ei.getValue());
+                        assert cv.getStatus() == StatusCode.success
+                            : "Non-constant initializer";
+                        return ensureBigInteger(cv.getValue(), intElementType);
+                      })
+                      .map(Object::toString)
+                      .collect(joining(", ", " = [", "]"));
+      }
+      return format("coredsl.register %s%s%s @%s[%d]%s : %s\n", protoStr,
+                    constStr, volatileStr, name, numElements, initStr,
+                    mappedElementType);
+    } else if (type.isStructType()) {
+      assert init == null : "NYI: initializers for struct registers";
+      var structType = MLIRStructType.mapType(type);
+      return format("coredsl.register %s%s%s @%s : %s", protoStr, constStr,
+                    volatileStr, name, structType);
+    } else {
+      assert false : "NYI: Union / Enum registers";
     }
-    return format("coredsl.register %s%s%s @%s[%d]%s : %s%s\n", protoStr,
-                  constStr, volatileStr, name, numElements, initStr,
-                  mappedElementType, attrStr);
+    assert false : "Should be unreachable";
+    return null;
   }
 
   private String emitAddressSpace(Declarator dtor, boolean isConst,
@@ -282,7 +316,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     assert type.isAddressSpaceType() : "NYI: Single-element address 'spaces'";
     var asType = (AddressSpaceType)type;
     assert asType.elementType.isIntegerType()
-        : "NYI: Multi-dimensional address spaces";
+        : "CoreDSL does not support multi-dimensional address spaces";
 
     var width = asType.elementType.getBitSize();
     var numElements = asType.count;
@@ -311,7 +345,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
     return format("coredsl.addrspace %s%s%s @%s : (ui%d) -> %s%s\n", proto,
                   constString, volatileString, name, addressWidth,
-                  mapType(asType.elementType), attrStr);
+                  MLIRIntType.mapType(asType.elementType), attrStr);
   }
 
   private String emitAlias(Declarator dtor, boolean isConst, boolean isVolatile,
@@ -394,7 +428,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
     Function<Declaration, String> emitParam = (d) -> {
       var dtor = d.getDeclarators().get(0);
-      var type = mapType(ctx.getDeclaredType(dtor));
+      var type = MLIRType.mapType(ctx.getDeclaredType(dtor));
       var value = new MLIRValue(dtor.getName(), type);
       values.put(dtor, value);
       return format("%s : %s", value, type);
@@ -402,8 +436,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var parameters =
         func.getParameters().stream().map(emitParam).collect(joining(", "));
     var anaReturnType = ctx.getFunctionSignature(func).getReturnType();
-    var returnType =
-        anaReturnType.isVoid() ? "" : format(" -> %s", mapType(anaReturnType));
+    var returnType = anaReturnType.isVoid()
+                         ? ""
+                         : format(" -> %s", MLIRType.mapType(anaReturnType));
     var body = func.getBody();
     var isExternal = body == null;
 

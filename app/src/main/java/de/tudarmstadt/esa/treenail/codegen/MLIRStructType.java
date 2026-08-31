@@ -1,0 +1,70 @@
+package de.tudarmstadt.esa.treenail.codegen;
+
+import com.minres.coredsl.type.CoreDslType;
+import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+class MLIRStructType extends MLIRType {
+  private final LinkedHashMap<String, MLIRType> members;
+  private final String mlirTypeString;
+
+  private static String
+  createStructTypeString(LinkedHashMap<String, MLIRType> members) {
+    StringBuilder sb = new StringBuilder("!hw.struct<");
+    final int lastIdx = members.size() - 1;
+    int currIdx = 0;
+    for (var item : members.entrySet()) {
+      String key = item.getKey();
+      MLIRType val = item.getValue();
+      sb.append(key);
+      sb.append(": ");
+      sb.append(val);
+      if (currIdx != lastIdx) {
+        sb.append(", ");
+      }
+      ++currIdx;
+    }
+    sb.append(">");
+    return sb.toString();
+  }
+
+  private MLIRStructType(LinkedHashMap<String, MLIRType> members) {
+    this.members = members;
+    this.mlirTypeString = createStructTypeString(members);
+  }
+
+  private static final LinkedHashMap<String, MLIRStructType> types =
+      new LinkedHashMap<>();
+  public static MLIRStructType getType(String typeName) {
+    assert types.containsKey(typeName) : "Unknown struct type " + typeName;
+    return types.get(typeName);
+  }
+  public static void
+  registerStructType(String name, LinkedHashMap<String, MLIRType> members) {
+    // Because types is static, it may read the same structs multiple times in
+    // the tests. Thus, we want to check if in any case a struct is redefined
+    // with different members.
+    assert !types.containsKey(name) || types.get(name).members.equals(members)
+        : "Redefinition of type with different members";
+    types.put(name, new MLIRStructType(members));
+  }
+
+  public static MLIRStructType mapType(CoreDslType type) {
+    assert type.isStructType();
+    // toString() returns "struct <name>", but we only need the name
+    String structName = type.toString().substring(7);
+    return MLIRStructType.getType(structName);
+  }
+
+  public MLIRType getMemberType(String memberName) {
+    assert members.containsKey(memberName);
+    return members.get(memberName);
+  }
+
+  public Map<String, MLIRType> getMembers() {
+    return Collections.unmodifiableMap(members);
+  }
+
+  public String toString() { return mlirTypeString; }
+}

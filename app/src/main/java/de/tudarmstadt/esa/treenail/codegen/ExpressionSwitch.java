@@ -1,8 +1,7 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.LongnailCodegen.N_SPACES;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.getType;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
+import static de.tudarmstadt.esa.treenail.codegen.MLIRIntType.getType;
 import static java.util.stream.Collectors.joining;
 
 import com.google.common.collect.Streams;
@@ -17,6 +16,7 @@ import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.InfixExpression;
 import com.minres.coredsl.coreDsl.IntegerConstant;
+import com.minres.coredsl.coreDsl.MemberAccessExpression;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.ParenthesisExpression;
 import com.minres.coredsl.coreDsl.PostfixExpression;
@@ -43,28 +43,128 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   class StoreSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
     private boolean isNestedLvalue = false;
-    private record StoreInfo(boolean isBitAccess,
-                             RangeAnalyzer.RangeResult index,
-                             // The original value modified through this store
-                             MLIRValue modifiedValue, MLIRType accessType) {}
-    private final Stack<StoreInfo> storeStack = new Stack<>();
-    // The final store is special, because we are not setting an MLIRValue, but
-    // a NamedEntity
-    private record
-    FinalStoreInfo(boolean isBitAccess, RangeAnalyzer.RangeResult index,
-                   NamedEntity destEntity,
-                   // For other accesses, we can write to destEntity directly,
-                   // but for bit accesses, we first need to use bitset on the
-                   // value originally loaded from entity, then set it
-                   MLIRValue bitAccessOldValue, MLIRType accessType) {}
-    private FinalStoreInfo finalStore = null;
+    private static abstract class StoreOperation {
+      abstract MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore);
+    }
+
+    private static final class BitFieldIntermediateStore
+        extends StoreOperation {
+      MLIRValue modifiedValue;
+      MLIRType accessType;
+      RangeAnalyzer.RangeResult index;
+      BitFieldIntermediateStore(RangeAnalyzer.RangeResult index,
+                                MLIRValue modifiedValue, MLIRType accessType) {
+        this.modifiedValue = modifiedValue;
+        this.accessType = accessType;
+        this.index = index;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        var resVal = cc.makeAnonymousValue(modifiedValue.type);
+        cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal,
+                  modifiedValue, index, toStore, modifiedValue.type, accessType,
+                  modifiedValue.type);
+        return resVal;
+      }
+    }
+
+    private static final class BitFieldNamedEntityStore extends StoreOperation {
+      NamedEntity destEntity;
+      MLIRType destEntityType;
+      RangeAnalyzer.RangeResult index;
+      MLIRValue bitAccessOldValue;
+      MLIRIntType accessType;
+      BitFieldNamedEntityStore(NamedEntity destEntity, MLIRType destEntityType,
+                               RangeAnalyzer.RangeResult index,
+                               MLIRValue bitAccessOldValue,
+                               MLIRIntType accessType) {
+        this.destEntity = destEntity;
+        this.destEntityType = destEntityType;
+        this.index = index;
+        this.bitAccessOldValue = bitAccessOldValue;
+        this.accessType = accessType;
+      }
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        var updatedValue = cc.makeAnonymousValue(destEntityType);
+        cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
+                  updatedValue, bitAccessOldValue, index, toStore,
+                  destEntityType, accessType, updatedValue.type);
+        if (cc.hasValue(destEntity)) {
+          cc.setValue(destEntity, updatedValue);
+        } else {
+          cc.emitLn("coredsl.set @%s = %s : %s", destEntity.getName(),
+                    updatedValue, destEntityType);
+        }
+        return updatedValue;
+      }
+    }
+
+    private static final class ArrayNamedEntityStore extends StoreOperation {
+      NamedEntity destEntity;
+      MLIRType accessType;
+      RangeAnalyzer.RangeResult index;
+      ArrayNamedEntityStore(NamedEntity destEntity, MLIRType accessType,
+                            RangeAnalyzer.RangeResult index) {
+        this.destEntity = destEntity;
+        this.accessType = accessType;
+        this.index = index;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        assert !cc.hasValue(destEntity) : "NYI: local arrays";
+        cc.emitLn("coredsl.set @%s[%s] = %s : %s", destEntity.getName(), index,
+                  toStore, accessType);
+        return toStore;
+      }
+    }
+
+    private static final class DirectNamedEntityStore extends StoreOperation {
+      NamedEntity destEntity;
+      MLIRType type;
+
+      DirectNamedEntityStore(NamedEntity destEntity, MLIRType type) {
+        this.destEntity = destEntity;
+        this.type = type;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue value) {
+        if (!cc.hasValue(destEntity)) {
+          cc.emitLn("coredsl.set @%s = %s : %s", destEntity.getName(), value,
+                    type);
+        } else {
+          cc.setValue(destEntity, value);
+        }
+        return value;
+      }
+    }
+
+    private static final class StructMemberStore extends StoreOperation {
+      MLIRValue structVal;
+      String memberName;
+      StructMemberStore(MLIRValue structVal, String memberName) {
+        this.structVal = structVal;
+        this.memberName = memberName;
+      }
+
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        var resultValue = cc.makeAnonymousValue(structVal.type);
+        cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue,
+                  structVal, memberName, toStore, structVal.type);
+        return resultValue;
+      }
+    }
+
+    private final Stack<StoreOperation> storeStack = new Stack<>();
+
     StoreSwitch(MLIRValue newValue) { this.newValue = newValue; }
 
     @Override
     public MLIRValue caseEntityReference(EntityReference reference) {
       var entity = reference.getTarget();
-      var type = mapType(ac.getDeclaredType(entity));
-      var castValue = cc.makeCast(newValue, type);
+      var type = MLIRType.mapType(ac.getDeclaredType(entity));
+      var castValue = type instanceof MLIRIntType intType
+                          ? cc.makeCast(newValue, intType)
+                          : newValue;
 
       if (cc.hasValue(entity)) {
         // It's a local variable, just put it in the value map.
@@ -78,13 +178,31 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return castValue;
     }
 
+    private MLIRValue resolveStoreStack(MLIRType storedValueType) {
+      var castValue = storedValueType instanceof MLIRIntType intType
+                          ? cc.makeCast(newValue, intType)
+                          : newValue;
+      var toStore = castValue;
+
+      assert storeStack.firstElement() instanceof ArrayNamedEntityStore ||
+          storeStack.firstElement() instanceof BitFieldNamedEntityStore ||
+          storeStack.firstElement() instanceof DirectNamedEntityStore
+          : "Last emitted store must store to a NamedEntity";
+      assert !storeStack.empty();
+      while (!storeStack.isEmpty()) {
+        final StoreOperation store = storeStack.pop();
+        toStore = store.emitStore(cc, toStore);
+      }
+      return castValue;
+    }
+
     @Override
     public MLIRValue caseIndexAccessExpression(IndexAccessExpression access) {
       var target = access.getTarget();
       var targetType = ac.getExpressionType(target);
       var isBitAccess = targetType.isIntegerType();
 
-      var accessType = mapType(ac.getExpressionType(access));
+      var accessType = MLIRType.mapType(ac.getExpressionType(access));
       var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
                                         targetType, cc, ExpressionSwitch.this);
       final boolean isTopLevel = !isNestedLvalue;
@@ -119,13 +237,18 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
             returnValue = writtenValue;
           }
         }
-        assert finalStore == null;
-        finalStore = new FinalStoreInfo(isBitAccess, index, entity,
-                                        bitAccessOldValue, accessType);
+        StoreOperation finalStore;
+        if (isBitAccess) {
+          final var entityType =
+              MLIRIntType.mapType(ac.getDeclaredType(entity));
+          finalStore = new BitFieldNamedEntityStore(entity, entityType, index,
+                                                    bitAccessOldValue,
+                                                    (MLIRIntType)accessType);
+        } else {
+          finalStore = new ArrayNamedEntityStore(entity, accessType, index);
+        }
+        storeStack.push(finalStore);
       } else {
-        assert target instanceof IndexAccessExpression
-            : "NYI: Nested Lvalues other than IndexAccessExpression: " +
-              target.getClass();
         // For nested IndexAccessExpressions, we need to generate code like
         // this:
         // CoreDSL: "a[b][c][d] = res;"
@@ -155,53 +278,76 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
                     valueToStore, index, valueToStore.type, accessType);
           returnValue = resValue;
         }
-        storeStack.push(
-            new StoreInfo(isBitAccess, index, valueToStore, accessType));
-      }
-      if (isTopLevel) {
-        var castValue = cc.makeCast(newValue, accessType);
-        var toStore = castValue;
 
-        while (!storeStack.isEmpty()) {
-          final StoreInfo store = storeStack.pop();
+        StoreOperation op;
+        if (isBitAccess) {
+          op = new BitFieldIntermediateStore(index, valueToStore, accessType);
+        } else {
           // TODO: This can only be implemented when multi dimensional arrays
           // are implemented, which is only possible with local arrays
-          assert store.isBitAccess
-              : ("Non-bit accesses should be impossible if they follow an "
-                 + "IndexAccessExpression as long as multi-dimensional arrays "
-                 + "are not implemented");
-          var resVal = cc.makeAnonymousValue(store.modifiedValue.type);
-          cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal,
-                    store.modifiedValue, store.index, toStore,
-                    store.modifiedValue.type, store.accessType,
-                    store.modifiedValue.type);
-          toStore = resVal;
+          assert false : "NYI: Array stores by value";
+          op = null;
         }
-        assert finalStore != null;
-        final boolean isLocal = cc.hasValue(finalStore.destEntity);
-        if (finalStore.isBitAccess) {
-          var dstType = mapType(ac.getDeclaredType(finalStore.destEntity));
-          var updatedValue = cc.makeAnonymousValue(dstType);
-          cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
-                    updatedValue, finalStore.bitAccessOldValue,
-                    finalStore.index, toStore, dstType, finalStore.accessType,
-                    updatedValue.type);
-          if (isLocal) {
-            cc.setValue(finalStore.destEntity, updatedValue);
-          } else {
-            cc.emitLn("coredsl.set @%s = %s : %s",
-                      finalStore.destEntity.getName(), updatedValue, dstType);
-          }
-        } else {
-          assert !isLocal : "NYI: local arrays";
-          cc.emitLn("coredsl.set @%s[%s] = %s : %s",
-                    finalStore.destEntity.getName(), finalStore.index, toStore,
-                    finalStore.accessType);
-        }
-        return castValue;
+        storeStack.push(op);
+      }
+      if (isTopLevel) {
+        return resolveStoreStack(accessType);
       }
       assert returnValue != null;
       return returnValue;
+    }
+
+    @Override
+    public MLIRValue
+    caseMemberAccessExpression(MemberAccessExpression memberAccess) {
+      final var accessType =
+          MLIRType.mapType(ac.getExpressionType(memberAccess));
+      final boolean isTopLevel = !isNestedLvalue;
+      final String memberName = memberAccess.getDeclarator().getName();
+      MLIRValue resultValue = null;
+      if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
+        var targetEntity = targetEntityRef.getTarget();
+        var entityVal = cc.getValue(targetEntity);
+        var declaredType = ac.getDeclaredType(targetEntity);
+        var structType = MLIRStructType.mapType(declaredType);
+        assert declaredType.isStructType()
+            : "NYI: Member access to union registers";
+        final boolean isArchitecturalState = entityVal == null;
+        if (isArchitecturalState) {
+          entityVal = cc.makeAnonymousValue(structType);
+          cc.emitLn("%s = coredsl.get @%s : %s", entityVal,
+                    targetEntity.getName(), structType);
+        }
+        resultValue = entityVal;
+        // If this is top level, we don't need to extract the member because we
+        // can write it directly
+        if (!isTopLevel) {
+          resultValue =
+              cc.makeAnonymousValue(structType.getMemberType(memberName));
+          cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultValue,
+                    entityVal, memberName, entityVal.type);
+        }
+        assert entityVal != null;
+        storeStack.push(new DirectNamedEntityStore(targetEntity, structType));
+        storeStack.push(new StructMemberStore(entityVal, memberName));
+      } else {
+        isNestedLvalue = true;
+        var valueToStore = doSwitch(memberAccess.getTarget());
+        assert valueToStore.type instanceof MLIRStructType;
+        if (!isTopLevel) {
+          var structType = (MLIRStructType)valueToStore.type;
+          resultValue =
+              cc.makeAnonymousValue(structType.getMemberType(memberName));
+          cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultValue,
+                    valueToStore, memberName, valueToStore.type);
+        }
+        storeStack.push(new StructMemberStore(valueToStore, memberName));
+      }
+      if (isTopLevel) {
+        return resolveStoreStack(accessType);
+      }
+      assert resultValue != null;
+      return resultValue;
     }
 
     @Override
@@ -223,12 +369,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var lhsVal = doSwitch(lhs);
 
       var binOpr = opr.substring(0, opr.length() - 1);
-      var lhsTy = lhsVal.type;
-      var rhsTy = rhsVal.type;
+      assert lhsVal.type instanceof MLIRIntType;
+      assert rhsVal.type instanceof MLIRIntType;
+      var lhsTy = (MLIRIntType)lhsVal.type;
+      var rhsTy = (MLIRIntType)rhsVal.type;
 
       // The result type of the underlying binary op cannot be queried from the
       // analysis context, so we have to manually compute it again here.
-      MLIRType type = null;
+      MLIRIntType type = null;
       switch (binOpr) {
       case "&":
       case "|":
@@ -239,10 +387,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         type = lhsTy;
         break;
       case "+":
-        type = MLIRType.getAddResultType(lhsTy, rhsTy);
+        type = MLIRIntType.getAddResultType(lhsTy, rhsTy);
         break;
       case "-":
-        type = MLIRType.getSubResultType(lhsTy, rhsTy);
+        type = MLIRIntType.getSubResultType(lhsTy, rhsTy);
         break;
       case "*":
         type =
@@ -274,7 +422,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   @Override
   public MLIRValue caseIntegerConstant(IntegerConstant konst) {
-    var type = mapType(ac.getExpressionType(konst));
+    var type = MLIRIntType.mapType(ac.getExpressionType(konst));
     var value = cc.getConstantValue(konst, type);
     return cc.makeConst(value, type);
   }
@@ -286,10 +434,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       // It's a local variable, retrieve its last definition.
       return cc.getValue(entity);
 
-    var type = mapType(ac.getDeclaredType(entity));
-    if (cc.isConstant(reference))
+    var type = MLIRType.mapType(ac.getDeclaredType(entity));
+    if (cc.isConstant(reference)) {
+      assert type instanceof MLIRIntType
+          : "NYI: Struct / Array / Union / Enum constants";
+      var intType = (MLIRIntType)type;
       // If it's a compile-time parameter emit a constant
-      return cc.makeConst(cc.getConstantValue(reference, type), type);
+      return cc.makeConst(cc.getConstantValue(reference, intType), intType);
+    }
 
     // Otherwise, emit a `coredsl.get`.
     var result = cc.makeAnonymousValue(type);
@@ -303,7 +455,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     // type of the expression that is indexed into, and the presence of an end
     // index (i.e. it's a range index).
 
-    var type = mapType(ac.getExpressionType(access));
+    var type = MLIRType.mapType(ac.getExpressionType(access));
     var targetType = ac.getExpressionType(access.getTarget());
     var result = cc.makeAnonymousValue(type);
     var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
@@ -365,12 +517,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   private static MLIRValue convertIntToBool(MLIRValue value,
                                             ConstructionContext cc) {
-    if (value.type.isSigned || value.type.width > 1) {
-      var zero = cc.makeConst(BigInteger.ZERO, value.type);
-      var valueAsBool = cc.makeAnonymousValue(MLIRType.DUMMY);
+    assert value.type instanceof MLIRIntType;
+    var valIntType = (MLIRIntType)value.type;
+    if (valIntType.isSigned || valIntType.width > 1) {
+      var zero = cc.makeConst(BigInteger.ZERO, valIntType);
+      var valueAsBool = cc.makeAnonymousValue(MLIRSignlessIntType.getType(1));
       cc.emitLn("%s = hwarith.icmp ne %s, %s : %s, %s", valueAsBool, value,
                 zero, value.type, zero.type);
-      var hwarithBoolVal = cc.makeAnonymousValue(MLIRType.getType(1, false));
+      var hwarithBoolVal = cc.makeAnonymousValue(MLIRIntType.getType(1, false));
       cc.emitLn("%s = hwarith.cast %s : (i1) -> ui1", hwarithBoolVal,
                 valueAsBool);
       return hwarithBoolVal;
@@ -382,7 +536,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   public MLIRValue caseInfixExpression(InfixExpression expr) {
     var lhs = doSwitch(expr.getLeft());
     var opr = expr.getOperator();
-    var type = mapType(ac.getExpressionType(expr));
+    var type = MLIRIntType.mapType(ac.getExpressionType(expr));
     final boolean isLAnd = "&&".equals(opr);
     final boolean isLOr = "||".equals(opr);
     if (isLAnd || isLOr) {
@@ -447,7 +601,9 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   public static MLIRValue emitIncrementOrDecrement(ConstructionContext cc,
                                                    MLIRValue value,
                                                    boolean decrement) {
-    var type = getType(value.type.width + 1, value.type.isSigned || decrement);
+    assert value.type instanceof MLIRIntType;
+    var valueType = (MLIRIntType)value.type;
+    var type = getType(valueType.width + 1, valueType.isSigned || decrement);
     var one = cc.makeConst(BigInteger.ONE, getType(1, false));
     return emitBinaryOp(cc, binaryOperatorMap.get(decrement ? "-" : "+"), type,
                         value, one);
@@ -464,7 +620,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       // The target dialect don't have unary operations, hence we must construct
       // equivalent binary operations here.
       MLIRValue lhs;
-      var type = mapType(ac.getExpressionType(expr));
+      var type = MLIRIntType.mapType(ac.getExpressionType(expr));
       if ("~".equals(opr)) {
         // To invert the value we need a -1 constant to xor with
         lhs = cc.makeHWConst(BigInteger.ONE.negate(), type.width);
@@ -507,9 +663,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     var head = doSwitch(parts.get(0));
     for (int i = 1; i < parts.size(); ++i) {
+      assert head.type instanceof MLIRIntType;
       var next = doSwitch(parts.get(i));
+      assert next.type instanceof MLIRIntType;
+      var nextIntType = (MLIRIntType)next.type;
+      var headIntType = (MLIRIntType)head.type;
       head = emitBinaryOp(cc, "coredsl.concat",
-                          getType(head.type.width + next.type.width, false),
+                          getType(headIntType.width + nextIntType.width, false),
                           head, next);
     }
 
@@ -582,7 +742,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   @Override
   public MLIRValue caseConditionalExpression(ConditionalExpression expr) {
-    var type = mapType(ac.getExpressionType(expr));
+    var type = MLIRIntType.mapType(ac.getExpressionType(expr));
 
     var cond = doSwitch(expr.getCondition());
     var cast = cc.makeI1Cast(cond);
@@ -605,7 +765,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue caseCastExpression(CastExpression cast) {
     var source = doSwitch(cast.getOperand());
-    var type = mapType(ac.getExpressionType(cast));
+    var type = MLIRIntType.mapType(ac.getExpressionType(cast));
     return cc.makeCast(source, type);
   }
 
@@ -627,7 +787,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         funcTy.getParamTypes().stream().map(MLIRType::mapType).toList();
     var argsCastStr = Streams
                           .zip(args.stream(), argTys.stream(),
-                               (arg, ty) -> cc.makeCast(arg, ty))
+                               (arg, ty) -> {
+                                 if (ty instanceof MLIRIntType intTy) {
+                                   return cc.makeCast(arg, intTy);
+                                 } else {
+                                   return arg;
+                                 }
+                               })
                           .map(Object::toString)
                           .collect(joining(", "));
     var argTysStr =
@@ -635,10 +801,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     if (funcTy.getReturnType().isVoid()) {
       cc.emitLn("func.call @%s(%s) : (%s) -> ()", callee.getName(), argsCastStr,
                 argTysStr);
-      return cc.makeAnonymousValue(MLIRType.DUMMY);
+      return cc.makeAnonymousValue(MLIRType.VOID);
     }
 
-    var retTy = mapType(funcTy.getReturnType());
+    var retTy = MLIRType.mapType(funcTy.getReturnType());
     var retVal = cc.makeAnonymousValue(retTy);
     cc.emitLn("%s = func.call @%s(%s) : (%s) -> %s", retVal, callee.getName(),
               argsCastStr, argTysStr, retTy);
@@ -646,8 +812,23 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   }
 
   @Override
+  public MLIRValue
+  caseMemberAccessExpression(MemberAccessExpression memberAccess) {
+    var targetStruct = doSwitch(memberAccess.getTarget());
+    assert targetStruct.type instanceof MLIRStructType
+        : "NYI: union member access";
+    var structType = (MLIRStructType)targetStruct.type;
+    var memberName = memberAccess.getDeclarator().getName();
+    var resultType = structType.getMemberType(memberName);
+    var resultVal = cc.makeAnonymousValue(resultType);
+    cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultVal, targetStruct,
+              memberName, structType);
+    return resultVal;
+  }
+
+  @Override
   public MLIRValue defaultCase(EObject obj) {
-    cc.emitLn("// unhandled: %s", obj);
-    return cc.makeAnonymousValue(MLIRType.DUMMY);
+    assert false : "NYI: Unsupported Expression class: " + obj.getClass();
+    return null;
   }
 }

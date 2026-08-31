@@ -1,0 +1,124 @@
+InstructionSet Structs {
+  architectural_state {
+    struct Simple {
+      unsigned<32> x, y;
+      signed<16> a, b, c, d;
+    }
+
+    struct Nested {
+      unsigned<32> notNested;
+      struct Simple nested;
+    }
+
+    struct TripleNested {
+      unsigned<32> notNestedAgain;
+      struct Nested nested2;
+    }
+    struct UVec2 {
+      unsigned<32> x, y;
+    }
+
+    struct VecAndInt {
+      signed<32> notNested;
+      struct UVec2 vec;
+    }
+
+    register struct UVec2 STRUCT_REG;
+    register struct VecAndInt NESTED_STRUCT_REG;
+    register struct VecAndInt STRUCT_REGS[32];
+  }
+
+  functions {
+    // Function with struct return type
+    struct Simple makeSimple(unsigned<32> x, unsigned<32> y) {
+      struct Simple res;
+      res.x = x;
+      res.y = y;
+      return res;
+    }
+    // Function with struct argument
+    unsigned<64> convertSimple(struct Simple arg) {
+      unsigned<64> retVal = arg.x * arg.y;
+      retVal += (unsigned<32>)(arg.a * arg.b);
+      retVal *= (unsigned<32>)(arg.c / arg.d);
+      return retVal;
+    }
+    // Function with both struct arguments and struct return type
+    struct Nested makeNested(unsigned<32> notNested, struct Simple simple) {
+        struct Nested res;
+        res.notNested = notNested;
+        res.nested = simple;
+        return res;
+    }
+  }
+
+  instructions {
+    StructLocalVals {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+        struct Simple localStruct;
+        // Member access
+        localStruct.x = 10;
+        localStruct.c = -1;
+        localStruct.x -= rs1;
+        struct Nested nestedStruct;
+        // Nested access
+        nestedStruct.nested = localStruct;
+        nestedStruct.nested.b = 42;
+        struct TripleNested triple;
+        triple.nested2 = nestedStruct;
+        triple.nested2.nested = localStruct;
+        triple.nested2.nested.d = 67;
+        // bit access to members
+        localStruct.y[4:0] = 3;
+        triple.nested2.nested.c[7:0] = 42;
+        // function calls
+        struct Simple simple = makeSimple(6, 7);
+        unsigned<64> converted = convertSimple(simple);
+        struct Nested nested = makeNested(10, simple);
+        // Struct modified in switch statement
+        switch (converted) {
+          case 10:
+            simple.x = 10;
+            break;
+          case 3:
+            simple.y = 10;
+            break;
+          default:
+            break;
+        }
+        nested.nested = simple;
+        // For loop that compiles to scf while
+        for (unsigned<32> i = simple.x; i < simple.y; ++i) {
+            simple.y -= (unsigned<32>)(i * simple.y);
+        }
+        nested.nested = simple;
+      }
+    }
+    StructReg {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+        // Reading whole register
+        struct UVec2 localStruct = STRUCT_REG;
+        localStruct.x = rs1;
+        // Writing whole register
+        STRUCT_REG = localStruct;
+        // Register member read / write
+        STRUCT_REG.x -= 1;
+        // Register nested member write
+        NESTED_STRUCT_REG.vec.x = 7;
+        // Bit access to members
+        STRUCT_REG.x[7:0] = 255;
+        // Simple register file write
+        STRUCT_REGS[2] = NESTED_STRUCT_REG;
+        // Register file nested write
+        STRUCT_REGS[rs1].notNested = 10;
+        // Register file read
+        NESTED_STRUCT_REG = STRUCT_REGS[31];
+        // Register file nested read
+        STRUCT_REG.y = STRUCT_REGS[0].vec.x;
+        unsigned<1056> val = STRUCT_REGS[rs1:rs1 + 10];
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ import com.minres.coredsl.type.ArrayType;
 import com.minres.coredsl.type.IntegerType;
 import com.minres.coredsl.util.TypedBigInteger;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -43,7 +44,7 @@ class ConstructionContext {
   // This method ensures that the return value is a standard `BigInteger`, as
   // the frontend's `TypedBigInteger` has a `toString()` method that is
   // unsuitable for use here.
-  static BigInteger ensureBigInteger(BigInteger value, MLIRType targetType) {
+  static BigInteger ensureBigInteger(BigInteger value, MLIRIntType targetType) {
     if (value == null)
       return null;
     if (value instanceof TypedBigInteger)
@@ -60,7 +61,7 @@ class ConstructionContext {
     return value;
   }
 
-  BigInteger getConstantValue(Expression expr, MLIRType type) {
+  BigInteger getConstantValue(Expression expr, MLIRIntType type) {
     var constExprEvalRes =
         CoreDslConstantExpressionEvaluator.evaluate(ac, expr);
     assert constExprEvalRes.isValid();
@@ -89,7 +90,34 @@ class ConstructionContext {
                          type);
   }
 
-  MLIRValue makeConst(BigInteger value, MLIRType type) {
+  MLIRValue makeZeroedStruct(MLIRStructType type) {
+    var members = type.getMembers();
+    var vals = new ArrayList<MLIRValue>();
+    for (var memberType : members.values()) {
+      if (memberType instanceof MLIRIntType intType) {
+        vals.add(makeConst(BigInteger.ZERO, intType));
+      } else if (memberType instanceof MLIRStructType structType) {
+        vals.add(makeZeroedStruct(structType));
+      } else {
+        assert false : "NYI: Array or union struct members";
+      }
+    }
+    var res = makeAnonymousValue(type);
+    emit("%s = hw.struct_create (", res);
+    final int last = vals.size() - 1;
+    int currIdx = 0;
+    for (var mlirVal : vals) {
+      emit("%s", mlirVal);
+      if (currIdx != last) {
+        emit(", ");
+      }
+      ++currIdx;
+    }
+    emitLn(") : %s", type);
+    return res;
+  }
+
+  MLIRValue makeConst(BigInteger value, MLIRIntType type) {
     assert !(value instanceof TypedBigInteger);
     var result = makeAnonymousValue(type);
     emitLn("%s = hwarith.constant %d : %s", result, value, type);
@@ -98,12 +126,12 @@ class ConstructionContext {
 
   MLIRValue makeHWConst(BigInteger value, int bitWidth) {
     assert !(value instanceof TypedBigInteger);
-    var result = makeAnonymousValue(MLIRType.getType(bitWidth, false));
+    var result = makeAnonymousValue(MLIRSignlessIntType.getType(bitWidth));
     emitLn("%s = hw.constant %d : i%d", result, value, bitWidth);
     return result;
   }
 
-  MLIRValue makeCast(MLIRValue value, MLIRType type) {
+  MLIRValue makeCast(MLIRValue value, MLIRIntType type) {
     if (type == value.type)
       return value;
 
@@ -113,20 +141,22 @@ class ConstructionContext {
   }
 
   MLIRValue makeI1Cast(MLIRValue value) {
-    var result = makeAnonymousValue(MLIRType.DUMMY);
+    var result = makeAnonymousValue(MLIRSignlessIntType.getType(1));
     emitLn("%s = coredsl.cast %s : %s to i1", result, value, value.type);
     return result;
   }
 
   MLIRValue makeSignlessCast(MLIRValue value, int newWidth) {
-    assert value.type.width <= newWidth : "Possibly unintended truncation";
-    var result = makeAnonymousValue(MLIRType.DUMMY);
-    emitLn("%s = hwarith.cast %s : (%s) -> i%d", result, value, value.type,
-           newWidth);
+    assert value.type instanceof MLIRIntType;
+    var intType = (MLIRIntType)value.type;
+    assert intType.width <= newWidth : "Possibly unintended truncation";
+    var result = makeAnonymousValue(MLIRSignlessIntType.getType(newWidth));
+    emitLn("%s = hwarith.cast %s : (%s) -> %s", result, value, value.type,
+           result.type);
     return result;
   }
 
-  MLIRValue makeHWConstCast(MLIRValue value, int inputWidth, MLIRType type) {
+  MLIRValue makeHWConstCast(MLIRValue value, int inputWidth, MLIRIntType type) {
     var result = makeAnonymousValue(type);
     emitLn("%s = hwarith.cast %s : (i%d) -> %s", result, value, inputWidth,
            type);

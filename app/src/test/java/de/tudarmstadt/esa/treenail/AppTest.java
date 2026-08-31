@@ -1319,6 +1319,30 @@ class AppTest {
           scf.yield %31 : ui32
         }
     """));
+    // StructMemberModifiedInLoop
+    assertTrue(mlirCode.contains("""
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hw.struct_create (%0, %1) : !hw.struct<x: ui32, y: ui32>
+        %3 = hw.constant 0 : i5
+        %4 = hw.constant 20 : i5
+        %5 = hw.constant 1 : i5
+        %6 = scf.for unsigned %6 = %3 to %4 step %5 iter_args(%9 = %2) -> (!hw.struct<x: ui32, y: ui32>) : i5 {
+          %7 = hwarith.cast %6 : (i5) -> ui5
+          %8 = coredsl.cast %7 : ui5 to ui32
+          %11 = hwarith.add %rs1, %8 : (ui5, ui32) -> ui33
+          %12 = coredsl.cast %11 : ui33 to ui32
+          %10 = coredsl.get @MEM[%12 : ui32] : ui8
+          %13 = hw.struct_extract %9["x"] : !hw.struct<x: ui32, y: ui32>
+          %14 = hwarith.add %13, %10 : (ui32, ui8) -> ui33
+          %15 = coredsl.cast %14 : ui33 to ui32
+          %16 = hw.struct_inject %9["x"], %15 : !hw.struct<x: ui32, y: ui32>
+          scf.yield %16 : !hw.struct<x: ui32, y: ui32>
+        }
+        %7 = hw.struct_extract %6["x"] : !hw.struct<x: ui32, y: ui32>
+        %8 = coredsl.cast %Imm6 : ui6 to ui32
+        coredsl.set @MEM[%8 : ui32, 0:3] = %7 : ui32
+    """));
 
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableIteratorModified"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableBoundModified"));
@@ -1326,6 +1350,7 @@ class AppTest {
     assertTrue(instrHasSCFFor(mlirCode, "RuntimeBoundedViableRefModification"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointee"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundPointer"));
+    assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundInArrayAccess"));
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedNotViableModifiedBoundMultipleRef"));
     // NOTE: this would technically be viable, but we don't check far enough for now
     assertFalse(instrHasSCFFor(mlirCode, "RuntimeBoundedViableBitRef"));
@@ -1348,5 +1373,232 @@ class AppTest {
     assertTrue(
         mlirCode.contains("} {coredsl.attr.unroll, coredsl.attr.pipeline = 2}"),
         "for-loop attributes should be forwarded onto scf.for");
+  }
+
+  @Test
+  void structsWork() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("structs.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    // clang-format off
+    assertTrue(mlirCode.contains("""
+      func.func @makeSimple(%x : ui32, %y : ui32) -> !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16> {
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hwarith.constant 0 : si16
+        %3 = hwarith.constant 0 : si16
+        %4 = hwarith.constant 0 : si16
+        %5 = hwarith.constant 0 : si16
+        %6 = hw.struct_create (%0, %1, %2, %3, %4, %5) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %7 = hw.struct_inject %6["x"], %x : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %8 = hw.struct_inject %7["y"], %y : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        return %8 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+      }
+      func.func @convertSimple(%arg : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> ui64 {
+        %0 = hw.struct_extract %arg["x"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %1 = hw.struct_extract %arg["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %2 = hwarith.mul %0, %1 : (ui32, ui32) -> ui64
+        %3 = hw.struct_extract %arg["a"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %4 = hw.struct_extract %arg["b"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %5 = hwarith.mul %3, %4 : (si16, si16) -> si32
+        %6 = coredsl.cast %5 : si32 to ui32
+        %7 = hwarith.add %2, %6 : (ui64, ui32) -> ui65
+        %8 = coredsl.cast %7 : ui65 to ui64
+        %9 = hw.struct_extract %arg["c"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %10 = hw.struct_extract %arg["d"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %11 = hwarith.div %9, %10 : (si16, si16) -> si17
+        %12 = coredsl.cast %11 : si17 to ui32
+        %13 = hwarith.mul %8, %12 : (ui64, ui32) -> ui96
+        %14 = coredsl.cast %13 : ui96 to ui64
+        return %14 : ui64
+      }
+      func.func @makeNested(%notNested : ui32, %simple : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>> {
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hwarith.constant 0 : ui32
+        %3 = hwarith.constant 0 : si16
+        %4 = hwarith.constant 0 : si16
+        %5 = hwarith.constant 0 : si16
+        %6 = hwarith.constant 0 : si16
+        %7 = hw.struct_create (%1, %2, %3, %4, %5, %6) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %8 = hw.struct_create (%0, %7) : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %9 = hw.struct_inject %8["notNested"], %notNested : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %10 = hw.struct_inject %9["nested"], %simple : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        return %10 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+      }
+    """));
+    // StructLocalVals
+    assertTrue(mlirCode.contains("""
+        %0 = hwarith.constant 0 : ui32
+        %1 = hwarith.constant 0 : ui32
+        %2 = hwarith.constant 0 : si16
+        %3 = hwarith.constant 0 : si16
+        %4 = hwarith.constant 0 : si16
+        %5 = hwarith.constant 0 : si16
+        %6 = hw.struct_create (%0, %1, %2, %3, %4, %5) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %7 = hwarith.constant 10 : ui4
+        %8 = coredsl.cast %7 : ui4 to ui32
+        %9 = hw.struct_inject %6["x"], %8 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %10 = hwarith.constant 1 : ui1
+        %11 = hwarith.constant 0 : ui1
+        %12 = hwarith.sub %11, %10 : (ui1, ui1) -> si2
+        %13 = coredsl.cast %12 : si2 to si16
+        %14 = hw.struct_inject %9["c"], %13 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %15 = hw.struct_extract %14["x"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %16 = hwarith.sub %15, %rs1 : (ui32, ui5) -> si33
+        %17 = coredsl.cast %16 : si33 to ui32
+        %18 = hw.struct_inject %14["x"], %17 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %19 = hwarith.constant 0 : ui32
+        %20 = hwarith.constant 0 : ui32
+        %21 = hwarith.constant 0 : ui32
+        %22 = hwarith.constant 0 : si16
+        %23 = hwarith.constant 0 : si16
+        %24 = hwarith.constant 0 : si16
+        %25 = hwarith.constant 0 : si16
+        %26 = hw.struct_create (%20, %21, %22, %23, %24, %25) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %27 = hw.struct_create (%19, %26) : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %28 = hw.struct_inject %27["nested"], %18 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %29 = hwarith.constant 42 : ui6
+        %30 = hw.struct_extract %28["nested"] : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %31 = coredsl.cast %29 : ui6 to si16
+        %32 = hw.struct_inject %30["b"], %31 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %33 = hw.struct_inject %28["nested"], %32 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %34 = hwarith.constant 0 : ui32
+        %35 = hwarith.constant 0 : ui32
+        %36 = hwarith.constant 0 : ui32
+        %37 = hwarith.constant 0 : ui32
+        %38 = hwarith.constant 0 : si16
+        %39 = hwarith.constant 0 : si16
+        %40 = hwarith.constant 0 : si16
+        %41 = hwarith.constant 0 : si16
+        %42 = hw.struct_create (%36, %37, %38, %39, %40, %41) : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %43 = hw.struct_create (%35, %42) : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %44 = hw.struct_create (%34, %43) : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %45 = hw.struct_inject %44["nested2"], %33 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %46 = hw.struct_extract %45["nested2"] : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %47 = hw.struct_inject %46["nested"], %18 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %48 = hw.struct_inject %45["nested2"], %47 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %49 = hwarith.constant 67 : ui7
+        %50 = hw.struct_extract %48["nested2"] : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %51 = hw.struct_extract %50["nested"] : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %52 = coredsl.cast %49 : ui7 to si16
+        %53 = hw.struct_inject %51["d"], %52 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %54 = hw.struct_inject %50["nested"], %53 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %55 = hw.struct_inject %48["nested2"], %54 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %56 = hwarith.constant 3 : ui2
+        %57 = hw.struct_extract %18["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %58 = coredsl.cast %56 : ui2 to ui5
+        %59 = coredsl.bitset %57[4:0] = %58 : (ui32, ui5) -> ui32
+        %60 = hw.struct_inject %18["y"], %59 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %61 = hwarith.constant 42 : ui6
+        %62 = hw.struct_extract %55["nested2"] : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %63 = hw.struct_extract %62["nested"] : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %64 = hw.struct_extract %63["c"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %65 = coredsl.cast %61 : ui6 to ui8
+        %66 = coredsl.bitset %64[7:0] = %65 : (si16, ui8) -> si16
+        %67 = hw.struct_inject %63["c"], %66 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %68 = hw.struct_inject %62["nested"], %67 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %69 = hw.struct_inject %55["nested2"], %68 : !hw.struct<notNestedAgain: ui32, nested2: !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>>
+        %70 = hwarith.constant 6 : ui3
+        %71 = hwarith.constant 7 : ui3
+        %72 = coredsl.cast %70 : ui3 to ui32
+        %73 = coredsl.cast %71 : ui3 to ui32
+        %74 = func.call @makeSimple(%72, %73) : (ui32, ui32) -> !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %75 = func.call @convertSimple(%74) : (!hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> ui64
+        %76 = hwarith.constant 10 : ui4
+        %77 = coredsl.cast %76 : ui4 to ui32
+        %78 = func.call @makeNested(%77, %74) : (ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %79 = hwarith.cast %75 : (ui64) -> i65
+        %80 = scf.execute_region -> (!hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) {
+          cf.switch %79 : i65, [
+            default: ^default,
+            10: ^case_10,
+            3: ^case_3
+          ]
+          ^case_10():
+            %80 = hwarith.constant 10 : ui4
+            %81 = coredsl.cast %80 : ui4 to ui32
+            %82 = hw.struct_inject %74["x"], %81 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+            cf.br ^switch_end(%82 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>)
+          ^case_3():
+            %83 = hwarith.constant 10 : ui4
+            %84 = coredsl.cast %83 : ui4 to ui32
+            %85 = hw.struct_inject %74["y"], %84 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+            cf.br ^switch_end(%85 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>)
+          ^default():
+            cf.br ^switch_end(%74 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>)
+          ^switch_end(%86: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>):
+            scf.yield %86 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        }
+        %81 = hw.struct_inject %78["nested"], %80 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+        %82 = hw.struct_extract %80["x"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        %83, %84 = scf.while (%83 = %82, %84 = %80) : (ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) -> (ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>) {
+          %85 = hw.struct_extract %84["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %87 = hwarith.icmp lt %83, %85 : ui32, ui32
+          %86 = hwarith.cast %87 : (i1) -> ui1
+          %88 = coredsl.cast %86 : ui1 to i1
+          scf.condition(%88) %83, %84 : ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        } do {
+        ^bb0(%83: ui32, %84: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>):
+          %85 = hw.struct_extract %84["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %86 = hwarith.mul %83, %85 : (ui32, ui32) -> ui64
+          %87 = coredsl.cast %86 : ui64 to ui32
+          %88 = hw.struct_extract %84["y"] : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %89 = hwarith.sub %88, %87 : (ui32, ui32) -> si33
+          %90 = coredsl.cast %89 : si33 to ui32
+          %91 = hw.struct_inject %84["y"], %90 : !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+          %92 = hwarith.constant 1 : ui1
+          %93 = hwarith.add %83, %92 : (ui32, ui1) -> ui33
+          %94 = coredsl.cast %93 : ui33 to ui32
+          scf.yield %94, %91 : ui32, !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>
+        }
+        %85 = hw.struct_inject %81["nested"], %84 : !hw.struct<notNested: ui32, nested: !hw.struct<x: ui32, y: ui32, a: si16, b: si16, c: si16, d: si16>>
+    """));
+    // StructReg
+    assertTrue(mlirCode.contains("""
+        %0 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %1 = coredsl.cast %rs1 : ui5 to ui32
+        %2 = hw.struct_inject %0["x"], %1 : !hw.struct<x: ui32, y: ui32>
+        coredsl.set @STRUCT_REG = %2 : !hw.struct<x: ui32, y: ui32>
+        %3 = hwarith.constant 1 : ui1
+        %4 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %5 = hw.struct_extract %4["x"] : !hw.struct<x: ui32, y: ui32>
+        %6 = hwarith.sub %5, %3 : (ui32, ui1) -> si33
+        %7 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %8 = coredsl.cast %6 : si33 to ui32
+        %9 = hw.struct_inject %7["x"], %8 : !hw.struct<x: ui32, y: ui32>
+        coredsl.set @STRUCT_REG = %9 : !hw.struct<x: ui32, y: ui32>
+        %10 = hwarith.constant 7 : ui3
+        %11 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %12 = hw.struct_extract %11["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %13 = coredsl.cast %10 : ui3 to ui32
+        %14 = hw.struct_inject %12["x"], %13 : !hw.struct<x: ui32, y: ui32>
+        %15 = hw.struct_inject %11["vec"], %14 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @NESTED_STRUCT_REG = %15 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %16 = hwarith.constant 255 : ui8
+        %17 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %18 = hw.struct_extract %17["x"] : !hw.struct<x: ui32, y: ui32>
+        %19 = coredsl.bitset %18[7:0] = %16 : (ui32, ui8) -> ui32
+        %20 = hw.struct_inject %17["x"], %19 : !hw.struct<x: ui32, y: ui32>
+        coredsl.set @STRUCT_REG = %20 : !hw.struct<x: ui32, y: ui32>
+        %21 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @STRUCT_REGS[2] = %21 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %22 = hwarith.constant 10 : ui4
+        %23 = coredsl.get @STRUCT_REGS[%rs1 : ui5] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %24 = coredsl.cast %22 : ui4 to si32
+        %25 = hw.struct_inject %23["notNested"], %24 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @STRUCT_REGS[%rs1 : ui5] = %25 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %26 = coredsl.get @STRUCT_REGS[31] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @NESTED_STRUCT_REG = %26 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %27 = coredsl.get @STRUCT_REGS[0] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %28 = hw.struct_extract %27["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %29 = hw.struct_extract %28["x"] : !hw.struct<x: ui32, y: ui32>
+        %30 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %31 = hw.struct_inject %30["y"], %29 : !hw.struct<x: ui32, y: ui32>
+        coredsl.set @STRUCT_REG = %31 : !hw.struct<x: ui32, y: ui32>
+    """));
+    // clang-format on
   }
 }
