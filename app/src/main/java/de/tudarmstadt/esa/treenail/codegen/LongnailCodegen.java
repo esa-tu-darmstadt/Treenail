@@ -29,7 +29,6 @@ import com.minres.coredsl.coreDsl.Statement;
 import com.minres.coredsl.coreDsl.TypeQualifier;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
-import com.minres.coredsl.type.CoreDslType;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -154,12 +153,14 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     sb.append(format("coredsl.isax \"%s\" {\n", isa.getName()));
     for (var stmt : isa.getArchStateBody()) {
       if (!(stmt instanceof DeclarationStatement)) {
-        System.out.println(
-            "NYI: Support for parameter assignments etc. Ignoring...");
+        // Non-declaration statements will always be parameter assignments.
+        // Because parameter assignments are always constant expressions, we
+        // don't need to emit anything in this case.
+        // For multiple assignments in one architectural_state body, only the
+        // last is valid, which is the value the frontend will return when
+        // evaluating a parameter
         continue;
       }
-      assert stmt instanceof DeclarationStatement
-          : "NYI: Support for parameter assignments etc.";
       var declStmt = (DeclarationStatement)stmt;
       var elem = emitArchitecturalStateElement(declStmt.getDeclaration(), ctx);
       if (elem != null)
@@ -187,25 +188,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     sb.append("}\n");
     return sb.toString();
-  }
-
-  private String emitConstParam(Declarator dtor, boolean isVolatile,
-                                AnalysisContext ctx) {
-    var name = dtor.getName();
-    var type = ctx.getDeclaredType(dtor);
-    var init = dtor.getInitializer();
-
-    assert type.isIntegerType() : "NYI: non integer type const parameters";
-    assert init != null;
-    assert init instanceof ExpressionInitializer;
-    var exprInit = (ExpressionInitializer)init;
-    var cv = ctx.getExpressionValue(exprInit.getValue());
-    assert cv.getStatus() == StatusCode.success : "Non-constant initializer";
-    var constType = mapType(type);
-    // Instead of a hwarith.constant we will emit a local const register, which
-    // will be optimized away but allows being accessed even in isolated from
-    // above regions (esp. func.func)
-    return emitRegister(dtor, /*isConst=*/true, isVolatile, ctx);
   }
 
   private String emitRegister(Declarator dtor, boolean isConst,
@@ -360,12 +342,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     for (var dtor : decl.getDeclarators()) {
       switch (ctx.getStorageClass(dtor)) {
       case param:
-        if (isConst) {
-          // Const parameters can be emitted since their value is already
-          // elaborated
-          sb.append(emitConstParam(dtor, isVolatile, ctx));
-        }
-        break; // Ignore, we're only dealing with the elaborated values.
+        // Ignore, because all params need to be constant expressions
+        // and can therefore just be inserted as hw.constant operations
+        break;
       case register:
         sb.append(emitRegister(dtor, isConst, isVolatile, ctx));
         break;
