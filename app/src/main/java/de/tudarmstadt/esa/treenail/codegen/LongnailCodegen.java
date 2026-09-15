@@ -198,8 +198,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     // Because functions, instructions, and always blocks can be overridden,
     // collect them from all ISAs before emitting, overwriting the ones that
     // have more than one definition with the later definition
-    // TODO: is it enough to differentiate by instruction name?
-    // - Test by redefining instruction with different encoding
     var functionNameMap = new LinkedHashMap<String, FunctionDefinition>();
     for (var isaToEmit : isasToEmit) {
       for (var func : isaToEmit.getFunctions()) {
