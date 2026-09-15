@@ -11,6 +11,7 @@ import com.minres.coredsl.analysis.CoreDslAnalyzer;
 import com.minres.coredsl.analysis.CoreDslConstantExpressionEvaluator;
 import com.minres.coredsl.coreDsl.AlwaysBlock;
 import com.minres.coredsl.coreDsl.Attribute;
+import com.minres.coredsl.coreDsl.CoreDef;
 import com.minres.coredsl.coreDsl.Declaration;
 import com.minres.coredsl.coreDsl.DeclarationStatement;
 import com.minres.coredsl.coreDsl.Declarator;
@@ -23,6 +24,7 @@ import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
 import com.minres.coredsl.coreDsl.Instruction;
+import com.minres.coredsl.coreDsl.InstructionSet;
 import com.minres.coredsl.coreDsl.ListInitializer;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
@@ -33,6 +35,7 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -54,7 +57,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     for (var isa : defs) {
       isaCode += emitISA(isa, anaRes.results.get(isa));
     }
-
     return isaCode;
   }
 
@@ -147,30 +149,74 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return true;
   }
 
+  private static void appendSuperISAs(InstructionSet isa,
+                                      LinkedHashSet<ISA> baseNames) {
+    var superType = isa.getSuperType();
+    if (superType != null) {
+      appendSuperISAs(superType, baseNames);
+      baseNames.add(superType);
+    }
+  }
+
   private String emitISA(ISA isa, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
     sb.append(format("coredsl.isax \"%s\" {\n", isa.getName()));
-    for (var stmt : isa.getArchStateBody()) {
-      if (!(stmt instanceof DeclarationStatement)) {
-        // Non-declaration statements will always be parameter assignments.
-        // Because parameter assignments are always constant expressions, we
-        // don't need to emit anything in this case.
-        // For multiple assignments in one architectural_state body, only the
-        // last is valid, which is the value the frontend will return when
-        // evaluating a parameter
-        continue;
+    var isasToEmit = new LinkedHashSet<ISA>();
+    if (isa instanceof InstructionSet instructionSet) {
+      appendSuperISAs(instructionSet, isasToEmit);
+    } else {
+      assert isa instanceof CoreDef
+          : "ISA other than InstructionSet and CoreDef";
+      var providedISAs = isa.getProvidedInstructionSets();
+      for (var providedISA : providedISAs) {
+        appendSuperISAs(providedISA, isasToEmit);
+        isasToEmit.add(providedISA);
       }
-      var declStmt = (DeclarationStatement)stmt;
-      var elem = emitArchitecturalStateElement(declStmt.getDeclaration(), ctx);
-      if (elem != null)
-        sb.append(elem.indent(N_SPACES));
+    }
+    isasToEmit.add(isa);
+    for (var isaToEmit : isasToEmit) {
+      for (var stmt : isaToEmit.getArchStateBody()) {
+        if (!(stmt instanceof DeclarationStatement)) {
+          // Non-declaration statements will always be parameter assignments.
+          // Because parameter assignments are always constant expressions, we
+          // don't need to emit anything in this case.
+          // For multiple assignments in one architectural_state body, only the
+          // last is valid. This is the value the frontend will return when
+          // evaluating a parameter, regardless of whether the assignment is
+          // later in the architectural state section
+          continue;
+        }
+        var declStmt = (DeclarationStatement)stmt;
+        var elem =
+            emitArchitecturalStateElement(declStmt.getDeclaration(), ctx);
+        if (elem != null)
+          sb.append(elem.indent(N_SPACES));
+      }
     }
 
-    for (var func : isa.getFunctions())
+    // Because functions, instructions, and always blocks can be overridden,
+    // collect them from all ISAs before emitting, overwriting the ones that
+    // have more than one definition with the later definition
+    // TODO: is it enough to differentiate by instruction name?
+    // - Test by redefining instruction with different encoding
+    var functionNameMap = new LinkedHashMap<String, FunctionDefinition>();
+    for (var isaToEmit : isasToEmit) {
+      for (var func : isaToEmit.getFunctions()) {
+        functionNameMap.put(func.getName(), func);
+      }
+    }
+    for (var func : functionNameMap.values()) {
       sb.append(emitFunction(func, ctx).indent(N_SPACES));
+    }
 
-    for (var inst : isa.getInstructions()) {
+    var instructionNameMap = new LinkedHashMap<String, Instruction>();
+    for (var isaToEmit : isasToEmit) {
+      for (var inst : isaToEmit.getInstructions()) {
+        instructionNameMap.put(inst.getName(), inst);
+      }
+    }
+    for (var inst : instructionNameMap.values()) {
       // emit only if not disabled via attributes
       if (isEnabled(inst.getAttributes(), ctx))
         sb.append(
@@ -178,7 +224,13 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                 .indent(N_SPACES));
     }
 
-    for (var always : isa.getAlwaysBlocks()) {
+    var alwaysNameMap = new LinkedHashMap<String, AlwaysBlock>();
+    for (var isaToEmit : isasToEmit) {
+      for (var always : isaToEmit.getAlwaysBlocks()) {
+        alwaysNameMap.put(always.getName(), always);
+      }
+    }
+    for (var always : alwaysNameMap.values()) {
       // emit only if not disabled via attributes
       if (isEnabled(always.getAttributes(), ctx))
         sb.append(
