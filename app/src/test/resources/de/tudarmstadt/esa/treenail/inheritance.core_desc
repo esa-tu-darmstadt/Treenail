@@ -1,0 +1,116 @@
+InstructionSet Base {
+  architectural_state {
+    int XLEN = 32;
+    int REG_BANK_SIZE = 32;
+    int MIN_ADDRESSABLE_SIZE = 8;
+    const int ADDR_SPACE_SIZE = 32;
+
+    register unsigned<XLEN> X[REG_BANK_SIZE];
+    extern unsigned<MIN_ADDRESSABLE_SIZE> MEM[1 << ADDR_SPACE_SIZE] [[is_main_mem]];
+  }
+  functions {
+    void zero_registers() {
+      X[0:REG_BANK_SIZE - 1] = 0;
+    }
+  }
+  instructions {
+    SwapRegBank [[enable=REG_BANK_SIZE == 32]] {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        for (int i = 0; i < REG_BANK_SIZE / 2; ++i) {
+          unsigned<XLEN> tmp = X[i];
+          int swap_idx = (int)(i + REG_BANK_SIZE / 2);
+          X[i] = X[swap_idx];
+          X[swap_idx] = tmp;
+        }
+      }
+    }
+  }
+  always {
+    TEST {
+      if (X[REG_BANK_SIZE - 1] == 0) {
+        zero_registers();
+      }
+    }
+  }
+}
+
+InstructionSet AddComponents extends Base {
+  architectural_state {
+    register unsigned<XLEN> SCALAR_REG;
+  }
+  functions {
+    void test() {
+      for (unsigned<XLEN> i = 0; i < REG_BANK_SIZE; ++i) {
+         X[i] = i;
+      }
+    }
+  }
+  instructions {
+      DoTheThing {
+        encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+        behavior: {
+          SCALAR_REG = MEM[100];
+        }
+      }
+  }
+  always {
+    NEW_ALWAYS {
+      MEM[0] = (unsigned<MIN_ADDRESSABLE_SIZE>)X[0];
+    }
+  }
+}
+
+InstructionSet MoreRegisters extends AddComponents {
+  architectural_state {
+    REG_BANK_SIZE = 64;
+  }
+}
+
+InstructionSet MoreRegisters64 extends MoreRegisters {
+  architectural_state {
+    XLEN = 64;
+  }
+}
+
+InstructionSet AnotherOne {
+  architectural_state {
+    int X2_SIZE = 32;
+    register unsigned<32> X2[X2_SIZE];
+  }
+  instructions {
+    DoAnotherThing {
+        encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+        behavior: {
+          X2[X2_SIZE / 2] = 0xffffffff;
+        }
+    }
+  }
+}
+
+Core Core128 provides MoreRegisters64, AnotherOne {
+  architectural_state {
+    XLEN = 128;
+  }
+  // Test function, instruction, and always block overriding
+  functions {
+    void test() {
+      for (unsigned<XLEN> i = 0; i < REG_BANK_SIZE; ++i) {
+         X[i] = (unsigned<XLEN>)(i + 2);
+      }
+    }
+  }
+  instructions {
+    DoTheThing {
+      encoding: 5'b00000 :: 1'b0 :: Imm6[0:5] :: rs1[4:3] :: rs1[0:2] :: 3'b110 :: rd[4:0] :: 7'b1111011;
+      behavior: {
+        X[0] = MEM[32];
+      }
+    }
+  }
+  always {
+    NEW_ALWAYS {
+      MEM[0] = (unsigned<MIN_ADDRESSABLE_SIZE>)X[2];
+    }
+  }
+}

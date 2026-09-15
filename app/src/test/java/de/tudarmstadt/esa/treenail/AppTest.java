@@ -1349,4 +1349,336 @@ class AppTest {
         mlirCode.contains("} {coredsl.attr.unroll, coredsl.attr.pipeline = 2}"),
         "for-loop attributes should be forwarded onto scf.for");
   }
+
+  @Test
+  void inheritanceWorks() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("inheritance.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertTrue(mlirCode.contains("""
+    coredsl.isax "Base" {
+      coredsl.register local @X[32] : ui32
+      coredsl.addrspace core_mem @MEM : (ui32) -> ui8 {coredsl.attr.is_main_mem}
+      func.func @zero_registers() {
+        %0 = hwarith.constant 0 : ui1
+        %1 = coredsl.cast %0 : ui1 to ui1024
+        coredsl.set @X[0:31] = %1 : ui1024
+        return
+      }
+      coredsl.instruction @SwapRegBank {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = hw.constant 0 : i5
+        %1 = hw.constant 16 : i5
+        %2 = hw.constant 1 : i5
+        scf.for unsigned %3 = %0 to %1 step %2 : i5 {
+          %4 = hwarith.cast %3 : (i5) -> si5
+          %5 = coredsl.cast %4 : si5 to si32
+          %7 = coredsl.cast %5 : si32 to ui5
+          %6 = coredsl.get @X[%7 : ui5] : ui32
+          %8 = hwarith.constant 32 : si32
+          %9 = hwarith.constant 2 : ui2
+          %10 = hwarith.div %8, %9 : (si32, ui2) -> si32
+          %11 = hwarith.add %5, %10 : (si32, si32) -> si33
+          %12 = coredsl.cast %11 : si33 to si32
+          %14 = coredsl.cast %12 : si32 to ui5
+          %13 = coredsl.get @X[%14 : ui5] : ui32
+          %15 = coredsl.cast %5 : si32 to ui5
+          coredsl.set @X[%15 : ui5] = %13 : ui32
+          %16 = coredsl.cast %12 : si32 to ui5
+          coredsl.set @X[%16 : ui5] = %6 : ui32
+          scf.yield
+        }
+        coredsl.end
+      }
+      coredsl.always @TEST {
+        %0 = coredsl.get @X[31] : ui32
+        %1 = hwarith.constant 0 : ui1
+        %3 = hwarith.icmp eq %0, %1 : ui32, ui1
+        %2 = hwarith.cast %3 : (i1) -> ui1
+        %4 = coredsl.cast %2 : ui1 to i1
+        scf.if %4 {
+          func.call @zero_registers() : () -> ()
+        }
+        coredsl.end
+      }
+    }
+    coredsl.isax "AddComponents" {
+      coredsl.register local @X[32] : ui32
+      coredsl.addrspace core_mem @MEM : (ui32) -> ui8 {coredsl.attr.is_main_mem}
+      coredsl.register local @SCALAR_REG : ui32
+      func.func @zero_registers() {
+        %0 = hwarith.constant 0 : ui1
+        %1 = coredsl.cast %0 : ui1 to ui1024
+        coredsl.set @X[0:31] = %1 : ui1024
+        return
+      }
+      func.func @test() {
+        %0 = hw.constant 0 : i6
+        %1 = hw.constant 32 : i6
+        %2 = hw.constant 1 : i6
+        scf.for unsigned %3 = %0 to %1 step %2 : i6 {
+          %4 = hwarith.cast %3 : (i6) -> ui6
+          %5 = coredsl.cast %4 : ui6 to ui32
+          %6 = coredsl.cast %5 : ui32 to ui5
+          coredsl.set @X[%6 : ui5] = %5 : ui32
+          scf.yield
+        }
+        return
+      }
+      coredsl.instruction @SwapRegBank {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = hw.constant 0 : i5
+        %1 = hw.constant 16 : i5
+        %2 = hw.constant 1 : i5
+        scf.for unsigned %3 = %0 to %1 step %2 : i5 {
+          %4 = hwarith.cast %3 : (i5) -> si5
+          %5 = coredsl.cast %4 : si5 to si32
+          %7 = coredsl.cast %5 : si32 to ui5
+          %6 = coredsl.get @X[%7 : ui5] : ui32
+          %8 = hwarith.constant 32 : si32
+          %9 = hwarith.constant 2 : ui2
+          %10 = hwarith.div %8, %9 : (si32, ui2) -> si32
+          %11 = hwarith.add %5, %10 : (si32, si32) -> si33
+          %12 = coredsl.cast %11 : si33 to si32
+          %14 = coredsl.cast %12 : si32 to ui5
+          %13 = coredsl.get @X[%14 : ui5] : ui32
+          %15 = coredsl.cast %5 : si32 to ui5
+          coredsl.set @X[%15 : ui5] = %13 : ui32
+          %16 = coredsl.cast %12 : si32 to ui5
+          coredsl.set @X[%16 : ui5] = %6 : ui32
+          scf.yield
+        }
+        coredsl.end
+      }
+      coredsl.instruction @DoTheThing {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = coredsl.get @MEM[100] : ui8
+        %1 = coredsl.cast %0 : ui8 to ui32
+        coredsl.set @SCALAR_REG = %1 : ui32
+        coredsl.end
+      }
+      coredsl.always @TEST {
+        %0 = coredsl.get @X[31] : ui32
+        %1 = hwarith.constant 0 : ui1
+        %3 = hwarith.icmp eq %0, %1 : ui32, ui1
+        %2 = hwarith.cast %3 : (i1) -> ui1
+        %4 = coredsl.cast %2 : ui1 to i1
+        scf.if %4 {
+          func.call @zero_registers() : () -> ()
+        }
+        coredsl.end
+      }
+      coredsl.always @NEW_ALWAYS {
+        %0 = coredsl.get @X[0] : ui32
+        %1 = coredsl.cast %0 : ui32 to ui8
+        coredsl.set @MEM[0] = %1 : ui8
+        coredsl.end
+      }
+    }
+    coredsl.isax "MoreRegisters" {
+      coredsl.register local @X[64] : ui32
+      coredsl.addrspace core_mem @MEM : (ui32) -> ui8 {coredsl.attr.is_main_mem}
+      coredsl.register local @SCALAR_REG : ui32
+      func.func @zero_registers() {
+        %0 = hwarith.constant 0 : ui1
+        %1 = coredsl.cast %0 : ui1 to ui2048
+        coredsl.set @X[0:63] = %1 : ui2048
+        return
+      }
+      func.func @test() {
+        %0 = hw.constant 0 : i7
+        %1 = hw.constant 64 : i7
+        %2 = hw.constant 1 : i7
+        scf.for unsigned %3 = %0 to %1 step %2 : i7 {
+          %4 = hwarith.cast %3 : (i7) -> ui7
+          %5 = coredsl.cast %4 : ui7 to ui32
+          %6 = coredsl.cast %5 : ui32 to ui6
+          coredsl.set @X[%6 : ui6] = %5 : ui32
+          scf.yield
+        }
+        return
+      }
+      coredsl.instruction @DoTheThing {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = coredsl.get @MEM[100] : ui8
+        %1 = coredsl.cast %0 : ui8 to ui32
+        coredsl.set @SCALAR_REG = %1 : ui32
+        coredsl.end
+      }
+      coredsl.always @TEST {
+        %0 = coredsl.get @X[63] : ui32
+        %1 = hwarith.constant 0 : ui1
+        %3 = hwarith.icmp eq %0, %1 : ui32, ui1
+        %2 = hwarith.cast %3 : (i1) -> ui1
+        %4 = coredsl.cast %2 : ui1 to i1
+        scf.if %4 {
+          func.call @zero_registers() : () -> ()
+        }
+        coredsl.end
+      }
+      coredsl.always @NEW_ALWAYS {
+        %0 = coredsl.get @X[0] : ui32
+        %1 = coredsl.cast %0 : ui32 to ui8
+        coredsl.set @MEM[0] = %1 : ui8
+        coredsl.end
+      }
+    }
+    coredsl.isax "MoreRegisters64" {
+      coredsl.register local @X[64] : ui64
+      coredsl.addrspace core_mem @MEM : (ui32) -> ui8 {coredsl.attr.is_main_mem}
+      coredsl.register local @SCALAR_REG : ui64
+      func.func @zero_registers() {
+        %0 = hwarith.constant 0 : ui1
+        %1 = coredsl.cast %0 : ui1 to ui4096
+        coredsl.set @X[0:63] = %1 : ui4096
+        return
+      }
+      func.func @test() {
+        %0 = hw.constant 0 : i7
+        %1 = hw.constant 64 : i7
+        %2 = hw.constant 1 : i7
+        scf.for unsigned %3 = %0 to %1 step %2 : i7 {
+          %4 = hwarith.cast %3 : (i7) -> ui7
+          %5 = coredsl.cast %4 : ui7 to ui64
+          %6 = coredsl.cast %5 : ui64 to ui6
+          coredsl.set @X[%6 : ui6] = %5 : ui64
+          scf.yield
+        }
+        return
+      }
+      coredsl.instruction @DoTheThing {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = coredsl.get @MEM[100] : ui8
+        %1 = coredsl.cast %0 : ui8 to ui64
+        coredsl.set @SCALAR_REG = %1 : ui64
+        coredsl.end
+      }
+      coredsl.always @TEST {
+        %0 = coredsl.get @X[63] : ui64
+        %1 = hwarith.constant 0 : ui1
+        %3 = hwarith.icmp eq %0, %1 : ui64, ui1
+        %2 = hwarith.cast %3 : (i1) -> ui1
+        %4 = coredsl.cast %2 : ui1 to i1
+        scf.if %4 {
+          func.call @zero_registers() : () -> ()
+        }
+        coredsl.end
+      }
+      coredsl.always @NEW_ALWAYS {
+        %0 = coredsl.get @X[0] : ui64
+        %1 = coredsl.cast %0 : ui64 to ui8
+        coredsl.set @MEM[0] = %1 : ui8
+        coredsl.end
+      }
+    }
+    coredsl.isax "AnotherOne" {
+      coredsl.register local @X2[32] : ui32
+      coredsl.instruction @DoAnotherThing {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = hwarith.constant 4294967295 : ui32
+        coredsl.set @X2[16] = %0 : ui32
+        coredsl.end
+      }
+    }
+    coredsl.isax "Core128" {
+      coredsl.register local @X[64] : ui128
+      coredsl.addrspace core_mem @MEM : (ui32) -> ui8 {coredsl.attr.is_main_mem}
+      coredsl.register local @SCALAR_REG : ui128
+      coredsl.register local @X2[32] : ui32
+      func.func @zero_registers() {
+        %0 = hwarith.constant 0 : ui1
+        %1 = coredsl.cast %0 : ui1 to ui8192
+        coredsl.set @X[0:63] = %1 : ui8192
+        return
+      }
+      func.func @test() {
+        %0 = hw.constant 0 : i7
+        %1 = hw.constant 64 : i7
+        %2 = hw.constant 1 : i7
+        scf.for unsigned %3 = %0 to %1 step %2 : i7 {
+          %4 = hwarith.cast %3 : (i7) -> ui7
+          %5 = coredsl.cast %4 : ui7 to ui128
+          %6 = hwarith.constant 2 : ui2
+          %7 = hwarith.add %5, %6 : (ui128, ui2) -> ui129
+          %8 = coredsl.cast %7 : ui129 to ui128
+          %9 = coredsl.cast %5 : ui128 to ui6
+          coredsl.set @X[%9 : ui6] = %8 : ui128
+          scf.yield
+        }
+        return
+      }
+      coredsl.instruction @DoTheThing {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = coredsl.get @MEM[32] : ui8
+        %1 = coredsl.cast %0 : ui8 to ui128
+        coredsl.set @X[0] = %1 : ui128
+        coredsl.end
+      }
+      coredsl.instruction @DoAnotherThing {lil.enc_immediates = [[["%TREENAIL_WAS_HERE_Imm6_5_0", 5, 0, 1, "Imm6"]], [["%TREENAIL_WAS_HERE_rs1_2_0", 2, 0, 1, "rs1"], ["%TREENAIL_WAS_HERE_rs1_4_3", 4, 3, 0, "rs1"]], [["%TREENAIL_WAS_HERE_rd_4_0", 4, 0, 0, "rd"]]]} ("00000", "0", %TREENAIL_WAS_HERE_Imm6_5_0 : ui6, %TREENAIL_WAS_HERE_rs1_4_3 : ui2, %TREENAIL_WAS_HERE_rs1_2_0 : ui3, "110", %TREENAIL_WAS_HERE_rd_4_0 : ui5, "1111011") {
+        %TREENAIL_WAS_HERE_reversed_0 = coredsl.bitextract %TREENAIL_WAS_HERE_Imm6_5_0[0:5] : (ui6) -> ui6
+        %Imm6 = coredsl.cast %TREENAIL_WAS_HERE_reversed_0 : ui6 to ui6
+        %TREENAIL_WAS_HERE_reversed_1 = coredsl.bitextract %TREENAIL_WAS_HERE_rs1_2_0[0:2] : (ui3) -> ui3
+        %TREENAIL_WAS_HERE_2 = coredsl.concat %TREENAIL_WAS_HERE_rs1_4_3, %TREENAIL_WAS_HERE_reversed_1 : ui2, ui3
+        %rs1 = coredsl.cast %TREENAIL_WAS_HERE_2 : ui5 to ui5
+        %rd = coredsl.cast %TREENAIL_WAS_HERE_rd_4_0 : ui5 to ui5
+        %0 = hwarith.constant 4294967295 : ui32
+        coredsl.set @X2[16] = %0 : ui32
+        coredsl.end
+      }
+      coredsl.always @TEST {
+        %0 = coredsl.get @X[63] : ui128
+        %1 = hwarith.constant 0 : ui1
+        %3 = hwarith.icmp eq %0, %1 : ui128, ui1
+        %2 = hwarith.cast %3 : (i1) -> ui1
+        %4 = coredsl.cast %2 : ui1 to i1
+        scf.if %4 {
+          func.call @zero_registers() : () -> ()
+        }
+        coredsl.end
+      }
+      coredsl.always @NEW_ALWAYS {
+        %0 = coredsl.get @X[2] : ui128
+        %1 = coredsl.cast %0 : ui128 to ui8
+        coredsl.set @MEM[0] = %1 : ui8
+        coredsl.end
+      }
+    }
+    """));
+  }
 }
