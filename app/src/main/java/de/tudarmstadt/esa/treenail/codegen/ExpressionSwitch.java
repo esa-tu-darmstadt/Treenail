@@ -744,7 +744,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   @Override
   public MLIRValue caseConditionalExpression(ConditionalExpression expr) {
-    var type = MLIRIntType.mapType(ac.getExpressionType(expr));
+    var type = types.mapType(ac.getExpressionType(expr));
 
     var cond = doSwitch(expr.getCondition());
     var cast = cc.makeI1Cast(cond);
@@ -754,12 +754,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
     var thenResult =
         new ExpressionSwitch(thenCC, types).doSwitch(expr.getThenExpression());
-    var thenRetVal = thenCC.makeCast(thenResult, type);
     var elseResult =
         new ExpressionSwitch(elseCC, types).doSwitch(expr.getElseExpression());
-    var elseRetVal = elseCC.makeCast(elseResult, type);
+    if (type instanceof MLIRIntType intType) {
+      thenResult = thenCC.makeCast(thenResult, intType);
+      elseResult = elseCC.makeCast(elseResult, intType);
+    }
     var retVal = emitConditionalWithSideEffects(cc, cast, thenCC, elseCC,
-                                                thenRetVal, elseRetVal);
+                                                thenResult, elseResult);
     assert retVal.type == type;
     return retVal;
   }
