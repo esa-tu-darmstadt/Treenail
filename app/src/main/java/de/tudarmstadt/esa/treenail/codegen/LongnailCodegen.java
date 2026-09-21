@@ -290,9 +290,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                       .map(Object::toString)
                       .collect(joining(", ", " = [", "]"));
       }
-      return format("coredsl.register %s%s%s @%s[%d]%s : %s\n", protoStr,
+      return format("coredsl.register %s%s%s @%s[%d]%s : %s%s\n", protoStr,
                     constStr, volatileStr, name, numElements, initStr,
-                    mappedElementType);
+                    mappedElementType, attrStr);
     } else if (type.isStructType()) {
       assert init == null : "NYI: initializers for struct registers";
       var structType = MLIRStructType.mapType(type);
