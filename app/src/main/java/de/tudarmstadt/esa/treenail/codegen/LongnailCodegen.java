@@ -259,7 +259,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                     constStr, volatileStr, name, initStr, targetType, attrStr);
     }
     if (type.isArrayType()) {
-      assert type.isArrayType();
       // Array type
       var arType = (ArrayType)type;
       var elementType = arType.elementType;
