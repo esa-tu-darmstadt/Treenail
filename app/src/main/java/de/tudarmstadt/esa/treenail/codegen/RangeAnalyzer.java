@@ -65,7 +65,7 @@ class RangeAnalyzer {
     return val;
   }
 
-  private static MLIRType getIndexType(CoreDslType baseType) {
+  private static MLIRIntType getIndexType(CoreDslType baseType) {
     BigInteger numElems;
     if (baseType instanceof ArrayType)
       numElems = BigInteger.valueOf(((ArrayType)baseType).count);
@@ -73,11 +73,11 @@ class RangeAnalyzer {
       numElems = ((AddressSpaceType)baseType).count;
     else
       numElems = BigInteger.valueOf(baseType.getBitSize());
-    return MLIRType.getType(numElems.bitLength() - 1, false);
+    return MLIRIntType.getType(numElems.bitLength() - 1, false);
   }
 
   static MLIRValue getEntityValue(NamedEntity entity, ConstructionContext cc,
-                                  MLIRType castType) {
+                                  MLIRIntType castType) {
     return cc.makeCast(cc.getOrLoad(entity), castType);
   }
 

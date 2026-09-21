@@ -1,7 +1,6 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import static de.tudarmstadt.esa.treenail.codegen.ConstructionContext.ensureBigInteger;
-import static de.tudarmstadt.esa.treenail.codegen.MLIRType.mapType;
 import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 
@@ -17,6 +16,7 @@ import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
 import com.minres.coredsl.coreDsl.EntityReference;
+import com.minres.coredsl.coreDsl.EnumTypeDeclaration;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
@@ -26,10 +26,11 @@ import com.minres.coredsl.coreDsl.Instruction;
 import com.minres.coredsl.coreDsl.ListInitializer;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.Statement;
+import com.minres.coredsl.coreDsl.StructTypeDeclaration;
 import com.minres.coredsl.coreDsl.TypeQualifier;
+import com.minres.coredsl.coreDsl.UnionTypeDeclaration;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
-import com.minres.coredsl.type.CoreDslType;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -151,7 +152,28 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   private String emitISA(ISA isa, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
+    var types = new ISATypes();
     sb.append(format("coredsl.isax \"%s\" {\n", isa.getName()));
+    for (var typeDecl : isa.getTypeDeclarations()) {
+      if (typeDecl instanceof StructTypeDeclaration structDecl) {
+        var members = new LinkedHashMap<String, MLIRType>();
+        for (var member : structDecl.getMembers()) {
+          assert !member.getQualifiers().contains(TypeQualifier.VOLATILE)
+              : "NYI: Volatile struct members";
+          var memberType =
+              types.mapType(ctx.getSpecifiedType(member.getType()));
+          for (var dtor : member.getDeclarators()) {
+            var memberName = dtor.getName();
+            members.put(memberName, memberType);
+          }
+        }
+        types.registerStructType(structDecl.getName(), members);
+      } else if (typeDecl instanceof UnionTypeDeclaration) {
+        assert false : "NYI: Unions";
+      } else if (typeDecl instanceof EnumTypeDeclaration) {
+        assert false : "NYI: Enums";
+      }
+    }
     for (var stmt : isa.getArchStateBody()) {
       if (!(stmt instanceof DeclarationStatement)) {
         System.out.println(
@@ -161,28 +183,29 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       assert stmt instanceof DeclarationStatement
           : "NYI: Support for parameter assignments etc.";
       var declStmt = (DeclarationStatement)stmt;
-      var elem = emitArchitecturalStateElement(declStmt.getDeclaration(), ctx);
+      var elem =
+          emitArchitecturalStateElement(declStmt.getDeclaration(), ctx, types);
       if (elem != null)
         sb.append(elem.indent(N_SPACES));
     }
 
     for (var func : isa.getFunctions())
-      sb.append(emitFunction(func, ctx).indent(N_SPACES));
+      sb.append(emitFunction(func, ctx, types).indent(N_SPACES));
 
     for (var inst : isa.getInstructions()) {
       // emit only if not disabled via attributes
       if (isEnabled(inst.getAttributes(), ctx))
-        sb.append(
-            emitInstruction(inst, ctx, isa.getCommonInstructionAttributes())
-                .indent(N_SPACES));
+        sb.append(emitInstruction(inst, ctx,
+                                  isa.getCommonInstructionAttributes(), types)
+                      .indent(N_SPACES));
     }
 
     for (var always : isa.getAlwaysBlocks()) {
       // emit only if not disabled via attributes
       if (isEnabled(always.getAttributes(), ctx))
-        sb.append(
-            emitAlwaysBlock(always, ctx, isa.getCommonAlwaysBlockAttributes())
-                .indent(N_SPACES));
+        sb.append(emitAlwaysBlock(always, ctx,
+                                  isa.getCommonAlwaysBlockAttributes(), types)
+                      .indent(N_SPACES));
     }
 
     sb.append("}\n");
@@ -190,7 +213,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   }
 
   private String emitConstParam(Declarator dtor, boolean isVolatile,
-                                AnalysisContext ctx) {
+                                AnalysisContext ctx, ISATypes types) {
     var name = dtor.getName();
     var type = ctx.getDeclaredType(dtor);
     var init = dtor.getInitializer();
@@ -201,15 +224,16 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var exprInit = (ExpressionInitializer)init;
     var cv = ctx.getExpressionValue(exprInit.getValue());
     assert cv.getStatus() == StatusCode.success : "Non-constant initializer";
-    var constType = mapType(type);
+    var constType = MLIRIntType.mapType(type);
     // Instead of a hwarith.constant we will emit a local const register, which
     // will be optimized away but allows being accessed even in isolated from
     // above regions (esp. func.func)
-    return emitRegister(dtor, /*isConst=*/true, isVolatile, ctx);
+    return emitRegister(dtor, /*isConst=*/true, isVolatile, ctx, types);
   }
 
   private String emitRegister(Declarator dtor, boolean isConst,
-                              boolean isVolatile, AnalysisContext ctx) {
+                              boolean isVolatile, AnalysisContext ctx,
+                              ISATypes types) {
     var name = dtor.getName();
     var type = ctx.getDeclaredType(dtor);
     var init = dtor.getInitializer();
@@ -223,7 +247,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
 
     if (type.isIntegerType()) {
-      var targetType = mapType(type);
+      var targetType = MLIRIntType.mapType(type);
       if (hasAttr(dtor.getAttributes(), "is_pc"))
         protoStr = "core_pc";
       if (init != null) {
@@ -237,38 +261,49 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       return format("coredsl.register %s%s%s @%s%s : %s%s\n", protoStr,
                     constStr, volatileStr, name, initStr, targetType, attrStr);
     }
+    if (type.isArrayType()) {
+      // Array type
+      var arType = (ArrayType)type;
+      var elementType = arType.elementType;
+      var numElements = arType.count;
 
-    assert type.isArrayType();
-    // Array type
-    var arType = (ArrayType)type;
-    var elementType = arType.elementType;
-    var numElements = arType.count;
-    var width = elementType.getBitSize();
+      assert !elementType.isArrayType() : "NYI : Multi-dimensional registers";
 
-    assert elementType.isIntegerType() : "NYI: Multi-dimensional registers";
+      if (hasAttr(dtor.getAttributes(), "is_main_reg"))
+        protoStr = "core_x";
 
-    if (hasAttr(dtor.getAttributes(), "is_main_reg"))
-      protoStr = "core_x";
-
-    var mappedElementType = mapType(elementType);
-    if (init != null) {
-      assert init instanceof ListInitializer;
-      var listInit = (ListInitializer)init;
-      initStr = listInit.getInitializers()
-                    .stream()
-                    .map(i -> {
-                      var ei = (ExpressionInitializer)i;
-                      var cv = ctx.getExpressionValue(ei.getValue());
-                      assert cv.getStatus() == StatusCode.success
-                          : "Non-constant initializer";
-                      return ensureBigInteger(cv.getValue(), mappedElementType);
-                    })
-                    .map(Object::toString)
-                    .collect(joining(", ", " = [", "]"));
+      var mappedElementType = types.mapType(elementType);
+      if (init != null) {
+        assert init instanceof ListInitializer;
+        var listInit = (ListInitializer)init;
+        assert mappedElementType instanceof MLIRIntType
+            : "CoreDSL does not support nested list initializers";
+        var intElementType = (MLIRIntType)mappedElementType;
+        initStr = listInit.getInitializers()
+                      .stream()
+                      .map(i -> {
+                        var ei = (ExpressionInitializer)i;
+                        var cv = ctx.getExpressionValue(ei.getValue());
+                        assert cv.getStatus() == StatusCode.success
+                            : "Non-constant initializer";
+                        return ensureBigInteger(cv.getValue(), intElementType);
+                      })
+                      .map(Object::toString)
+                      .collect(joining(", ", " = [", "]"));
+      }
+      return format("coredsl.register %s%s%s @%s[%d]%s : %s%s\n", protoStr,
+                    constStr, volatileStr, name, numElements, initStr,
+                    mappedElementType, attrStr);
+    } else if (type.isStructType()) {
+      assert init == null : "NYI: initializers for struct registers";
+      var structType = types.mapStructType(type);
+      return format("coredsl.register %s%s%s @%s : %s%s\n", protoStr, constStr,
+                    volatileStr, name, structType, attrStr);
+    } else {
+      assert false : "NYI: Union / Enum registers";
     }
-    return format("coredsl.register %s%s%s @%s[%d]%s : %s%s\n", protoStr,
-                  constStr, volatileStr, name, numElements, initStr,
-                  mappedElementType, attrStr);
+    assert false : "Should be unreachable";
+    return null;
   }
 
   private String emitAddressSpace(Declarator dtor, boolean isConst,
@@ -282,7 +317,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     assert type.isAddressSpaceType() : "NYI: Single-element address 'spaces'";
     var asType = (AddressSpaceType)type;
     assert asType.elementType.isIntegerType()
-        : "NYI: Multi-dimensional address spaces";
+        : "CoreDSL does not support multi-dimensional address spaces";
 
     var width = asType.elementType.getBitSize();
     var numElements = asType.count;
@@ -311,7 +346,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
     return format("coredsl.addrspace %s%s%s @%s : (ui%d) -> %s%s\n", proto,
                   constString, volatileString, name, addressWidth,
-                  mapType(asType.elementType), attrStr);
+                  MLIRIntType.mapType(asType.elementType), attrStr);
   }
 
   private String emitAlias(Declarator dtor, boolean isConst, boolean isVolatile,
@@ -351,7 +386,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   }
 
   private String emitArchitecturalStateElement(Declaration decl,
-                                               AnalysisContext ctx) {
+                                               AnalysisContext ctx,
+                                               ISATypes types) {
     var qual = decl.getQualifiers();
     var isConst = qual.contains(TypeQualifier.CONST);
     var isVolatile = qual.contains(TypeQualifier.VOLATILE);
@@ -363,11 +399,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         if (isConst) {
           // Const parameters can be emitted since their value is already
           // elaborated
-          sb.append(emitConstParam(dtor, isVolatile, ctx));
+          sb.append(emitConstParam(dtor, isVolatile, ctx, types));
         }
         break; // Ignore, we're only dealing with the elaborated values.
       case register:
-        sb.append(emitRegister(dtor, isConst, isVolatile, ctx));
+        sb.append(emitRegister(dtor, isConst, isVolatile, ctx, types));
         break;
       case extern:
         sb.append(emitAddressSpace(dtor, isConst, isVolatile, ctx));
@@ -388,13 +424,14 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return sb.toString();
   }
 
-  private String emitFunction(FunctionDefinition func, AnalysisContext ctx) {
+  private String emitFunction(FunctionDefinition func, AnalysisContext ctx,
+                              ISATypes types) {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
     Function<Declaration, String> emitParam = (d) -> {
       var dtor = d.getDeclarators().get(0);
-      var type = mapType(ctx.getDeclaredType(dtor));
+      var type = types.mapType(ctx.getDeclaredType(dtor));
       var value = new MLIRValue(dtor.getName(), type);
       values.put(dtor, value);
       return format("%s : %s", value, type);
@@ -402,8 +439,9 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     var parameters =
         func.getParameters().stream().map(emitParam).collect(joining(", "));
     var anaReturnType = ctx.getFunctionSignature(func).getReturnType();
-    var returnType =
-        anaReturnType.isVoid() ? "" : format(" -> %s", mapType(anaReturnType));
+    var returnType = anaReturnType.isVoid()
+                         ? ""
+                         : format(" -> %s", types.mapType(anaReturnType));
     var body = func.getBody();
     var isExternal = body == null;
 
@@ -422,7 +460,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       return sb.toString();
     }
 
-    var behavior = emitBehavior(body, ctx, values, "return");
+    var behavior = emitBehavior(body, ctx, values, types, "return");
 
     sb.append(funcSignature + attrStr + " {\n")
         .append(behavior.indent(N_SPACES))
@@ -432,7 +470,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   }
 
   private String emitInstruction(Instruction inst, AnalysisContext ctx,
-                                 List<Attribute> commonAttrs) {
+                                 List<Attribute> commonAttrs, ISATypes types) {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
@@ -444,7 +482,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         coreDslAttrEntries(ctx, inst.getAttributes(), commonAttrs);
     var encoding = emitEncoding(inst.getEncoding(), values, splitValueDefStmts,
                                 attrEntries);
-    var behavior = emitBehavior(inst.getBehavior(), ctx, values);
+    var behavior = emitBehavior(inst.getBehavior(), ctx, values, types);
 
     sb.append(
         format("coredsl.instruction @%s%s {\n", inst.getName(), encoding));
@@ -477,11 +515,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   }
 
   public String emitAlwaysBlock(AlwaysBlock always, AnalysisContext ctx,
-                                List<Attribute> commonAttrs) {
+                                List<Attribute> commonAttrs, ISATypes types) {
     var sb = new StringBuilder();
 
     Map<NamedEntity, MLIRValue> values = new LinkedHashMap<>();
-    var behavior = emitBehavior(always.getBehavior(), ctx, values);
+    var behavior = emitBehavior(always.getBehavior(), ctx, values, types);
 
     // coredsl.always prints its attribute dict after the body region.
     var attrStr = attrDictOrEmpty(
@@ -495,15 +533,17 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
   }
 
   public String emitBehavior(Statement behavior, AnalysisContext ctx,
-                             Map<NamedEntity, MLIRValue> values) {
-    return emitBehavior(behavior, ctx, values, "coredsl.end");
+                             Map<NamedEntity, MLIRValue> values,
+                             ISATypes types) {
+    return emitBehavior(behavior, ctx, values, types, "coredsl.end");
   }
   public String emitBehavior(Statement behavior, AnalysisContext ctx,
-                             Map<NamedEntity, MLIRValue> values,
+                             Map<NamedEntity, MLIRValue> values, ISATypes types,
                              String fallbackTerminator) {
     var sb = new StringBuilder();
-    var cc = new ConstructionContext(values, new AtomicInteger(0), ctx, sb);
-    new StatementSwitch(cc).doSwitch(behavior);
+    var cc =
+        new ConstructionContext(types, values, new AtomicInteger(0), ctx, sb);
+    new StatementSwitch(cc, types).doSwitch(behavior);
     if (!cc.getTerminatorWasEmitted())
       cc.emitLn(fallbackTerminator);
     return sb.toString();

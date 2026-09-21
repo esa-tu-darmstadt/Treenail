@@ -9,6 +9,7 @@ import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.ISA;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
+import com.minres.coredsl.coreDsl.MemberAccessExpression;
 import com.minres.coredsl.coreDsl.NamedEntity;
 import com.minres.coredsl.coreDsl.PostfixExpression;
 import com.minres.coredsl.coreDsl.PrefixExpression;
@@ -104,8 +105,17 @@ class AliasAnalysis {
 
   private static boolean containsOneOf(Expression expr,
                                        HashSet<NamedEntity> entities) {
+    // NOTE: There is no need to inspect the contents of the access, because
+    // if there is something like 'arr[i++]', it will be visited later
     while (expr instanceof IndexAccessExpression indexAccess) {
       expr = indexAccess.getTarget();
+    }
+    // For now, we are only checking integer values here, as ForLoopAnalyzer
+    // ignores more complicated expressions as bounds
+    // TODO: This won't work if ForLoopAnalyzer accepts more complicated
+    // expressions as loop bounds (e.g. "i < aStruct.intMember")
+    if (expr instanceof MemberAccessExpression) {
+      return false;
     }
     assert expr instanceof EntityReference;
     EntityReference entityReference = (EntityReference)expr;
