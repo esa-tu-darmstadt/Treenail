@@ -103,6 +103,10 @@ InstructionSet Structs {
         localStruct.x = rs1;
         // Writing whole register
         STRUCT_REG = localStruct;
+        // Conditional expression with register type
+        struct UVec2 a, b;
+        a = (rs1 == 1) ? a : b;
+        STRUCT_REG = a;
         // Register member read / write
         STRUCT_REG.x -= 1;
         // Register nested member write
