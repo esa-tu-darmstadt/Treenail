@@ -40,19 +40,22 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   private final AnalysisContext ac;
   private final ConstructionContext cc;
   private final ExpressionSwitch exprSwitch;
+  private final ISATypes types;
 
   // For detecting break statements that are in locations other than the end of
   // a SwitchSection, as they are currently unsupported
   private BreakStatement switchEndBreak = null;
 
-  StatementSwitch(ConstructionContext cc) {
+  StatementSwitch(ConstructionContext cc, ISATypes types) {
     this.ac = cc.getAnalysisContext();
     this.cc = cc;
-    exprSwitch = new ExpressionSwitch(cc);
+    exprSwitch = new ExpressionSwitch(cc, types);
+    this.types = types;
   }
 
-  StatementSwitch(ConstructionContext cc, BreakStatement breakStatement) {
-    this(cc);
+  StatementSwitch(ConstructionContext cc, ISATypes types,
+                  BreakStatement breakStatement) {
+    this(cc, types);
     this.switchEndBreak = breakStatement;
   }
 
@@ -90,10 +93,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         var castValue = cc.makeCast(value, MLIRIntType.mapType(type));
         cc.setValue(dtor, castValue);
       } else if (type.isStructType()) {
-        var mlirType = MLIRStructType.mapType(type);
+        var mlirType = types.mapStructType(type);
         var init = dtor.getInitializer();
         if (init instanceof ExpressionInitializer exprInit) {
-          var val = new ExpressionSwitch(cc).doSwitch(exprInit.getValue());
+          var val =
+              new ExpressionSwitch(cc, types).doSwitch(exprInit.getValue());
           cc.setValue(dtor, val);
         } else if (init != null) {
           assert false : "NYI: List Initializers";
@@ -136,7 +140,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     assert funcDef != null : "Return statement outside of function?";
 
     var sig = ac.getFunctionSignature((FunctionDefinition)funcDef);
-    var retTy = MLIRType.mapType(sig.getReturnType());
+    var retTy = types.mapType(sig.getReturnType());
     var retVal = exprSwitch.doSwitch(expr);
     if (retTy instanceof MLIRIntType retIntType) {
       retVal = cc.makeCast(retVal, retIntType);
@@ -156,7 +160,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   // into the given ConstructionContexts
   // Returns the inputs to the final basic block as a string
   private static SwitchFinalBranchesRes
-  emitSwitchFinalBranches(ConstructionContext cc,
+  emitSwitchFinalBranches(ConstructionContext cc, ISATypes types,
                           List<ConstructionContext> condCCs,
                           String finalBBName) {
     assert !condCCs.isEmpty();
@@ -173,7 +177,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var ac = cc.getAnalysisContext();
     var returnTypes = updatedEntities.stream()
                           .map(ac::getDeclaredType)
-                          .map(MLIRType::mapType)
+                          .map(types::mapType)
                           .toList();
     var returnTypesStr =
         returnTypes.stream().map(Object::toString).collect(joining(", "));
@@ -258,7 +262,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       scf.yield %res_x, %res_y, %res_z : ui32, ui32, ui32
      */
     final var condVal =
-        new ExpressionSwitch(cc).doSwitch(switchStmt.getCondition());
+        new ExpressionSwitch(cc, types).doSwitch(switchStmt.getCondition());
     var sections = switchStmt.getSections();
     if (sections.isEmpty()) {
       // For an empty switch statement, there is nothing to do
@@ -311,16 +315,17 @@ class StatementSwitch extends CoreDslSwitch<Object> {
           : "NYI: Fallthrough in switch statement";
       var endBreak = (BreakStatement)lastStatement;
       var valueCounter = lastCC.getValueCounter();
-      var sectionCC = new ConstructionContext(new LinkedHashMap<>(values),
-                                              new AtomicInteger(valueCounter),
-                                              ac, new StringBuilder());
+      var sectionCC = new ConstructionContext(
+          types, new LinkedHashMap<>(values), new AtomicInteger(valueCounter),
+          ac, new StringBuilder());
       for (var stmt : section.getBody()) {
-        new StatementSwitch(sectionCC, endBreak).doSwitch(stmt);
+        new StatementSwitch(sectionCC, types, endBreak).doSwitch(stmt);
       }
       sectionCCs.add(sectionCC);
       lastCC = sectionCC;
     }
-    var finalBranchesRes = emitSwitchFinalBranches(cc, sectionCCs, finalBBName);
+    var finalBranchesRes =
+        emitSwitchFinalBranches(cc, types, sectionCCs, finalBBName);
     var returnTypes = finalBranchesRes.returnTypes;
     var updatedEntities = finalBranchesRes.updatedEntities;
     String returnTypeString = finalBranchesRes.returnTypesString;
@@ -390,9 +395,9 @@ class StatementSwitch extends CoreDslSwitch<Object> {
 
     var elseCC = cc.createDerivedCC();
 
-    new StatementSwitch(thenCC).doSwitch(ifStmt.getThenBody());
+    new StatementSwitch(thenCC, types).doSwitch(ifStmt.getThenBody());
     if (hasElse)
-      new StatementSwitch(elseCC).doSwitch(ifStmt.getElseBody());
+      new StatementSwitch(elseCC, types).doSwitch(ifStmt.getElseBody());
 
     // Check if the entities are present in `cc`. If not, they're local
     // variables that cannot be live outside the branch.
@@ -458,8 +463,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // Simulate construction to find loop-carried values, in lieu of proper
     // analysis.
     var simCC = cc.createDerivedCC();
-    var simExprSwitch = new ExpressionSwitch(simCC);
-    var simStmtSwitch = new StatementSwitch(simCC);
+    var simExprSwitch = new ExpressionSwitch(simCC, types);
+    var simStmtSwitch = new StatementSwitch(simCC, types);
 
     var startDecl = loop.getStartDeclaration();
     var startExpr = loop.getStartExpression();
@@ -469,7 +474,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
       simExprSwitch.doSwitch(startExpr);
     simExprSwitch.doSwitch(loop.getCondition());
     simStmtSwitch.doSwitch(loop.getBody());
-    loop.getLoopExpressions().forEach(new ExpressionSwitch(simCC)::doSwitch);
+    loop.getLoopExpressions().forEach(
+        new ExpressionSwitch(simCC, types)::doSwitch);
 
     var res = new LinkedList<>(simCC.getUpdatedEntities());
     // Filter out variables declared inside the loop.
@@ -588,7 +594,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var iterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var results = new LinkedList<MLIRValue>();
     for (var v : iterArgVars) {
-      var type = MLIRType.mapType(ac.getDeclaredType(v));
+      var type = types.mapType(ac.getDeclaredType(v));
       iterArgTypes.add(type);
 
       forCC.setValue(v, forCC.makeAnonymousValue(type));
@@ -598,7 +604,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     }
 
     // Recurse into loop body.
-    new StatementSwitch(forCC).doSwitch(loop.getBody());
+    new StatementSwitch(forCC, types).doSwitch(loop.getBody());
 
     // Forward the loop's CoreDSL attributes as discardable attributes; scf.for
     // prints its attribute dict after the body region (like coredsl.always).
@@ -673,7 +679,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var afterArgs = new LinkedHashMap<NamedEntity, MLIRValue>();
     var results = new LinkedList<MLIRValue>();
     for (var v : loopCarriedVars) {
-      var type = MLIRType.mapType(ac.getDeclaredType(v));
+      var type = types.mapType(ac.getDeclaredType(v));
       argTypes.add(type);
 
       beforeCC.setValue(v, beforeCC.makeAnonymousValue(type));
@@ -688,7 +694,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     var argTypesStr =
         argTypes.stream().map(Object::toString).collect(joining(", "));
 
-    var cond = new ExpressionSwitch(beforeCC).doSwitch(condExpr);
+    var cond = new ExpressionSwitch(beforeCC, types).doSwitch(condExpr);
     var condCast = beforeCC.makeI1Cast(cond);
     var beforeCondVals =
         loopCarriedVars.stream().map(beforeCC::getValue).toList();
@@ -697,10 +703,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         beforeCondVals.stream().map(Object::toString).collect(joining(", ")),
         argTypesStr);
 
-    var bodySwitch = new StatementSwitch(afterCC);
+    var bodySwitch = new StatementSwitch(afterCC, types);
     bodySwitch.doSwitch(bodyStmt);
 
-    var loopExprSwitch = new ExpressionSwitch(afterCC);
+    var loopExprSwitch = new ExpressionSwitch(afterCC, types);
     loopExprs.forEach(loopExprSwitch::doSwitch);
 
     var afterYieldVals =
@@ -741,7 +747,7 @@ class StatementSwitch extends CoreDslSwitch<Object> {
   @Override
   public Object caseSpawnStatement(SpawnStatement spawn) {
     var spawnCC = cc.createDerivedCC();
-    new StatementSwitch(spawnCC).doSwitch(spawn.getBody());
+    new StatementSwitch(spawnCC, types).doSwitch(spawn.getBody());
     spawnCC.emitLn("coredsl.end");
     cc.emitLn("coredsl.spawn {\n%s}",
               spawnCC.getStringBuilder().toString().indent(N_SPACES));

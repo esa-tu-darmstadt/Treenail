@@ -34,10 +34,12 @@ import org.eclipse.emf.ecore.EObject;
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private final AnalysisContext ac;
   private final ConstructionContext cc;
+  private final ISATypes types;
 
-  ExpressionSwitch(ConstructionContext cc) {
+  ExpressionSwitch(ConstructionContext cc, ISATypes types) {
     this.ac = cc.getAnalysisContext();
     this.cc = cc;
+    this.types = types;
   }
 
   class StoreSwitch extends CoreDslSwitch<MLIRValue> {
@@ -161,7 +163,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     @Override
     public MLIRValue caseEntityReference(EntityReference reference) {
       var entity = reference.getTarget();
-      var type = MLIRType.mapType(ac.getDeclaredType(entity));
+      var type = types.mapType(ac.getDeclaredType(entity));
       var castValue = type instanceof MLIRIntType intType
                           ? cc.makeCast(newValue, intType)
                           : newValue;
@@ -202,7 +204,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var targetType = ac.getExpressionType(target);
       var isBitAccess = targetType.isIntegerType();
 
-      var accessType = MLIRType.mapType(ac.getExpressionType(access));
+      var accessType = types.mapType(ac.getExpressionType(access));
       var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
                                         targetType, cc, ExpressionSwitch.this);
       final boolean isTopLevel = !isNestedLvalue;
@@ -300,8 +302,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     @Override
     public MLIRValue
     caseMemberAccessExpression(MemberAccessExpression memberAccess) {
-      final var accessType =
-          MLIRType.mapType(ac.getExpressionType(memberAccess));
+      final var accessType = types.mapType(ac.getExpressionType(memberAccess));
       final boolean isTopLevel = !isNestedLvalue;
       final String memberName = memberAccess.getDeclarator().getName();
       MLIRValue resultValue = null;
@@ -309,7 +310,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var targetEntity = targetEntityRef.getTarget();
         var entityVal = cc.getValue(targetEntity);
         var declaredType = ac.getDeclaredType(targetEntity);
-        var structType = MLIRStructType.mapType(declaredType);
+        var structType = types.mapStructType(declaredType);
         assert declaredType.isStructType()
             : "NYI: Member access to union registers";
         final boolean isArchitecturalState = entityVal == null;
@@ -434,7 +435,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       // It's a local variable, retrieve its last definition.
       return cc.getValue(entity);
 
-    var type = MLIRType.mapType(ac.getDeclaredType(entity));
+    var type = types.mapType(ac.getDeclaredType(entity));
     if (cc.isConstant(reference)) {
       assert type instanceof MLIRIntType
           : "NYI: Struct / Array / Union / Enum constants";
@@ -455,7 +456,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     // type of the expression that is indexed into, and the presence of an end
     // index (i.e. it's a range index).
 
-    var type = MLIRType.mapType(ac.getExpressionType(access));
+    var type = types.mapType(ac.getExpressionType(access));
     var targetType = ac.getExpressionType(access.getTarget());
     var result = cc.makeAnonymousValue(type);
     var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
@@ -578,7 +579,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         emitRhsCC = elseCC;
       }
       assert yieldConstCC != emitRhsCC;
-      var rhs = new ExpressionSwitch(emitRhsCC).doSwitch(expr.getRight());
+      var rhs =
+          new ExpressionSwitch(emitRhsCC, types).doSwitch(expr.getRight());
       var hwarithBoolRhs = convertIntToBool(rhs, emitRhsCC);
 
       var constToYield = yieldConstCC.makeConst(constValToYield, type);
@@ -751,10 +753,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var elseCC = cc.createDerivedCC();
 
     var thenResult =
-        new ExpressionSwitch(thenCC).doSwitch(expr.getThenExpression());
+        new ExpressionSwitch(thenCC, types).doSwitch(expr.getThenExpression());
     var thenRetVal = thenCC.makeCast(thenResult, type);
     var elseResult =
-        new ExpressionSwitch(elseCC).doSwitch(expr.getElseExpression());
+        new ExpressionSwitch(elseCC, types).doSwitch(expr.getElseExpression());
     var elseRetVal = elseCC.makeCast(elseResult, type);
     var retVal = emitConditionalWithSideEffects(cc, cast, thenCC, elseCC,
                                                 thenRetVal, elseRetVal);
@@ -783,8 +785,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var funcTy = ac.getFunctionSignature((FunctionDefinition)callee);
 
     var args = call.getArguments().stream().map(this::doSwitch).toList();
-    var argTys =
-        funcTy.getParamTypes().stream().map(MLIRType::mapType).toList();
+    var argTys = funcTy.getParamTypes().stream().map(types::mapType).toList();
     var argsCastStr = Streams
                           .zip(args.stream(), argTys.stream(),
                                (arg, ty) -> {
@@ -804,7 +805,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return cc.makeAnonymousValue(MLIRType.VOID);
     }
 
-    var retTy = MLIRType.mapType(funcTy.getReturnType());
+    var retTy = types.mapType(funcTy.getReturnType());
     var retVal = cc.makeAnonymousValue(retTy);
     cc.emitLn("%s = func.call @%s(%s) : (%s) -> %s", retVal, callee.getName(),
               argsCastStr, argTysStr, retTy);

@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 class ConstructionContext {
   private final Set<NamedEntity> updatedEntities = new LinkedHashSet<>();
 
+  private final ISATypes types;
   private final Map<NamedEntity, MLIRValue> values;
   private final AtomicInteger valueCounter;
   private final AnalysisContext ac;
@@ -26,9 +27,10 @@ class ConstructionContext {
 
   private boolean terminatorWasEmitted = false;
 
-  ConstructionContext(Map<NamedEntity, MLIRValue> values,
+  ConstructionContext(ISATypes types, Map<NamedEntity, MLIRValue> values,
                       AtomicInteger valueCounter, AnalysisContext ac,
                       StringBuilder sb) {
+    this.types = types;
     this.values = values;
     this.valueCounter = valueCounter;
     this.ac = ac;
@@ -168,7 +170,7 @@ class ConstructionContext {
   MLIRValue getOrLoad(NamedEntity entity) {
     var mlirValue = getValue(entity);
     if (mlirValue == null) {
-      var type = MLIRType.mapType(ac.getDeclaredType(entity));
+      var type = types.mapType(ac.getDeclaredType(entity));
       mlirValue = makeAnonymousValue(type);
       emitLn("%s = coredsl.get @%s : %s", mlirValue, entity.getName(), type);
     }
@@ -204,7 +206,7 @@ class ConstructionContext {
 
   // Create a ConstructionContext with a copy of the current value map
   ConstructionContext createDerivedCC() {
-    return new ConstructionContext(new LinkedHashMap<>(values),
+    return new ConstructionContext(types, new LinkedHashMap<>(values),
                                    new AtomicInteger(getValueCounter()), ac,
                                    new StringBuilder());
   }

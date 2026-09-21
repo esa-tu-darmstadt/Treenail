@@ -29,32 +29,9 @@ class MLIRStructType extends MLIRType {
     return sb.toString();
   }
 
-  private MLIRStructType(LinkedHashMap<String, MLIRType> members) {
+  MLIRStructType(LinkedHashMap<String, MLIRType> members) {
     this.members = members;
     this.mlirTypeString = createStructTypeString(members);
-  }
-
-  private static final LinkedHashMap<String, MLIRStructType> types =
-      new LinkedHashMap<>();
-  public static MLIRStructType getType(String typeName) {
-    assert types.containsKey(typeName) : "Unknown struct type " + typeName;
-    return types.get(typeName);
-  }
-  public static void
-  registerStructType(String name, LinkedHashMap<String, MLIRType> members) {
-    // Because types is static, it may read the same structs multiple times in
-    // the tests. Thus, we want to check if in any case a struct is redefined
-    // with different members.
-    assert !types.containsKey(name) || types.get(name).members.equals(members)
-        : "Redefinition of type with different members";
-    types.put(name, new MLIRStructType(members));
-  }
-
-  public static MLIRStructType mapType(CoreDslType type) {
-    assert type.isStructType();
-    // toString() returns "struct <name>", but we only need the name
-    String structName = type.toString().substring(7);
-    return MLIRStructType.getType(structName);
   }
 
   public MLIRType getMemberType(String memberName) {
