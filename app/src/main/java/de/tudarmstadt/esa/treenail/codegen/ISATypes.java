@@ -15,8 +15,9 @@ class ISATypes {
 
   void registerStructType(String name,
                           LinkedHashMap<String, MLIRType> members) {
-    assert !nameToStructType.containsKey(name) : ("Redefinition of struct " +
-                                                  "type");
+    assert !nameToStructType.containsKey(name)
+        : ("Redefinition of struct "
+           + "type");
     nameToStructType.put(name, new MLIRStructType(members));
   }
   MLIRStructType mapStructType(CoreDslType type) {
