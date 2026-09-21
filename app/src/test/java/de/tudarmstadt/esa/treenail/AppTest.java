@@ -1562,42 +1562,59 @@ class AppTest {
         %1 = coredsl.cast %rs1 : ui5 to ui32
         %2 = hw.struct_inject %0["x"], %1 : !hw.struct<x: ui32, y: ui32>
         coredsl.set @STRUCT_REG = %2 : !hw.struct<x: ui32, y: ui32>
-        %3 = hwarith.constant 1 : ui1
-        %4 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
-        %5 = hw.struct_extract %4["x"] : !hw.struct<x: ui32, y: ui32>
-        %6 = hwarith.sub %5, %3 : (ui32, ui1) -> si33
-        %7 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
-        %8 = coredsl.cast %6 : si33 to ui32
-        %9 = hw.struct_inject %7["x"], %8 : !hw.struct<x: ui32, y: ui32>
-        coredsl.set @STRUCT_REG = %9 : !hw.struct<x: ui32, y: ui32>
-        %10 = hwarith.constant 7 : ui3
-        %11 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %12 = hw.struct_extract %11["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %13 = coredsl.cast %10 : ui3 to ui32
-        %14 = hw.struct_inject %12["x"], %13 : !hw.struct<x: ui32, y: ui32>
-        %15 = hw.struct_inject %11["vec"], %14 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        coredsl.set @NESTED_STRUCT_REG = %15 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %16 = hwarith.constant 255 : ui8
-        %17 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
-        %18 = hw.struct_extract %17["x"] : !hw.struct<x: ui32, y: ui32>
-        %19 = coredsl.bitset %18[7:0] = %16 : (ui32, ui8) -> ui32
-        %20 = hw.struct_inject %17["x"], %19 : !hw.struct<x: ui32, y: ui32>
+        %3 = hwarith.constant 0 : ui32
+        %4 = hwarith.constant 0 : ui32
+        %5 = hw.struct_create (%3, %4) : !hw.struct<x: ui32, y: ui32>
+        %6 = hwarith.constant 0 : ui32
+        %7 = hwarith.constant 0 : ui32
+        %8 = hw.struct_create (%6, %7) : !hw.struct<x: ui32, y: ui32>
+        %9 = hwarith.constant 1 : ui1
+        %11 = hwarith.icmp eq %rs1, %9 : ui5, ui1
+        %10 = hwarith.cast %11 : (i1) -> ui1
+        %12 = coredsl.cast %10 : ui1 to i1
+        %13 = scf.if %12 -> (!hw.struct<x: ui32, y: ui32>) {
+          scf.yield %5 : !hw.struct<x: ui32, y: ui32>
+        } else {
+          scf.yield %8 : !hw.struct<x: ui32, y: ui32>
+        }
+        coredsl.set @STRUCT_REG = %13 : !hw.struct<x: ui32, y: ui32>
+        %14 = hwarith.constant 1 : ui1
+        %15 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %16 = hw.struct_extract %15["x"] : !hw.struct<x: ui32, y: ui32>
+        %17 = hwarith.sub %16, %14 : (ui32, ui1) -> si33
+        %18 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %19 = coredsl.cast %17 : si33 to ui32
+        %20 = hw.struct_inject %18["x"], %19 : !hw.struct<x: ui32, y: ui32>
         coredsl.set @STRUCT_REG = %20 : !hw.struct<x: ui32, y: ui32>
-        %21 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        coredsl.set @STRUCT_REGS[2] = %21 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %22 = hwarith.constant 10 : ui4
-        %23 = coredsl.get @STRUCT_REGS[%rs1 : ui5] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %24 = coredsl.cast %22 : ui4 to si32
-        %25 = hw.struct_inject %23["notNested"], %24 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        coredsl.set @STRUCT_REGS[%rs1 : ui5] = %25 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %26 = coredsl.get @STRUCT_REGS[31] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %21 = hwarith.constant 7 : ui3
+        %22 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %23 = hw.struct_extract %22["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %24 = coredsl.cast %21 : ui3 to ui32
+        %25 = hw.struct_inject %23["x"], %24 : !hw.struct<x: ui32, y: ui32>
+        %26 = hw.struct_inject %22["vec"], %25 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
         coredsl.set @NESTED_STRUCT_REG = %26 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %27 = coredsl.get @STRUCT_REGS[0] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
-        %28 = hw.struct_extract %27["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %27 = hwarith.constant 255 : ui8
+        %28 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
         %29 = hw.struct_extract %28["x"] : !hw.struct<x: ui32, y: ui32>
-        %30 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
-        %31 = hw.struct_inject %30["y"], %29 : !hw.struct<x: ui32, y: ui32>
+        %30 = coredsl.bitset %29[7:0] = %27 : (ui32, ui8) -> ui32
+        %31 = hw.struct_inject %28["x"], %30 : !hw.struct<x: ui32, y: ui32>
         coredsl.set @STRUCT_REG = %31 : !hw.struct<x: ui32, y: ui32>
+        %32 = coredsl.get @NESTED_STRUCT_REG : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @STRUCT_REGS[2] = %32 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %33 = hwarith.constant 10 : ui4
+        %34 = coredsl.get @STRUCT_REGS[%rs1 : ui5] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %35 = coredsl.cast %33 : ui4 to si32
+        %36 = hw.struct_inject %34["notNested"], %35 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @STRUCT_REGS[%rs1 : ui5] = %36 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %37 = coredsl.get @STRUCT_REGS[31] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @NESTED_STRUCT_REG = %37 : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %38 = coredsl.get @STRUCT_REGS[0] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %39 = hw.struct_extract %38["vec"] : !hw.struct<notNested: si32, vec: !hw.struct<x: ui32, y: ui32>>
+        %40 = hw.struct_extract %39["x"] : !hw.struct<x: ui32, y: ui32>
+        %41 = coredsl.get @STRUCT_REG : !hw.struct<x: ui32, y: ui32>
+        %42 = hw.struct_inject %41["y"], %40 : !hw.struct<x: ui32, y: ui32>
+        coredsl.set @STRUCT_REG = %42 : !hw.struct<x: ui32, y: ui32>
+        %43 = coredsl.get @STRUCT_REGS[%rs1 : ui5, 0:10] : ui1056
     """));
     // clang-format on
   }
