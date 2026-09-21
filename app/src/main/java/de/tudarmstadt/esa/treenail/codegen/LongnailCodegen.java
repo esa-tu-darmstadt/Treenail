@@ -263,7 +263,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       var arType = (ArrayType)type;
       var elementType = arType.elementType;
       var numElements = arType.count;
-      var width = elementType.getBitSize();
 
       assert !elementType.isArrayType() : "NYI : Multi-dimensional registers";
 
