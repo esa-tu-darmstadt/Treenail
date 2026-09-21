@@ -296,8 +296,8 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     } else if (type.isStructType()) {
       assert init == null : "NYI: initializers for struct registers";
       var structType = MLIRStructType.mapType(type);
-      return format("coredsl.register %s%s%s @%s : %s", protoStr, constStr,
-                    volatileStr, name, structType);
+      return format("coredsl.register %s%s%s @%s : %s%s\n", protoStr, constStr,
+                    volatileStr, name, structType, attrStr);
     } else {
       assert false : "NYI: Union / Enum registers";
     }
