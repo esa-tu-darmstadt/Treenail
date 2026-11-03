@@ -1618,4 +1618,14 @@ class AppTest {
     """));
     // clang-format on
   }
+
+  @Test
+  void unionsWork() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("unions.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+    assertFalse(true);
+  }
 }

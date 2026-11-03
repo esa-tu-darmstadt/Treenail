@@ -1,0 +1,24 @@
+InstructionSet Unions {
+  architectural_state {
+
+  }
+
+  functions {
+
+  }
+
+  instructions {
+    UnionLocalVals {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+
+      }
+    }
+    UnionReg {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+
+      }
+    }
+  }
+}
