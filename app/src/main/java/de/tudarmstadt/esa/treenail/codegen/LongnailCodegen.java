@@ -16,7 +16,6 @@ import com.minres.coredsl.coreDsl.Declarator;
 import com.minres.coredsl.coreDsl.DescriptionContent;
 import com.minres.coredsl.coreDsl.Encoding;
 import com.minres.coredsl.coreDsl.EntityReference;
-import com.minres.coredsl.coreDsl.EnumTypeDeclaration;
 import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.ExpressionInitializer;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
@@ -31,6 +30,7 @@ import com.minres.coredsl.coreDsl.TypeQualifier;
 import com.minres.coredsl.coreDsl.UnionTypeDeclaration;
 import com.minres.coredsl.type.AddressSpaceType;
 import com.minres.coredsl.type.ArrayType;
+import com.minres.coredsl.type.EnumType;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -170,8 +170,6 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         types.registerStructType(structDecl.getName(), members);
       } else if (typeDecl instanceof UnionTypeDeclaration) {
         assert false : "NYI: Unions";
-      } else if (typeDecl instanceof EnumTypeDeclaration) {
-        assert false : "NYI: Enums";
       }
     }
     for (var stmt : isa.getArchStateBody()) {
@@ -236,6 +234,12 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
                               ISATypes types) {
     var name = dtor.getName();
     var type = ctx.getDeclaredType(dtor);
+    // Because enums are just integers, just use the baseType and treat it as
+    // an integer
+    if (type.isEnumType()) {
+      var enumType = (EnumType)type;
+      type = enumType.baseType;
+    }
     var init = dtor.getInitializer();
 
     var protoStr = "local";
@@ -300,7 +304,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       return format("coredsl.register %s%s%s @%s : %s%s\n", protoStr, constStr,
                     volatileStr, name, structType, attrStr);
     } else {
-      assert false : "NYI: Union / Enum registers";
+      assert false : "NYI: Union registers";
     }
     assert false : "Should be unreachable";
     return null;

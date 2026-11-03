@@ -1,6 +1,8 @@
 package de.tudarmstadt.esa.treenail.codegen;
 
 import com.minres.coredsl.type.CoreDslType;
+import com.minres.coredsl.type.EnumType;
+
 import java.util.LinkedHashMap;
 
 class ISATypes {
@@ -29,6 +31,9 @@ class ISATypes {
   MLIRType mapType(CoreDslType type) {
     if (type.isIntegerType()) {
       return MLIRIntType.mapType(type);
+    } else if (type.isEnumType()) {
+      var enumType = (EnumType)type;
+      return MLIRIntType.mapType(enumType.baseType);
     } else if (type.isStructType()) {
       return mapStructType(type);
     }
