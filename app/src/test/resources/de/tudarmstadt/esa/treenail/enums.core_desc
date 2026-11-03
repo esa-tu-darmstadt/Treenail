@@ -1,0 +1,37 @@
+Core EnumTest {
+  architectural_state {
+    enum MyEnum {
+      ENUM_VAL_0,
+      ENUM_VAL_1 = 10,
+      ENUM_VAL_2,
+      ENUM_VAL_3 = 37,
+      ENUM_VAL_4,
+    }
+    register enum MyEnum STATE = ENUM_VAL_0;
+  }
+
+  instructions {
+    StructReg {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+        switch (imm) {
+          case 0:
+            STATE = ENUM_VAL_0;
+            break;
+          case 1:
+            STATE = ENUM_VAL_1;
+            break;
+          case 2:
+            STATE = ENUM_VAL_2;
+            break;
+          case 3:
+            STATE = ENUM_VAL_3;
+            break;
+          case 4:
+            STATE = ENUM_VAL_4;
+            break;
+        }
+      }
+    }
+  }
+}

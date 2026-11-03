@@ -1618,4 +1618,48 @@ class AppTest {
     """));
     // clang-format on
   }
+
+  @Test
+  void enumsWork() {
+    var appInst = App.getInstance();
+    var fileName = getClass().getResource("enums.core_desc").getPath();
+    var content = appInst.parse(fileName);
+    var mlirCode = appInst.generateMLIR(content);
+    assertNotNull(mlirCode);
+
+    assertTrue(mlirCode.contains("""
+        scf.execute_region {
+          cf.switch %0 : i13, [
+            default: ^switch_end,
+            0: ^case_0,
+            1: ^case_1,
+            2: ^case_2,
+            3: ^case_3,
+            4: ^case_4
+          ]
+          ^case_0():
+            %1 = hwarith.constant 0 : ui6
+            coredsl.set @STATE = %1 : ui6
+            cf.br ^switch_end
+          ^case_1():
+            %2 = hwarith.constant 10 : ui6
+            coredsl.set @STATE = %2 : ui6
+            cf.br ^switch_end
+          ^case_2():
+            %3 = hwarith.constant 11 : ui6
+            coredsl.set @STATE = %3 : ui6
+            cf.br ^switch_end
+          ^case_3():
+            %4 = hwarith.constant 37 : ui6
+            coredsl.set @STATE = %4 : ui6
+            cf.br ^switch_end
+          ^case_4():
+            %5 = hwarith.constant 38 : ui6
+            coredsl.set @STATE = %5 : ui6
+            cf.br ^switch_end
+          ^switch_end():
+            scf.yield
+        }
+    """));
+  }
 }
