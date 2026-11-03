@@ -320,10 +320,15 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
 
     assert type.isAddressSpaceType() : "NYI: Single-element address 'spaces'";
     var asType = (AddressSpaceType)type;
-    assert asType.elementType.isIntegerType()
+    assert asType.elementType.isIntegerType() || asType.elementType.isEnumType()
         : "CoreDSL does not support multi-dimensional address spaces";
 
-    var width = asType.elementType.getBitSize();
+    var elementType = asType.elementType;
+    if (elementType.isEnumType()) {
+      var enumType = (EnumType)elementType;
+      elementType = enumType.baseType;
+    }
+    var width = elementType.getBitSize();
     var numElements = asType.count;
     var proto = "";
     var addressWidth = -1;
@@ -350,7 +355,7 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
         attrDictOrEmpty(" ", coreDslAttrEntries(ctx, dtor.getAttributes()));
     return format("coredsl.addrspace %s%s%s @%s : (ui%d) -> %s%s\n", proto,
                   constString, volatileString, name, addressWidth,
-                  MLIRIntType.mapType(asType.elementType), attrStr);
+                  MLIRIntType.mapType(elementType), attrStr);
   }
 
   private String emitAlias(Declarator dtor, boolean isConst, boolean isVolatile,
