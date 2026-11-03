@@ -185,10 +185,14 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     for (var xCC : condCCs) {
       var values = xCC.getValues();
       var yieldValues = updatedEntities.stream().map(values::get).toList();
-      var yieldValuesStr =
-          yieldValues.stream().map(Object::toString).collect(joining(", "));
-      xCC.emitLn("cf.br %s(%s : %s)", finalBBName, yieldValuesStr,
-                 returnTypesStr);
+      if (yieldValues.isEmpty()) {
+        xCC.emitLn("cf.br %s", finalBBName);
+      } else {
+        var yieldValuesStr =
+                yieldValues.stream().map(Object::toString).collect(joining(", "));
+        xCC.emitLn("cf.br %s(%s : %s)", finalBBName, yieldValuesStr,
+                returnTypesStr);
+      }
     }
     // Input values to the final cc which will immediately be yielded
     var resultValues = returnTypes.stream()
@@ -340,17 +344,24 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     // operations require the region to only consist of one block.
     // This is not required for top-level switch statements, but it's easier to
     // do this in a uniform way
-    cc.emitLn("%s = scf.execute_region -> (%s) {", returnValuesString,
+    if (updatedEntities.isEmpty()) {
+      cc.emitLn("scf.execute_region {");
+    } else {
+      cc.emitLn("%s = scf.execute_region -> (%s) {", returnValuesString,
               returnTypeString);
+    }
     cc.emitLn("  cf.switch %s : i%d, [", condValSignless, condWidth);
     // The default case must be the first in the list
     if (gotDefaultCase) {
       cc.emit("    default: %s", defaultBBName);
     } else {
-      String finalBBInputs =
-          oldReturnValues.stream().map(Object::toString).collect(joining(", "));
-      cc.emit("    default: %s(%s : %s)", finalBBName, finalBBInputs,
-              returnTypeString);
+      String bbArgs = "";
+      if (!oldReturnValues.isEmpty()) {
+        String finalBBInputs =
+                oldReturnValues.stream().map(Object::toString).collect(joining(", "));
+        bbArgs = format("(%s : %s)", finalBBInputs, returnTypeString);
+      }
+      cc.emit("    default: %s%s", finalBBName, bbArgs);
     }
     assert sectionBBNames.size() == sectionValStrings.size();
     for (int i = 0; i < sectionValStrings.size(); ++i) {
@@ -377,9 +388,13 @@ class StatementSwitch extends CoreDslSwitch<Object> {
             .map((MLIRValue val) -> val.toString() + ": " + val.type.toString())
             .collect(joining(", "));
     cc.emitLn("  %s(%s):", finalBBName, typedYieldedValueString);
-    String yieldedValueString =
-        yieldValues.stream().map(Object::toString).collect(joining(", "));
-    cc.emitLn("    scf.yield %s : %s", yieldedValueString, returnTypeString);
+    var yieldArgString = "";
+    if (!yieldValues.isEmpty()) {
+      String yieldedValueString =
+              yieldValues.stream().map(Object::toString).collect(joining(", "));
+      yieldArgString = format(" %s : %s", yieldedValueString, returnTypeString);
+    }
+    cc.emitLn("    scf.yield%s", yieldArgString);
     cc.emitLn("}");
     return this;
   }
