@@ -24,6 +24,7 @@ import com.minres.coredsl.coreDsl.ReturnStatement;
 import com.minres.coredsl.coreDsl.SpawnStatement;
 import com.minres.coredsl.coreDsl.SwitchStatement;
 import com.minres.coredsl.coreDsl.util.CoreDslSwitch;
+import com.minres.coredsl.type.EnumType;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -75,6 +76,10 @@ class StatementSwitch extends CoreDslSwitch<Object> {
     for (var dtor : decl.getDeclarators()) {
       assert ac.getStorageClass(dtor) == StorageClass.local;
       var type = ac.getDeclaredType(dtor);
+      if (type.isEnumType()) {
+        var enumType = (EnumType)type;
+        type = enumType.baseType;
+      }
       if (type.isIntegerType()) {
         var init = dtor.getInitializer();
         if (init == null) {
