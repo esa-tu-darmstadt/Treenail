@@ -9,6 +9,7 @@ Core EnumTest {
     }
     register enum MyEnum STATE = ENUM_VAL_0;
     register enum MyEnum STATES[32];
+    extern enum MyEnum ENUM_MEM[1 << 32] [[is_main_mem]];
   }
 
   instructions {
@@ -26,7 +27,7 @@ Core EnumTest {
             STATE = ENUM_VAL_2;
             break;
           case 3:
-            STATE = ENUM_VAL_3;
+            ENUM_MEM[42] = ENUM_VAL_3;
             break;
           case 4:
             STATES[0] = ENUM_VAL_4;

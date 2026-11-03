@@ -1690,7 +1690,7 @@ class AppTest {
             cf.br ^switch_end
           ^case_3():
             %4 = hwarith.constant 37 : ui6
-            coredsl.set @STATE = %4 : ui6
+            coredsl.set @ENUM_MEM[42] = %4 : ui6
             cf.br ^switch_end
           ^case_4():
             %5 = hwarith.constant 38 : ui6
