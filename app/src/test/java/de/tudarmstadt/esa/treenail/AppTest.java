@@ -1700,5 +1700,37 @@ class AppTest {
             scf.yield
         }
     """));
+    assertTrue(mlirCode.contains("""
+        %0 = coredsl.get @STATE : ui6
+        %1 = coredsl.get @ENUM_MEM[0] : ui6
+        %2 = coredsl.get @STATES[31] : ui6
+        %4 = hwarith.icmp eq %0, %1 : ui6, ui6
+        %3 = hwarith.cast %4 : (i1) -> ui1
+        %5 = coredsl.cast %3 : ui1 to i1
+        %6, %7 = scf.if %5 -> (ui6, ui6) {
+          %6 = hwarith.constant 0 : ui6
+          scf.yield %6, %1 : ui6, ui6
+        } else {
+          %7 = hwarith.icmp eq %0, %2 : ui6, ui6
+          %6 = hwarith.cast %7 : (i1) -> ui1
+          %8 = coredsl.cast %6 : ui1 to i1
+          %9 = scf.if %8 -> (ui6) {
+            %9 = hwarith.constant 10 : ui6
+            scf.yield %9 : ui6
+          } else {
+            scf.yield %1 : ui6
+          }
+          scf.yield %2, %9 : ui6, ui6
+        }
+        %9 = hwarith.icmp eq %7, %6 : ui6, ui6
+        %8 = hwarith.cast %9 : (i1) -> ui1
+        %10 = coredsl.cast %8 : ui1 to i1
+        scf.if %10 {
+          coredsl.set @STATE = %7 : ui6
+        } else {
+          %11 = hwarith.constant 38 : ui6
+          coredsl.set @STATE = %11 : ui6
+        }
+    """));
   }
 }

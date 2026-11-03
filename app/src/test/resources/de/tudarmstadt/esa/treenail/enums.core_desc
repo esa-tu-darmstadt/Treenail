@@ -11,9 +11,8 @@ Core EnumTest {
     register enum MyEnum STATES[32];
     extern enum MyEnum ENUM_MEM[1 << 32] [[is_main_mem]];
   }
-
   instructions {
-    StructReg {
+    EnumReg {
       encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
       behavior: {
         switch (imm) {
@@ -32,6 +31,25 @@ Core EnumTest {
           case 4:
             STATES[0] = ENUM_VAL_4;
             break;
+        }
+      }
+    }
+
+    LocalEnumVal {
+      encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
+      behavior: {
+        enum MyEnum val1 = STATE;
+        enum MyEnum val2 = ENUM_MEM[0];
+        enum MyEnum val3 = STATES[31];
+        if (val1 == val2) {
+          val3 = ENUM_VAL_0;
+        } else if (val1 == val3) {
+          val2 = ENUM_VAL_1;
+        }
+        if (val2 == val3) {
+          STATE = val2;
+        } else {
+          STATE = ENUM_VAL_4;
         }
       }
     }
