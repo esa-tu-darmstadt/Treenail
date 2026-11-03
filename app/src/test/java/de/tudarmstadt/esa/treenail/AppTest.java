@@ -1059,6 +1059,45 @@ class AppTest {
           coredsl.set @MEM[1:0] = %3 : ui16
           coredsl.set @MEM[2] = %4 : ui8
       """));
+    // NoResultValues
+    assertTrue(mlirCode.contains("""
+        scf.execute_region {
+          cf.switch %0 : i6, [
+            default: ^switch_end,
+            0: ^case_0,
+            1: ^case_1,
+            2: ^case_2,
+            3: ^case_3,
+            4: ^case_4
+          ]
+          ^case_0():
+            %1 = hwarith.constant 42 : ui6
+            %2 = coredsl.cast %1 : ui6 to ui32
+            coredsl.set @X[0] = %2 : ui32
+            cf.br ^switch_end
+          ^case_1():
+            %3 = hwarith.constant 123 : ui7
+            %4 = coredsl.cast %3 : ui7 to ui32
+            coredsl.set @X[0] = %4 : ui32
+            cf.br ^switch_end
+          ^case_2():
+            %5 = hwarith.constant 3735928559 : ui32
+            coredsl.set @X[0] = %5 : ui32
+            cf.br ^switch_end
+          ^case_3():
+            %6 = hwarith.constant 24 : ui5
+            %7 = coredsl.cast %6 : ui5 to ui32
+            coredsl.set @X[0] = %7 : ui32
+            cf.br ^switch_end
+          ^case_4():
+            %8 = hwarith.constant 7 : ui3
+            %9 = coredsl.cast %8 : ui3 to ui32
+            coredsl.set @X[1] = %9 : ui32
+            cf.br ^switch_end
+          ^switch_end():
+            scf.yield
+        }
+    """));
     // clang-format on
   }
 
