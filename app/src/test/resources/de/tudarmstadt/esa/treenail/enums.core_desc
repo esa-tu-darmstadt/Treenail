@@ -8,6 +8,7 @@ Core EnumTest {
       ENUM_VAL_4,
     }
     register enum MyEnum STATE = ENUM_VAL_0;
+    register enum MyEnum STATES[32];
   }
 
   instructions {
@@ -28,7 +29,7 @@ Core EnumTest {
             STATE = ENUM_VAL_3;
             break;
           case 4:
-            STATE = ENUM_VAL_4;
+            STATES[0] = ENUM_VAL_4;
             break;
         }
       }

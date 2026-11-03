@@ -1694,7 +1694,7 @@ class AppTest {
             cf.br ^switch_end
           ^case_4():
             %5 = hwarith.constant 38 : ui6
-            coredsl.set @STATE = %5 : ui6
+            coredsl.set @STATES[0] = %5 : ui6
             cf.br ^switch_end
           ^switch_end():
             scf.yield
