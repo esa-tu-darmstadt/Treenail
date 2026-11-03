@@ -1666,6 +1666,13 @@ class AppTest {
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
 
+    // clang-format off
+    assertTrue(mlirCode.contains("""
+      func.func @enumIdentity(%returnMe : ui6) -> ui6 {
+        return %returnMe : ui6
+      }
+    """));
+    // EnumReg
     assertTrue(mlirCode.contains("""
         scf.execute_region {
           cf.switch %0 : i13, [
@@ -1700,6 +1707,7 @@ class AppTest {
             scf.yield
         }
     """));
+    // LocalEnumVal
     assertTrue(mlirCode.contains("""
         %0 = coredsl.get @STATE : ui6
         %1 = coredsl.get @ENUM_MEM[0] : ui6
@@ -1726,11 +1734,13 @@ class AppTest {
         %8 = hwarith.cast %9 : (i1) -> ui1
         %10 = coredsl.cast %8 : ui1 to i1
         scf.if %10 {
-          coredsl.set @STATE = %7 : ui6
+          %11 = func.call @enumIdentity(%7) : (ui6) -> ui6
+          coredsl.set @STATE = %11 : ui6
         } else {
           %11 = hwarith.constant 38 : ui6
           coredsl.set @STATE = %11 : ui6
         }
     """));
+    // clang-format on
   }
 }

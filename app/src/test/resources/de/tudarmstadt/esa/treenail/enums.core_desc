@@ -11,6 +11,11 @@ Core EnumTest {
     register enum MyEnum STATES[32];
     extern enum MyEnum ENUM_MEM[1 << 32] [[is_main_mem]];
   }
+  functions {
+    enum MyEnum enumIdentity(enum MyEnum returnMe) {
+      return returnMe;
+    }
+  }
   instructions {
     EnumReg {
       encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
@@ -47,7 +52,7 @@ Core EnumTest {
           val2 = ENUM_VAL_1;
         }
         if (val2 == val3) {
-          STATE = val2;
+          STATE = enumIdentity(val2);
         } else {
           STATE = ENUM_VAL_4;
         }
