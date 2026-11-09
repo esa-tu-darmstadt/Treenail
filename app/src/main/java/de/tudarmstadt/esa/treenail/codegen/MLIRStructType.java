@@ -10,7 +10,8 @@ class MLIRStructType extends MLIRStructUnionCommon {
 
   MLIRStructType(LinkedHashMap<String, MLIRType> members) {
     this.members = members;
-    this.mlirTypeString = MLIRStructUnionCommon.createStructUnionTypeString("struct", members);
+    this.mlirTypeString =
+        MLIRStructUnionCommon.createStructUnionTypeString("struct", members);
   }
 
   @Override

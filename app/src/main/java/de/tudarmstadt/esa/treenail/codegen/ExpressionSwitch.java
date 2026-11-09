@@ -157,7 +157,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
         var resultValue = cc.makeAnonymousValue(unionVal.type);
-        cc.emitLn("%s = hw.union_create \"%s\", %s : %s", resultValue, memberName, toStore, resultValue.type);
+        cc.emitLn("%s = hw.union_create \"%s\", %s : %s", resultValue,
+                  memberName, toStore, resultValue.type);
         return resultValue;
       }
     }
@@ -323,7 +324,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return returnValue;
     }
 
-    static StoreOperation createStructUnionStore(MLIRValue entityVal, String memberName) {
+    static StoreOperation createStructUnionStore(MLIRValue entityVal,
+                                                 String memberName) {
       if (entityVal.type instanceof MLIRStructType) {
         return new StructMemberStore(entityVal, memberName);
       } else {
@@ -358,12 +360,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           resultValue = cc.emitMemberExtract(entityVal, memberName);
         }
         assert entityVal != null;
-        storeStack.push(new DirectNamedEntityStore(targetEntity, structOrUnion));
+        storeStack.push(
+            new DirectNamedEntityStore(targetEntity, structOrUnion));
         storeStack.push(createStructUnionStore(entityVal, memberName));
       } else {
         isNestedLvalue = true;
         var valueToStore = doSwitch(memberAccess.getTarget());
-        assert valueToStore.type instanceof MLIRStructType || valueToStore.type instanceof MLIRUnionType;
+        assert valueToStore.type instanceof MLIRStructType ||
+            valueToStore.type instanceof MLIRUnionType;
         if (!isTopLevel) {
           resultValue = cc.emitMemberExtract(valueToStore, memberName);
         }
@@ -843,7 +847,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   public MLIRValue
   caseMemberAccessExpression(MemberAccessExpression memberAccess) {
     var targetValue = doSwitch(memberAccess.getTarget());
-    assert targetValue.type instanceof MLIRStructUnionCommon : "Member access is only allowed for structs or unions";
+    assert targetValue.type instanceof MLIRStructUnionCommon
+        : "Member access is only allowed for structs or unions";
     var memberName = memberAccess.getDeclarator().getName();
     return cc.emitMemberExtract(targetValue, memberName);
   }
