@@ -61,6 +61,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         this.index = index;
       }
 
+      @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
         var resVal = cc.makeAnonymousValue(modifiedValue.type);
         cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s", resVal,
@@ -86,6 +87,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         this.bitAccessOldValue = bitAccessOldValue;
         this.accessType = accessType;
       }
+
+      @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
         var updatedValue = cc.makeAnonymousValue(destEntityType);
         cc.emitLn("%s = coredsl.bitset %s[%s] = %s : (%s, %s) -> %s",
@@ -112,6 +115,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         this.index = index;
       }
 
+      @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
         assert !cc.hasValue(destEntity) : "NYI: local arrays";
         cc.emitLn("coredsl.set @%s[%s] = %s : %s", destEntity.getName(), index,
@@ -129,6 +133,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         this.type = type;
       }
 
+      @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue value) {
         if (!cc.hasValue(destEntity)) {
           cc.emitLn("coredsl.set @%s = %s : %s", destEntity.getName(), value,
@@ -140,14 +145,33 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       }
     }
 
+    private static final class UnionMemberStore extends StoreOperation {
+      MLIRValue unionVal;
+      String memberName;
+      UnionMemberStore(MLIRValue unionVal, String memberName) {
+        assert unionVal.type instanceof MLIRUnionType;
+        this.unionVal = unionVal;
+        this.memberName = memberName;
+      }
+
+      @Override
+      MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
+        var resultValue = cc.makeAnonymousValue(unionVal.type);
+        cc.emitLn("%s = hw.union_create \"%s\", %s : %s", resultValue, memberName, toStore, resultValue.type);
+        return resultValue;
+      }
+    }
+
     private static final class StructMemberStore extends StoreOperation {
       MLIRValue structVal;
       String memberName;
       StructMemberStore(MLIRValue structVal, String memberName) {
+        assert structVal.type instanceof MLIRStructType;
         this.structVal = structVal;
         this.memberName = memberName;
       }
 
+      @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
         var resultValue = cc.makeAnonymousValue(structVal.type);
         cc.emitLn("%s = hw.struct_inject %s[\"%s\"], %s : %s", resultValue,
@@ -299,6 +323,15 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return returnValue;
     }
 
+    static StoreOperation createStructUnionStore(MLIRValue entityVal, String memberName) {
+      if (entityVal.type instanceof MLIRStructType) {
+        return new StructMemberStore(entityVal, memberName);
+      } else {
+        assert entityVal.type instanceof MLIRUnionType;
+        return new UnionMemberStore(entityVal, memberName);
+      }
+    }
+
     @Override
     public MLIRValue
     caseMemberAccessExpression(MemberAccessExpression memberAccess) {
@@ -310,39 +343,31 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var targetEntity = targetEntityRef.getTarget();
         var entityVal = cc.getValue(targetEntity);
         var declaredType = ac.getDeclaredType(targetEntity);
-        var structType = types.mapStructType(declaredType);
-        assert declaredType.isStructType()
-            : "NYI: Member access to union registers";
+        assert declaredType.isStructType() || declaredType.isUnionType();
+        var structOrUnion = types.mapStructOrUnionType(declaredType);
         final boolean isArchitecturalState = entityVal == null;
         if (isArchitecturalState) {
-          entityVal = cc.makeAnonymousValue(structType);
+          entityVal = cc.makeAnonymousValue(structOrUnion);
           cc.emitLn("%s = coredsl.get @%s : %s", entityVal,
-                    targetEntity.getName(), structType);
+                    targetEntity.getName(), structOrUnion);
         }
         resultValue = entityVal;
         // If this is top level, we don't need to extract the member because we
         // can write it directly
         if (!isTopLevel) {
-          resultValue =
-              cc.makeAnonymousValue(structType.getMemberType(memberName));
-          cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultValue,
-                    entityVal, memberName, entityVal.type);
+          resultValue = cc.emitMemberExtract(entityVal, memberName);
         }
         assert entityVal != null;
-        storeStack.push(new DirectNamedEntityStore(targetEntity, structType));
-        storeStack.push(new StructMemberStore(entityVal, memberName));
+        storeStack.push(new DirectNamedEntityStore(targetEntity, structOrUnion));
+        storeStack.push(createStructUnionStore(entityVal, memberName));
       } else {
         isNestedLvalue = true;
         var valueToStore = doSwitch(memberAccess.getTarget());
-        assert valueToStore.type instanceof MLIRStructType;
+        assert valueToStore.type instanceof MLIRStructType || valueToStore.type instanceof MLIRUnionType;
         if (!isTopLevel) {
-          var structType = (MLIRStructType)valueToStore.type;
-          resultValue =
-              cc.makeAnonymousValue(structType.getMemberType(memberName));
-          cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultValue,
-                    valueToStore, memberName, valueToStore.type);
+          resultValue = cc.emitMemberExtract(valueToStore, memberName);
         }
-        storeStack.push(new StructMemberStore(valueToStore, memberName));
+        storeStack.push(createStructUnionStore(valueToStore, memberName));
       }
       if (isTopLevel) {
         return resolveStoreStack(accessType);
@@ -817,16 +842,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   @Override
   public MLIRValue
   caseMemberAccessExpression(MemberAccessExpression memberAccess) {
-    var targetStruct = doSwitch(memberAccess.getTarget());
-    assert targetStruct.type instanceof MLIRStructType
-        : "NYI: union member access";
-    var structType = (MLIRStructType)targetStruct.type;
+    var targetValue = doSwitch(memberAccess.getTarget());
+    assert targetValue.type instanceof MLIRStructUnionCommon : "Member access is only allowed for structs or unions";
     var memberName = memberAccess.getDeclarator().getName();
-    var resultType = structType.getMemberType(memberName);
-    var resultVal = cc.makeAnonymousValue(resultType);
-    cc.emitLn("%s = hw.struct_extract %s[\"%s\"] : %s", resultVal, targetStruct,
-              memberName, structType);
-    return resultVal;
+    return cc.emitMemberExtract(targetValue, memberName);
   }
 
   @Override
