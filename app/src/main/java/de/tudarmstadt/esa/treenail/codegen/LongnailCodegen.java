@@ -303,13 +303,13 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
       return format("coredsl.register %s%s%s @%s[%d]%s : %s%s\n", protoStr,
                     constStr, volatileStr, name, numElements, initStr,
                     mappedElementType, attrStr);
-    } else if (type.isStructType()) {
-      assert init == null : "NYI: initializers for struct registers";
-      var structType = types.mapStructType(type);
+    } else if (type.isStructType() || type.isUnionType()) {
+      assert init == null : "NYI: initializers for struct or union registers";
+      var structType = types.mapStructOrUnionType(type);
       return format("coredsl.register %s%s%s @%s : %s%s\n", protoStr, constStr,
                     volatileStr, name, structType, attrStr);
     } else {
-      assert false : "NYI: Union / Enum registers";
+      assert false : "NYI: Enum registers";
     }
     assert false : "Should be unreachable";
     return null;
