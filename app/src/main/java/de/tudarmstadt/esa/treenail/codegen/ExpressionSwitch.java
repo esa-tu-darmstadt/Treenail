@@ -31,6 +31,7 @@ import java.util.Stack;
 import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 
+// TODO: unions don't really need to have values extracted from them
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private final AnalysisContext ac;
   private final ConstructionContext cc;
@@ -146,17 +147,16 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
 
     private static final class UnionMemberStore extends StoreOperation {
-      MLIRValue unionVal;
+      MLIRUnionType unionType;
       String memberName;
-      UnionMemberStore(MLIRValue unionVal, String memberName) {
-        assert unionVal.type instanceof MLIRUnionType;
-        this.unionVal = unionVal;
+      UnionMemberStore(MLIRUnionType unionType, String memberName) {
+        this.unionType = unionType;
         this.memberName = memberName;
       }
 
       @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
-        var resultValue = cc.makeAnonymousValue(unionVal.type);
+        var resultValue = cc.makeAnonymousValue(unionType);
         cc.emitLn("%s = hw.union_create \"%s\", %s : %s", resultValue,
                   memberName, toStore, resultValue.type);
         return resultValue;
@@ -330,7 +330,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         return new StructMemberStore(entityVal, memberName);
       } else {
         assert entityVal.type instanceof MLIRUnionType;
-        return new UnionMemberStore(entityVal, memberName);
+        return new UnionMemberStore((MLIRUnionType)entityVal.type, memberName);
       }
     }
 
