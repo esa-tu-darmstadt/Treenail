@@ -20,6 +20,11 @@ class MLIRIntType extends MLIRType {
     this.isSigned = isSigned;
   }
 
+  @Override
+  int getBitWidth() {
+    return width;
+  }
+
   static MLIRIntType getType(int width, boolean isSigned) {
     var map = isSigned ? signedTypes : unsignedTypes;
     if (!map.containsKey(width)) {

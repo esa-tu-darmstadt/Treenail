@@ -13,6 +13,11 @@ class MLIRSignlessIntType extends MLIRType {
     this.width = width;
   }
 
+  @Override
+  int getBitWidth() {
+    return width;
+  }
+
   public static MLIRSignlessIntType getType(int width) {
     if (!types.containsKey(width)) {
       var res = new MLIRSignlessIntType(width);
