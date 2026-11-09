@@ -92,6 +92,18 @@ class ConstructionContext {
                          type);
   }
 
+  private MLIRValue makeZeroed(MLIRType type) {
+    if (type instanceof MLIRStructType structType) {
+      return makeZeroedStruct(structType);
+    } else if (type instanceof MLIRUnionType unionType) {
+      return makeZeroedUnion(unionType);
+    } else if (type instanceof MLIRIntType intType) {
+      return makeConst(BigInteger.ZERO, intType);
+    }
+    assert false : "Type " + type + " cannot be zeroed";
+    return null;
+  }
+
   MLIRValue makeZeroedStruct(MLIRStructType type) {
     var members = type.getMembers();
     var vals = new ArrayList<MLIRValue>();
@@ -117,6 +129,38 @@ class ConstructionContext {
     }
     emitLn(") : %s", type);
     return res;
+  }
+
+  MLIRValue makeZeroedUnion(MLIRUnionType type) {
+    // Find largest member of the union and create a union with that member zeroed
+    int maxWidth = 0;
+    MLIRType largestMemberType = null;
+    String largestMemberName = null;
+    var members = type.getMembers();
+    for (var memberName : members.keySet()) {
+      var member = members.get(memberName);
+      int width = member.getBitWidth();
+      if (width > maxWidth) {
+        maxWidth = width;
+        largestMemberName = memberName;
+        largestMemberType = member;
+      }
+    }
+    assert largestMemberType != null : "Union must have at least one member";
+    var zeroed = makeZeroed(largestMemberType);
+    var result = makeAnonymousValue(type);
+    emitLn("%s = hw.union_create \"%s\", %s : %s", result, largestMemberName, zeroed, type);
+    return result;
+  }
+
+  MLIRValue emitMemberExtract(MLIRValue structOrUnion, String memberName) {
+    assert structOrUnion.type instanceof MLIRStructUnionCommon;
+    var type = (MLIRStructUnionCommon)structOrUnion.type;
+    var memberType = type.getMemberType(memberName);
+    var result = makeAnonymousValue(memberType);
+    String structOrUnionString = type instanceof MLIRStructType ? "struct" : "union";
+    emitLn("%s = hw.%s_extract %s[\"%s\"] : %s", result, structOrUnionString, structOrUnion, memberName, type);
+    return result;
   }
 
   MLIRValue makeConst(BigInteger value, MLIRIntType type) {
