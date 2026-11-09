@@ -92,7 +92,7 @@ class ConstructionContext {
                          type);
   }
 
-  private MLIRValue makeZeroed(MLIRType type) {
+  MLIRValue makeZeroed(MLIRType type) {
     if (type instanceof MLIRStructType structType) {
       return makeZeroedStruct(structType);
     } else if (type instanceof MLIRUnionType unionType) {
