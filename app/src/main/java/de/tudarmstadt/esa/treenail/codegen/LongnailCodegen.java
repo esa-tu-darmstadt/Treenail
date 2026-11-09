@@ -149,6 +149,21 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     return true;
   }
 
+  private static LinkedHashMap<String, MLIRType> getStructOrUnionMembers(List<Declaration> memberList, ISATypes types, AnalysisContext ctx) {
+    var members = new LinkedHashMap<String, MLIRType>();
+    for (var member : memberList) {
+      assert !member.getQualifiers().contains(TypeQualifier.VOLATILE)
+              : "NYI: Volatile struct members";
+      var memberType =
+              types.mapType(ctx.getSpecifiedType(member.getType()));
+      for (var dtor : member.getDeclarators()) {
+        var memberName = dtor.getName();
+        members.put(memberName, memberType);
+      }
+    }
+    return members;
+  }
+
   private String emitISA(ISA isa, AnalysisContext ctx) {
     var sb = new StringBuilder();
 
@@ -156,20 +171,11 @@ public class LongnailCodegen implements ValidationMessageAcceptor {
     sb.append(format("coredsl.isax \"%s\" {\n", isa.getName()));
     for (var typeDecl : isa.getTypeDeclarations()) {
       if (typeDecl instanceof StructTypeDeclaration structDecl) {
-        var members = new LinkedHashMap<String, MLIRType>();
-        for (var member : structDecl.getMembers()) {
-          assert !member.getQualifiers().contains(TypeQualifier.VOLATILE)
-              : "NYI: Volatile struct members";
-          var memberType =
-              types.mapType(ctx.getSpecifiedType(member.getType()));
-          for (var dtor : member.getDeclarators()) {
-            var memberName = dtor.getName();
-            members.put(memberName, memberType);
-          }
-        }
+        var members = getStructOrUnionMembers(structDecl.getMembers(), types, ctx);
         types.registerStructType(structDecl.getName(), members);
-      } else if (typeDecl instanceof UnionTypeDeclaration) {
-        assert false : "NYI: Unions";
+      } else if (typeDecl instanceof UnionTypeDeclaration unionDecl) {
+        var members = getStructOrUnionMembers(unionDecl.getMembers(), types, ctx);
+        types.registerUnionType(unionDecl.getName(), members);
       } else if (typeDecl instanceof EnumTypeDeclaration) {
         assert false : "NYI: Enums";
       }
