@@ -92,8 +92,8 @@ class StatementSwitch extends CoreDslSwitch<Object> {
             exprSwitch.doSwitch(((ExpressionInitializer)init).getValue());
         var castValue = cc.makeCast(value, MLIRIntType.mapType(type));
         cc.setValue(dtor, castValue);
-      } else if (type.isStructType()) {
-        var mlirType = types.mapStructType(type);
+      } else if (type.isStructType() || type.isUnionType()) {
+        var mlirType = types.mapStructOrUnionType(type);
         var init = dtor.getInitializer();
         if (init instanceof ExpressionInitializer exprInit) {
           var val =
@@ -102,11 +102,11 @@ class StatementSwitch extends CoreDslSwitch<Object> {
         } else if (init != null) {
           assert false : "NYI: List Initializers";
         } else {
-          var zeroedValue = cc.makeZeroedStruct(mlirType);
+          var zeroedValue = cc.makeZeroed(mlirType);
           cc.setValue(dtor, zeroedValue);
         }
       } else {
-        assert false : "NYI: local arrays and unions";
+        assert false : "NYI: local arrays";
       }
     }
 
