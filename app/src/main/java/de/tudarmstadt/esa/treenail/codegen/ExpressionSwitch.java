@@ -31,7 +31,6 @@ import java.util.Stack;
 import java.util.stream.Collectors;
 import org.eclipse.emf.ecore.EObject;
 
-// TODO: unions don't really need to have values extracted from them
 class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
   private final AnalysisContext ac;
   private final ConstructionContext cc;
@@ -324,16 +323,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       return returnValue;
     }
 
-    static StoreOperation createStructUnionStore(MLIRValue entityVal,
-                                                 String memberName) {
-      if (entityVal.type instanceof MLIRStructType) {
-        return new StructMemberStore(entityVal, memberName);
-      } else {
-        assert entityVal.type instanceof MLIRUnionType;
-        return new UnionMemberStore((MLIRUnionType)entityVal.type, memberName);
-      }
-    }
-
     @Override
     public MLIRValue
     caseMemberAccessExpression(MemberAccessExpression memberAccess) {
@@ -342,29 +331,29 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       final String memberName = memberAccess.getDeclarator().getName();
       MLIRValue resultValue = null;
       MLIRValue storeDestination;
+      MLIRStructUnionCommon destinationType;
       if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
         var targetEntity = targetEntityRef.getTarget();
         storeDestination = cc.getValue(targetEntity);
         var declaredType = ac.getDeclaredType(targetEntity);
         assert declaredType.isStructType() || declaredType.isUnionType();
-        var structOrUnion = types.mapStructOrUnionType(declaredType);
-        final boolean isArchitecturalState = storeDestination == null;
-        // TODO: this also is not necessary for unions
-        //  could also remove some other unnecessary loads while we're at it
-        if (isArchitecturalState) {
-          storeDestination = cc.makeAnonymousValue(structOrUnion);
+        destinationType = types.mapStructOrUnionType(declaredType);
+        // Structs need the original value to be fetched, but unions don't,
+        // because unions are always overwritten
+        if (storeDestination == null && destinationType instanceof
+                                            MLIRStructType) {
+          storeDestination = cc.makeAnonymousValue(destinationType);
           cc.emitLn("%s = coredsl.get @%s : %s", storeDestination,
-                    targetEntity.getName(), structOrUnion);
+                    targetEntity.getName(), destinationType);
         }
         storeStack.push(
-                new DirectNamedEntityStore(targetEntity, structOrUnion));
+            new DirectNamedEntityStore(targetEntity, destinationType));
         resultValue = storeDestination;
       } else {
         isNestedLvalue = true;
         storeDestination = doSwitch(memberAccess.getTarget());
+        destinationType = (MLIRStructUnionCommon)storeDestination.type;
       }
-      assert storeDestination.type instanceof MLIRStructType ||
-              storeDestination.type instanceof MLIRUnionType;
       // If this is top level, we don't need to extract the member because we
       // can write it directly
       // We also don't need to extract a value from unions, because they are
@@ -373,7 +362,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       if (!isTopLevel && storeDestination.type instanceof MLIRStructType) {
         resultValue = cc.emitMemberExtract(storeDestination, memberName);
       }
-      storeStack.push(createStructUnionStore(storeDestination, memberName));
+      if (destinationType instanceof MLIRUnionType) {
+        storeStack.push(
+            new UnionMemberStore((MLIRUnionType)destinationType, memberName));
+      } else {
+        assert storeDestination != null;
+        storeStack.push(new StructMemberStore(storeDestination, memberName));
+      }
       if (isTopLevel) {
         return resolveStoreStack(accessType);
       }
