@@ -341,38 +341,39 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       final boolean isTopLevel = !isNestedLvalue;
       final String memberName = memberAccess.getDeclarator().getName();
       MLIRValue resultValue = null;
+      MLIRValue storeDestination;
       if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
         var targetEntity = targetEntityRef.getTarget();
-        var entityVal = cc.getValue(targetEntity);
+        storeDestination = cc.getValue(targetEntity);
         var declaredType = ac.getDeclaredType(targetEntity);
         assert declaredType.isStructType() || declaredType.isUnionType();
         var structOrUnion = types.mapStructOrUnionType(declaredType);
-        final boolean isArchitecturalState = entityVal == null;
+        final boolean isArchitecturalState = storeDestination == null;
+        // TODO: this also is not necessary for unions
+        //  could also remove some other unnecessary loads while we're at it
         if (isArchitecturalState) {
-          entityVal = cc.makeAnonymousValue(structOrUnion);
-          cc.emitLn("%s = coredsl.get @%s : %s", entityVal,
+          storeDestination = cc.makeAnonymousValue(structOrUnion);
+          cc.emitLn("%s = coredsl.get @%s : %s", storeDestination,
                     targetEntity.getName(), structOrUnion);
         }
-        resultValue = entityVal;
-        // If this is top level, we don't need to extract the member because we
-        // can write it directly
-        if (!isTopLevel) {
-          resultValue = cc.emitMemberExtract(entityVal, memberName);
-        }
-        assert entityVal != null;
         storeStack.push(
-            new DirectNamedEntityStore(targetEntity, structOrUnion));
-        storeStack.push(createStructUnionStore(entityVal, memberName));
+                new DirectNamedEntityStore(targetEntity, structOrUnion));
+        resultValue = storeDestination;
       } else {
         isNestedLvalue = true;
-        var valueToStore = doSwitch(memberAccess.getTarget());
-        assert valueToStore.type instanceof MLIRStructType ||
-            valueToStore.type instanceof MLIRUnionType;
-        if (!isTopLevel) {
-          resultValue = cc.emitMemberExtract(valueToStore, memberName);
-        }
-        storeStack.push(createStructUnionStore(valueToStore, memberName));
+        storeDestination = doSwitch(memberAccess.getTarget());
       }
+      assert storeDestination.type instanceof MLIRStructType ||
+              storeDestination.type instanceof MLIRUnionType;
+      // If this is top level, we don't need to extract the member because we
+      // can write it directly
+      // We also don't need to extract a value from unions, because they are
+      // always overwritten
+      // TODO: does this work properly with unions
+      if (!isTopLevel && storeDestination.type instanceof MLIRStructType) {
+        resultValue = cc.emitMemberExtract(storeDestination, memberName);
+      }
+      storeStack.push(createStructUnionStore(storeDestination, memberName));
       if (isTopLevel) {
         return resolveStoreStack(accessType);
       }
