@@ -260,8 +260,10 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           assert !isLocal : "NYI: local arrays";
           if (!isTopLevel) {
             var writtenValue = cc.makeAnonymousValue(accessType);
-            cc.emitLn("%s = coredsl.get @%s[%s] : %s", writtenValue,
-                      entity.getName(), index, accessType);
+            if (!(accessType instanceof MLIRUnionType)) {
+              cc.emitLn("%s = coredsl.get @%s[%s] : %s", writtenValue,
+                        entity.getName(), index, accessType);
+            }
             returnValue = writtenValue;
           }
         }
