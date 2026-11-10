@@ -329,7 +329,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       final var accessType = types.mapType(ac.getExpressionType(memberAccess));
       final boolean isTopLevel = !isNestedLvalue;
       final String memberName = memberAccess.getDeclarator().getName();
-      MLIRValue resultValue = null;
       MLIRValue storeDestination;
       MLIRStructUnionCommon destinationType;
       if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
@@ -348,29 +347,31 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         }
         storeStack.push(
             new DirectNamedEntityStore(targetEntity, destinationType));
-        resultValue = storeDestination;
       } else {
         isNestedLvalue = true;
         storeDestination = doSwitch(memberAccess.getTarget());
         destinationType = (MLIRStructUnionCommon)storeDestination.type;
       }
-      // If this is top level, we don't need to extract the member because we
-      // can write it directly
-      // We also don't need to extract a value from unions, because they are
-      // always overwritten
-      // TODO: does this work properly with unions
-      if (!isTopLevel && storeDestination.type instanceof MLIRStructType) {
-        resultValue = cc.emitMemberExtract(storeDestination, memberName);
-      }
       if (destinationType instanceof MLIRUnionType) {
         storeStack.push(
-            new UnionMemberStore((MLIRUnionType)destinationType, memberName));
+                new UnionMemberStore((MLIRUnionType)destinationType, memberName));
       } else {
         assert storeDestination != null;
         storeStack.push(new StructMemberStore(storeDestination, memberName));
       }
+      MLIRValue resultValue = null;
+      // If this is top level, we don't need to extract the member because we
+      // can write it directly
+      // We also don't need to extract a value from unions, because they are
+      // always overwritten
       if (isTopLevel) {
         return resolveStoreStack(accessType);
+      } else if (destinationType instanceof MLIRStructType) {
+        resultValue = cc.emitMemberExtract(storeDestination, memberName);
+      }
+      if (resultValue == null) {
+        // TODO: this anonymous value is only ever used for its type
+        return cc.makeAnonymousValue(accessType);
       }
       assert resultValue != null;
       return resultValue;
