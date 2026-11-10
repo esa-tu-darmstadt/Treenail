@@ -146,19 +146,21 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     }
 
     private static final class UnionMemberStore extends StoreOperation {
-      MLIRUnionType unionType;
+      // NOTE: this needs to be a value that has not been written yet, like the
+      // return value of cc.makeAnonymousValue()
+      MLIRValue unionVal;
       String memberName;
-      UnionMemberStore(MLIRUnionType unionType, String memberName) {
-        this.unionType = unionType;
+      UnionMemberStore(MLIRValue unionVal, String memberName) {
+        assert unionVal.type instanceof MLIRUnionType;
+        this.unionVal = unionVal;
         this.memberName = memberName;
       }
 
       @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
-        var resultValue = cc.makeAnonymousValue(unionType);
-        cc.emitLn("%s = hw.union_create \"%s\", %s : %s", resultValue,
-                  memberName, toStore, resultValue.type);
-        return resultValue;
+        cc.emitLn("%s = hw.union_create \"%s\", %s : %s", unionVal, memberName,
+                  toStore, unionVal.type);
+        return unionVal;
       }
     }
 
@@ -330,51 +332,40 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       final boolean isTopLevel = !isNestedLvalue;
       final String memberName = memberAccess.getDeclarator().getName();
       MLIRValue storeDestination;
-      MLIRStructUnionCommon destinationType;
       if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
         var targetEntity = targetEntityRef.getTarget();
         storeDestination = cc.getValue(targetEntity);
         var declaredType = ac.getDeclaredType(targetEntity);
         assert declaredType.isStructType() || declaredType.isUnionType();
-        destinationType = types.mapStructOrUnionType(declaredType);
-        // Structs need the original value to be fetched, but unions don't,
-        // because unions are always overwritten
-        if (storeDestination == null && destinationType instanceof
-                                            MLIRStructType) {
+        var destinationType = types.mapStructOrUnionType(declaredType);
+        if (storeDestination == null) {
+          // Structs need the original value to be fetched, but unions don't,
+          // because unions are always overwritten
           storeDestination = cc.makeAnonymousValue(destinationType);
-          cc.emitLn("%s = coredsl.get @%s : %s", storeDestination,
-                    targetEntity.getName(), destinationType);
+          if (destinationType instanceof MLIRStructType) {
+            cc.emitLn("%s = coredsl.get @%s : %s", storeDestination,
+                      targetEntity.getName(), destinationType);
+          }
         }
         storeStack.push(
             new DirectNamedEntityStore(targetEntity, destinationType));
       } else {
         isNestedLvalue = true;
         storeDestination = doSwitch(memberAccess.getTarget());
-        destinationType = (MLIRStructUnionCommon)storeDestination.type;
       }
-      if (destinationType instanceof MLIRUnionType) {
-        storeStack.push(
-                new UnionMemberStore((MLIRUnionType)destinationType, memberName));
+      assert storeDestination != null;
+      if (storeDestination.type instanceof MLIRUnionType) {
+        storeStack.push(new UnionMemberStore(storeDestination, memberName));
       } else {
-        assert storeDestination != null;
         storeStack.push(new StructMemberStore(storeDestination, memberName));
       }
-      MLIRValue resultValue = null;
-      // If this is top level, we don't need to extract the member because we
-      // can write it directly
-      // We also don't need to extract a value from unions, because they are
-      // always overwritten
       if (isTopLevel) {
         return resolveStoreStack(accessType);
-      } else if (destinationType instanceof MLIRStructType) {
-        resultValue = cc.emitMemberExtract(storeDestination, memberName);
-      }
-      if (resultValue == null) {
-        // TODO: this anonymous value is only ever used for its type
+      } else if (storeDestination.type instanceof MLIRStructType) {
+        return cc.emitMemberExtract(storeDestination, memberName);
+      } else {
         return cc.makeAnonymousValue(accessType);
       }
-      assert resultValue != null;
-      return resultValue;
     }
 
     @Override
