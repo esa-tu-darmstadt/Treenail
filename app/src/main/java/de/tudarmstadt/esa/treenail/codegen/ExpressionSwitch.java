@@ -337,18 +337,19 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       MLIRValue storeDestination;
       if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
         var targetEntity = targetEntityRef.getTarget();
-        storeDestination = cc.getValue(targetEntity);
         var declaredType = ac.getDeclaredType(targetEntity);
-        assert declaredType.isStructType() || declaredType.isUnionType();
         var destinationType = types.mapStructOrUnionType(declaredType);
+        storeDestination = destinationType instanceof MLIRUnionType
+                               ? cc.makeAnonymousValue(destinationType)
+                               : cc.getValue(targetEntity);
+        assert declaredType.isStructType() || declaredType.isUnionType();
         if (storeDestination == null) {
           // Structs need the original value to be fetched, but unions don't,
           // because unions are always overwritten
           storeDestination = cc.makeAnonymousValue(destinationType);
-          if (destinationType instanceof MLIRStructType) {
-            cc.emitLn("%s = coredsl.get @%s : %s", storeDestination,
-                      targetEntity.getName(), destinationType);
-          }
+          assert destinationType instanceof MLIRStructType;
+          cc.emitLn("%s = coredsl.get @%s : %s", storeDestination,
+                    targetEntity.getName(), destinationType);
         }
         storeStack.push(
             new DirectNamedEntityStore(targetEntity, destinationType));
