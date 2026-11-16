@@ -108,13 +108,14 @@ class ConstructionContext {
     var members = type.getMembers();
     var vals = new ArrayList<MLIRValue>();
     for (var memberType : members.values()) {
-      if (memberType instanceof MLIRIntType intType) {
-        vals.add(makeConst(BigInteger.ZERO, intType));
-      } else if (memberType instanceof MLIRStructType structType) {
-        vals.add(makeZeroedStruct(structType));
-      } else {
-        assert false : "NYI: Array or union struct members";
-      }
+        switch (memberType) {
+            case MLIRIntType intType -> vals.add(makeConst(BigInteger.ZERO, intType));
+            case MLIRStructType structType -> vals.add(makeZeroedStruct(structType));
+            case MLIRUnionType unionType -> vals.add(makeZeroedUnion(unionType));
+            case null, default -> {
+                assert false : "NYI: Union struct members";
+            }
+        }
     }
     var res = makeAnonymousValue(type);
     emit("%s = hw.struct_create (", res);
