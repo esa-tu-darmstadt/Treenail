@@ -149,19 +149,19 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     private static final class UnionMemberStore extends StoreOperation {
       // NOTE: this needs to be a value that has not been written yet, like the
       // return value of cc.makeAnonymousValue()
-      MLIRValue unionVal;
+      MLIRUnionType unionType;
       String memberName;
-      UnionMemberStore(MLIRValue unionVal, String memberName) {
-        assert unionVal.type instanceof MLIRUnionType;
-        this.unionVal = unionVal;
+      UnionMemberStore(MLIRUnionType unionType, String memberName) {
+        this.unionType = unionType;
         this.memberName = memberName;
       }
 
       @Override
       MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore) {
-        cc.emitLn("%s = hw.union_create \"%s\", %s : %s", unionVal, memberName,
-                  toStore, unionVal.type);
-        return unionVal;
+        var result = cc.makeAnonymousValue(unionType);
+        cc.emitLn("%s = hw.union_create \"%s\", %s : %s", result, memberName,
+                  toStore, unionType);
+        return result;
       }
     }
 
@@ -339,15 +339,12 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var targetEntity = targetEntityRef.getTarget();
         var declaredType = ac.getDeclaredType(targetEntity);
         var destinationType = types.mapStructOrUnionType(declaredType);
-        storeDestination = destinationType instanceof MLIRUnionType
-                               ? cc.makeAnonymousValue(destinationType)
-                               : cc.getValue(targetEntity);
+        // Structs need the original value to be fetched, but unions don't,
+        // because unions are always overwritten
+        storeDestination = cc.getValue(targetEntity);
         assert declaredType.isStructType() || declaredType.isUnionType();
         if (storeDestination == null) {
-          // Structs need the original value to be fetched, but unions don't,
-          // because unions are always overwritten
           storeDestination = cc.makeAnonymousValue(destinationType);
-          assert destinationType instanceof MLIRStructType;
           cc.emitLn("%s = coredsl.get @%s : %s", storeDestination,
                     targetEntity.getName(), destinationType);
         }
@@ -358,17 +355,17 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         storeDestination = doSwitch(memberAccess.getTarget());
       }
       assert storeDestination != null;
-      if (storeDestination.type instanceof MLIRUnionType) {
-        storeStack.push(new UnionMemberStore(storeDestination, memberName));
+      if (storeDestination.type instanceof MLIRUnionType unionType) {
+        storeStack.push(new UnionMemberStore(unionType, memberName));
       } else {
         storeStack.push(new StructMemberStore(storeDestination, memberName));
       }
       if (isTopLevel) {
         return resolveStoreStack(accessType);
-      } else if (storeDestination.type instanceof MLIRStructType) {
-        return cc.emitMemberExtract(storeDestination, memberName);
       } else {
-        return cc.makeAnonymousValue(accessType);
+        // TODO: if union members are written directly, we don't need to extract them
+        //  is it worth it to remove this? Will be removed by canonicalizer anyways
+        return cc.emitMemberExtract(storeDestination, memberName);
       }
     }
 
