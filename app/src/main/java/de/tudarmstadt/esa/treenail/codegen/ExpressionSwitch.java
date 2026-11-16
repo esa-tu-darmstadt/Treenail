@@ -12,6 +12,7 @@ import com.minres.coredsl.coreDsl.CastExpression;
 import com.minres.coredsl.coreDsl.ConcatenationExpression;
 import com.minres.coredsl.coreDsl.ConditionalExpression;
 import com.minres.coredsl.coreDsl.EntityReference;
+import com.minres.coredsl.coreDsl.Expression;
 import com.minres.coredsl.coreDsl.FunctionCallExpression;
 import com.minres.coredsl.coreDsl.FunctionDefinition;
 import com.minres.coredsl.coreDsl.IndexAccessExpression;
@@ -45,9 +46,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
 
   class StoreSwitch extends CoreDslSwitch<MLIRValue> {
     private final MLIRValue newValue;
-    private boolean isNestedLvalue = false;
     private static abstract class StoreOperation {
       abstract MLIRValue emitStore(ConstructionContext cc, MLIRValue toStore);
+    }
+
+    private static boolean isTopLevel(Expression e) {
+      return e.eContainer() instanceof AssignmentExpression ||
+          e.eContainer() instanceof PrefixExpression ||
+          e.eContainer() instanceof PostfixExpression;
     }
 
     private static final class BitFieldIntermediateStore
@@ -234,7 +240,7 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       var accessType = types.mapType(ac.getExpressionType(access));
       var index = RangeAnalyzer.analyze(access.getIndex(), access.getEndIndex(),
                                         targetType, cc, ExpressionSwitch.this);
-      final boolean isTopLevel = !isNestedLvalue;
+      final boolean isTopLevel = isTopLevel(access);
       MLIRValue returnValue = null;
       if (target instanceof EntityReference) {
         // For non-nested stores, we need to differentiate between top-level
@@ -296,7 +302,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         // (Steps 3-4).
         // Note that the output MLIR needs to create new temporaries for each
         // store into a temporary, due to being in SSA form
-        isNestedLvalue = true;
         var valueToStore = doSwitch(target);
         returnValue = valueToStore;
         // For top-level accesses, we can directly write to the result, rather
@@ -332,7 +337,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     public MLIRValue
     caseMemberAccessExpression(MemberAccessExpression memberAccess) {
       final var accessType = types.mapType(ac.getExpressionType(memberAccess));
-      final boolean isTopLevel = !isNestedLvalue;
       final String memberName = memberAccess.getDeclarator().getName();
       MLIRValue storeDestination;
       if (memberAccess.getTarget() instanceof EntityReference targetEntityRef) {
@@ -349,7 +353,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         storeStack.push(
             new DirectNamedEntityStore(targetEntity, destinationType));
       } else {
-        isNestedLvalue = true;
         storeDestination = doSwitch(memberAccess.getTarget());
       }
       assert storeDestination != null;
@@ -358,11 +361,14 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       } else {
         storeStack.push(new StructMemberStore(storeDestination, memberName));
       }
-      if (isTopLevel) {
+      if (isTopLevel(memberAccess)) {
         return resolveStoreStack(accessType);
       } else {
-        // TODO: if union members are written directly, we don't need to extract them
-        //  is it worth it to remove this? Will be removed by canonicalizer anyways
+        // TODO: if union members are written directly, we don't need to extract
+        // them
+        //  is it worth it to remove this? Will be removed by canonicalizer
+        //  anyways we can determine if the parent is top level, but what do we
+        //  return then?
         return cc.emitMemberExtract(storeDestination, memberName);
       }
     }
