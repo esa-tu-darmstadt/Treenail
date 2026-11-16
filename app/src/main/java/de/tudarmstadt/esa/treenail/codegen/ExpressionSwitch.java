@@ -339,8 +339,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
         var targetEntity = targetEntityRef.getTarget();
         var declaredType = ac.getDeclaredType(targetEntity);
         var destinationType = types.mapStructOrUnionType(declaredType);
-        // Structs need the original value to be fetched, but unions don't,
-        // because unions are always overwritten
         storeDestination = cc.getValue(targetEntity);
         assert declaredType.isStructType() || declaredType.isUnionType();
         if (storeDestination == null) {
