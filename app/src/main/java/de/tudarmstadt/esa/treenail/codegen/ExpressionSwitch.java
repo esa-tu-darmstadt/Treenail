@@ -7,6 +7,7 @@ import static java.util.stream.Collectors.joining;
 import com.google.common.collect.Streams;
 import com.minres.coredsl.analysis.AnalysisContext;
 import com.minres.coredsl.coreDsl.AssignmentExpression;
+import com.minres.coredsl.coreDsl.BoolConstant;
 import com.minres.coredsl.coreDsl.CastExpression;
 import com.minres.coredsl.coreDsl.ConcatenationExpression;
 import com.minres.coredsl.coreDsl.ConditionalExpression;
@@ -445,6 +446,13 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
     var type = MLIRIntType.mapType(ac.getExpressionType(konst));
     var value = cc.getConstantValue(konst, type);
     return cc.makeConst(value, type);
+  }
+
+  @Override
+  public MLIRValue caseBoolConstant(BoolConstant boolConstant) {
+    BigInteger value =
+        boolConstant.isValue() ? BigInteger.ONE : BigInteger.ZERO;
+    return cc.makeConst(value, MLIRIntType.getType(1, false));
   }
 
   @Override
