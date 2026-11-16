@@ -113,7 +113,7 @@ class ConstructionContext {
             case MLIRStructType structType -> vals.add(makeZeroedStruct(structType));
             case MLIRUnionType unionType -> vals.add(makeZeroedUnion(unionType));
             case null, default -> {
-                assert false : "NYI: Union struct members";
+                assert false : "NYI: Array struct members";
             }
         }
     }
