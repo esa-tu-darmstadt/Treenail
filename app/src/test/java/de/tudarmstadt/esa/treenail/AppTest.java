@@ -1690,6 +1690,10 @@ class AppTest {
         %42 = hw.struct_inject %40["x"], %41 : !hw.struct<x: ui64, y: ui64, z: ui64>
         %43 = hw.union_create "v", %42 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>
         %44 = hw.struct_inject %37["val"], %43 : !hw.struct<aValue: ui32, val: !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>>
+        %45 = hwarith.constant 0 : ui32
+        %46 = hw.union_create "uint", %45 : !hw.union<uint: ui32, sint: si32>
+        %47 = hwarith.constant 1 : ui1
+        %48 = func.call @unionIdentity(%47, %46) : (ui1, !hw.union<uint: ui32, sint: si32>) -> !hw.union<uint: ui32, sint: si32>
     """));
     // UnionReg
     assertTrue(mlirCode.contains("""

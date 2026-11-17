@@ -8,7 +8,6 @@ InstructionSet Unions {
       union Simple nested;
       unsigned<128> notNested;
     }
-    // TODO: does this fit better into nested_lvalues.core_desc
     struct StructWithUnion {
       bool isNested;
       union NestedUnion onion;
@@ -38,8 +37,6 @@ InstructionSet Unions {
     register union UnionWithStruct UNIONS_WITH_STRUCTS[64];
   }
 
-  // TODO: zeroing struct that contains a union that contains a struct
-
   functions {
     union Simple unionIdentity(bool isUint, union Simple v) {
       union Simple result;
@@ -66,6 +63,8 @@ InstructionSet Unions {
         unionWithStruct.v.y = 2;
         struct StructUnionStruct structUnionStruct;
         structUnionStruct.val.v.x = 100;
+        union Simple simple;
+        simple = unionIdentity(true, simple);
       }
     }
     UnionReg {
