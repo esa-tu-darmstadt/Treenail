@@ -23,6 +23,8 @@ InstructionSet Unions {
     register union Simple SIMPLE_UNION;
     register union NestedUnion NESTED_UNION;
     register union NestedUnion NESTED_UNIONS[32];
+    register struct StructWithUnion STRUCTS_WITH_UNION[64];
+    register union UnionWithStruct UNIONS_WITH_STRUCTS[64];
   }
 
   // TODO: zeroing struct that contains a union that contains a struct
@@ -60,6 +62,8 @@ InstructionSet Unions {
         NESTED_UNION.nested = SIMPLE_UNION;
         NESTED_UNION.nested.uint = SIMPLE_UNION.uint;
         NESTED_UNIONS[rs1].nested.uint[16:0] = 3;
+        STRUCTS_WITH_UNION[rs1].onion.nested.uint = 34;
+        UNIONS_WITH_STRUCTS[rd].v.x = 100;
       }
     }
   }

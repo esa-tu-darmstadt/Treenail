@@ -1704,6 +1704,24 @@ class AppTest {
         %19 = hw.union_create "uint", %18 : !hw.union<uint: ui32, sint: si32>
         %20 = hw.union_create "nested", %19 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
         coredsl.set @NESTED_UNIONS[%rs1 : ui5] = %20 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %21 = hwarith.constant 34 : ui6
+        %22 = coredsl.cast %rs1 : ui5 to ui6
+        %23 = coredsl.get @STRUCTS_WITH_UNION[%22 : ui6] : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        %24 = hw.struct_extract %23["onion"] : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        %25 = hw.union_extract %24["nested"] : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %26 = coredsl.cast %21 : ui6 to ui32
+        %27 = hw.union_create "uint", %26 : !hw.union<uint: ui32, sint: si32>
+        %28 = hw.union_create "nested", %27 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %29 = hw.struct_inject %23["onion"], %28 : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        coredsl.set @STRUCTS_WITH_UNION[%22 : ui6] = %29 : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        %30 = hwarith.constant 100 : ui7
+        %31 = coredsl.cast %rd : ui5 to ui6
+        %32 = coredsl.get @UNIONS_WITH_STRUCTS[%31 : ui6] : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        %33 = hw.union_extract %32["v"] : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        %34 = coredsl.cast %30 : ui7 to ui32
+        %35 = hw.struct_inject %33["x"], %34 : !hw.struct<x: ui32, y: ui32>
+        %36 = hw.union_create "v", %35 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        coredsl.set @UNIONS_WITH_STRUCTS[%31 : ui6] = %36 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
     """));
     // clang-format on
     assertFalse(true);
