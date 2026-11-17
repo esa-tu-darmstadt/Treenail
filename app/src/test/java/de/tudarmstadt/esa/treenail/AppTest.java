@@ -1626,6 +1626,58 @@ class AppTest {
     var content = appInst.parse(fileName);
     var mlirCode = appInst.generateMLIR(content);
     assertNotNull(mlirCode);
+    // clang-format off
+    // unionIdentity
+    assertTrue(mlirCode.contains("""
+        %0 = hwarith.constant 0 : ui32
+        %1 = hw.union_create "uint", %0 : !hw.union<uint: ui32, sint: si32>
+        %2 = coredsl.cast %isUint : ui1 to i1
+        %3 = scf.if %2 -> (!hw.union<uint: ui32, sint: si32>) {
+          %3 = hw.union_extract %v["uint"] : !hw.union<uint: ui32, sint: si32>
+          %4 = hw.union_create "uint", %3 : !hw.union<uint: ui32, sint: si32>
+          scf.yield %4 : !hw.union<uint: ui32, sint: si32>
+        } else {
+          %3 = hw.union_extract %v["sint"] : !hw.union<uint: ui32, sint: si32>
+          %4 = hw.union_create "sint", %3 : !hw.union<uint: ui32, sint: si32>
+          scf.yield %4 : !hw.union<uint: ui32, sint: si32>
+        }
+        return %3 : !hw.union<uint: ui32, sint: si32>
+    """));
+    // UnionLocalVals
+    assertTrue(mlirCode.contains("""
+        %0 = hwarith.constant 0 : ui128
+        %1 = hw.union_create "notNested", %0 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %2 = hwarith.constant 10 : ui4
+        %3 = hw.union_extract %1["nested"] : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %4 = coredsl.cast %2 : ui4 to ui32
+        %5 = hw.union_create "uint", %4 : !hw.union<uint: ui32, sint: si32>
+        %6 = hw.union_create "nested", %5 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %7 = hwarith.constant 0 : ui1
+        %8 = hwarith.constant 0 : ui128
+        %9 = hw.union_create "notNested", %8 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %10 = hw.struct_create (%7, %9) : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        %11 = hwarith.constant 1 : ui1
+        %12 = hw.struct_inject %10["isNested"], %11 : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        %13 = hw.struct_extract %12["onion"] : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        %14 = hw.union_extract %13["nested"] : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %15 = coredsl.cast %imm : ui12 to ui32
+        %16 = hw.union_create "uint", %15 : !hw.union<uint: ui32, sint: si32>
+        %17 = hw.union_create "nested", %16 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %18 = hw.struct_inject %12["onion"], %17 : !hw.struct<isNested: ui1, onion: !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>>
+        %19 = hwarith.constant 0 : ui64
+        %20 = hw.union_create "nonStructVal", %19 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        %21 = hwarith.constant 10 : ui4
+        %22 = hw.union_extract %20["v"] : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        %23 = coredsl.cast %21 : ui4 to ui32
+        %24 = hw.struct_inject %22["x"], %23 : !hw.struct<x: ui32, y: ui32>
+        %25 = hw.union_create "v", %24 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        %26 = hwarith.constant 2 : ui2
+        %27 = hw.union_extract %25["v"] : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        %28 = coredsl.cast %26 : ui2 to ui32
+        %29 = hw.struct_inject %27["y"], %28 : !hw.struct<x: ui32, y: ui32>
+        %30 = hw.union_create "v", %29 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+    """));
+    // clang-format on
     assertFalse(true);
   }
 }

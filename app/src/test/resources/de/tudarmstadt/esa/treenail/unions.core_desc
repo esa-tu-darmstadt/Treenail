@@ -1,23 +1,65 @@
 InstructionSet Unions {
   architectural_state {
-
+    union Simple {
+      unsigned<32> uint;
+      signed<32> sint;
+    }
+    union NestedUnion {
+      union Simple nested;
+      unsigned<128> notNested;
+    }
+    // TODO: does this fit better into nested_lvalues.core_desc
+    struct StructWithUnion {
+      bool isNested;
+      union NestedUnion onion;
+    }
+    struct Vec2 {
+      unsigned<32> x, y;
+    }
+    union UnionWithStruct {
+      unsigned<64> nonStructVal;
+      struct Vec2 v;
+    }
+    register union Simple SIMPLE_UNION;
+    register union NestedUnion NESTED_UNION;
+    register union NestedUnion NESTED_UNIONS[32];
   }
 
-  functions {
+  // TODO: zeroing struct that contains a union that contains a struct
 
+  functions {
+    union Simple unionIdentity(bool isUint, union Simple v) {
+      union Simple result;
+      if (isUint) {
+        result.uint = v.uint;
+      } else {
+        result.sint = v.sint;
+      }
+      return result;
+    }
   }
 
   instructions {
     UnionLocalVals {
       encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
       behavior: {
-
+        union NestedUnion val;
+        val.nested.uint = 10;
+        struct StructWithUnion aStruct;
+        aStruct.isNested = true;
+        aStruct.onion.nested.uint = imm;
+        union UnionWithStruct unionWithStruct;
+        unionWithStruct.v.x = 10;
+        unionWithStruct.v.y = 2;
       }
     }
     UnionReg {
       encoding: imm[11:0] :: rs1[4:0] :: 3'b010 :: rd[4:0] :: 7'b0000011;
       behavior: {
-
+        SIMPLE_UNION.uint = 10;
+        NESTED_UNION.nested = SIMPLE_UNION;
+        NESTED_UNION.nested.uint = SIMPLE_UNION.uint;
+        NESTED_UNIONS[rs1].nested.uint[16:0] = 3;
       }
     }
   }
