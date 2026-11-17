@@ -20,6 +20,17 @@ InstructionSet Unions {
       unsigned<64> nonStructVal;
       struct Vec2 v;
     }
+    struct Vec3 {
+      unsigned<64> x, y, z;
+    }
+    union UnionWithBigStruct {
+      unsigned<64> nonStructVal;
+      struct Vec3 v;
+    }
+    struct StructUnionStruct {
+      unsigned<32> aValue;
+      union UnionWithBigStruct val;
+    }
     register union Simple SIMPLE_UNION;
     register union NestedUnion NESTED_UNION;
     register union NestedUnion NESTED_UNIONS[32];
@@ -53,6 +64,8 @@ InstructionSet Unions {
         union UnionWithStruct unionWithStruct;
         unionWithStruct.v.x = 10;
         unionWithStruct.v.y = 2;
+        struct StructUnionStruct structUnionStruct;
+        structUnionStruct.val.v.x = 100;
       }
     }
     UnionReg {

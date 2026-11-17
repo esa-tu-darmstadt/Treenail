@@ -1676,6 +1676,20 @@ class AppTest {
         %28 = coredsl.cast %26 : ui2 to ui32
         %29 = hw.struct_inject %27["y"], %28 : !hw.struct<x: ui32, y: ui32>
         %30 = hw.union_create "v", %29 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
+        %31 = hwarith.constant 0 : ui32
+        %32 = hwarith.constant 0 : ui64
+        %33 = hwarith.constant 0 : ui64
+        %34 = hwarith.constant 0 : ui64
+        %35 = hw.struct_create (%32, %33, %34) : !hw.struct<x: ui64, y: ui64, z: ui64>
+        %36 = hw.union_create "v", %35 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>
+        %37 = hw.struct_create (%31, %36) : !hw.struct<aValue: ui32, val: !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>>
+        %38 = hwarith.constant 100 : ui7
+        %39 = hw.struct_extract %37["val"] : !hw.struct<aValue: ui32, val: !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>>
+        %40 = hw.union_extract %39["v"] : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>
+        %41 = coredsl.cast %38 : ui7 to ui64
+        %42 = hw.struct_inject %40["x"], %41 : !hw.struct<x: ui64, y: ui64, z: ui64>
+        %43 = hw.union_create "v", %42 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>
+        %44 = hw.struct_inject %37["val"], %43 : !hw.struct<aValue: ui32, val: !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui64, y: ui64, z: ui64>>>
     """));
     // UnionReg
     assertTrue(mlirCode.contains("""
