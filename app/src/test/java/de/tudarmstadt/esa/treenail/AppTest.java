@@ -1677,6 +1677,34 @@ class AppTest {
         %29 = hw.struct_inject %27["y"], %28 : !hw.struct<x: ui32, y: ui32>
         %30 = hw.union_create "v", %29 : !hw.union<nonStructVal: ui64, v: !hw.struct<x: ui32, y: ui32>>
     """));
+    // UnionReg
+    assertTrue(mlirCode.contains("""
+        %0 = hwarith.constant 10 : ui4
+        %1 = coredsl.get @SIMPLE_UNION : !hw.union<uint: ui32, sint: si32>
+        %2 = coredsl.cast %0 : ui4 to ui32
+        %3 = hw.union_create "uint", %2 : !hw.union<uint: ui32, sint: si32>
+        coredsl.set @SIMPLE_UNION = %3 : !hw.union<uint: ui32, sint: si32>
+        %4 = coredsl.get @SIMPLE_UNION : !hw.union<uint: ui32, sint: si32>
+        %5 = coredsl.get @NESTED_UNION : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %6 = hw.union_create "nested", %4 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        coredsl.set @NESTED_UNION = %6 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %7 = coredsl.get @SIMPLE_UNION : !hw.union<uint: ui32, sint: si32>
+        %8 = hw.union_extract %7["uint"] : !hw.union<uint: ui32, sint: si32>
+        %9 = coredsl.get @NESTED_UNION : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %10 = hw.union_extract %9["nested"] : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %11 = hw.union_create "uint", %8 : !hw.union<uint: ui32, sint: si32>
+        %12 = hw.union_create "nested", %11 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        coredsl.set @NESTED_UNION = %12 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %13 = hwarith.constant 3 : ui2
+        %14 = coredsl.get @NESTED_UNIONS[%rs1 : ui5] : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %15 = hw.union_extract %14["nested"] : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        %16 = hw.union_extract %15["uint"] : !hw.union<uint: ui32, sint: si32>
+        %17 = coredsl.cast %13 : ui2 to ui17
+        %18 = coredsl.bitset %16[16:0] = %17 : (ui32, ui17) -> ui32
+        %19 = hw.union_create "uint", %18 : !hw.union<uint: ui32, sint: si32>
+        %20 = hw.union_create "nested", %19 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+        coredsl.set @NESTED_UNIONS[%rs1 : ui5] = %20 : !hw.union<nested: !hw.union<uint: ui32, sint: si32>, notNested: ui128>
+    """));
     // clang-format on
     assertFalse(true);
   }
