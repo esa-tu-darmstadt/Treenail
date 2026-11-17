@@ -267,10 +267,8 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
           assert !isLocal : "NYI: local arrays";
           if (!isTopLevel) {
             var writtenValue = cc.makeAnonymousValue(accessType);
-            if (!(accessType instanceof MLIRUnionType)) {
-              cc.emitLn("%s = coredsl.get @%s[%s] : %s", writtenValue,
-                        entity.getName(), index, accessType);
-            }
+            cc.emitLn("%s = coredsl.get @%s[%s] : %s", writtenValue,
+                      entity.getName(), index, accessType);
             returnValue = writtenValue;
           }
         }
@@ -364,11 +362,6 @@ class ExpressionSwitch extends CoreDslSwitch<MLIRValue> {
       if (isTopLevel(memberAccess)) {
         return resolveStoreStack(accessType);
       } else {
-        // TODO: if union members are written directly, we don't need to extract
-        // them
-        //  is it worth it to remove this? Will be removed by canonicalizer
-        //  anyways we can determine if the parent is top level, but what do we
-        //  return then?
         return cc.emitMemberExtract(storeDestination, memberName);
       }
     }
